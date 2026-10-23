@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a1030">
   <link rel="manifest" href="manifest.json">
-  <title>オニバスターズ</title>
+  <title>バスターズ</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,17 +19,17 @@
 
   <!-- タイトル -->
   <section id="title" class="screen active">
-    <h1>オニバスターズ</h1>
-    <p class="sub">4人で力を合わせて大鬼をたおせ！</p>
+    <h1>バスターズ</h1>
+    <p class="sub">鬼の世界で鬼玉を集めて、襖から脱出せよ！</p>
     <div class="row">
       <input id="name" maxlength="10" placeholder="なまえ">
     </div>
-    <div id="roles" class="roles"></div>
     <div class="row">
       <button id="btnCreate" class="big">ルームを作る</button>
       <input id="code" maxlength="4" placeholder="コード" autocapitalize="characters">
       <button id="btnJoin" class="big alt">参加する</button>
     </div>
+    <p id="friendCount" class="sub"></p>
     <p id="err" class="err"></p>
   </section>
 
@@ -41,28 +41,48 @@
       <button id="btnShare" class="small">招待リンクをコピー</button>
     </div>
     <ul id="plist" class="plist"></ul>
-    <div id="lobbyRoles" class="roles small"></div>
+    <p class="sub">連れていくお友達を選んでね</p>
+    <div id="friends" class="friends"></div>
     <div class="row">
-      <button id="btnStart" class="big">バトル開始！</button>
+      <button id="btnStart" class="big">鬼の世界へ！</button>
       <span id="waitMsg" class="sub">ホストの開始を待っています…</span>
     </div>
   </section>
 
-  <!-- バトル -->
+  <!-- ゲーム -->
   <section id="game" class="screen">
     <canvas id="cv"></canvas>
   </section>
 
+  <!-- 鬼ガチャ -->
+  <section id="gacha" class="screen overlay">
+    <h2 id="gachaTitle">鬼ガチャ</h2>
+    <p id="gachaSub" class="sub"></p>
+    <div id="machine" class="machine">
+      <div class="dome"><div class="balls"></div></div>
+      <div class="body"><div class="slot"></div><div class="knob"></div></div>
+      <div id="ball" class="ball"></div>
+    </div>
+    <div id="reveal" class="reveal">
+      <div id="revealIcon" class="ricon"></div>
+      <div id="revealRank" class="rrank"></div>
+      <div id="revealName" class="rname"></div>
+      <div id="revealMsg" class="sub"></div>
+    </div>
+    <p id="gachaHint" class="hint">タップしてまわす！</p>
+    <button id="btnToResult" class="big">結果を見る</button>
+  </section>
+
   <!-- リザルト -->
   <section id="result" class="screen overlay">
-    <h2 id="resTitle">クリア！</h2>
-    <p id="resTime" class="sub"></p>
+    <h2 id="resTitle">結果</h2>
     <table id="resTable"></table>
     <div class="row">
       <button id="btnAgain" class="big">ロビーへもどる</button>
     </div>
   </section>
 
+  <script src="shared.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
