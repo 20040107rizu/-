@@ -1,6 +1,6 @@
 // 鬼バスターズ Service Worker
 // 画面ファイルはネット優先で取得し、つながらないときだけ保存版を使う（更新がすぐ反映されるように）。
-const CACHE = 'busters-v7';
+const CACHE = 'busters-v8';
 const ASSETS = ['/', '/index.html', '/style.css', '/yokai.js', '/shared.js', '/title.js', '/game.js', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {

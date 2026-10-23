@@ -8,6 +8,7 @@
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     refreshUpdateBar();
+    try { showBuildInfo(); } catch {}
   }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -184,6 +185,7 @@
 
   // ---------- 更新のお知らせ ----------
   // サーバーのバージョンが変わったら「今すぐ更新」を出す（プレイ中は出さない）
+  const BUILD = document.documentElement.dataset.build || '';
   var loadedVersion = null; // show() から先に呼ばれても大丈夫なように var
   var updateReady = false;
   function refreshUpdateBar() {
@@ -196,6 +198,13 @@
     fetch('version', { cache: 'no-store' }).then(r => r.json()).then(info => {
       if (!loadedVersion) {
         loadedVersion = info.v;
+        // 古い版が残っていたら、タイトル画面にいるうちに自動で新しい版にする（1回だけ）
+        if (BUILD && BUILD !== '__BUILD__' && BUILD !== info.v) {
+          let tried = null;
+          try { tried = sessionStorage.getItem('autoUpdate'); sessionStorage.setItem('autoUpdate', info.v); } catch {}
+          if (tried !== info.v && $('title').classList.contains('active') && !ws) { location.reload(); return; }
+          updateReady = true; refreshUpdateBar();
+        }
         let seen = null;
         try { seen = localStorage.getItem('seenVersion'); localStorage.setItem('seenVersion', info.v); } catch {}
         // 更新したあとに開いたら、変わったところを見せる
@@ -513,10 +522,30 @@
     W = w; H = h; DPR = dpr;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   }
-  window.addEventListener('resize', resize);
-  window.addEventListener('orientationchange', () => { resize(); setTimeout(resize, 300); setTimeout(resize, 1000); });
+  function fixViewport() {
+    const landscape = matchMedia('(orientation: landscape)').matches || (screen.orientation && /landscape/.test(screen.orientation.type)) || Math.abs(window.orientation || 0) === 90;
+    if (landscape && window.innerWidth < window.innerHeight) {
+      const m = document.querySelector('meta[name=viewport]');
+      const c = m.getAttribute('content');
+      m.setAttribute('content', c.replace('initial-scale=1', 'initial-scale=1.0001'));
+      setTimeout(() => { m.setAttribute('content', c); resize(); }, 50);
+    }
+    resize();
+    showBuildInfo();
+  }
+  window.addEventListener('resize', fixViewport);
+  window.addEventListener('orientationchange', () => { fixViewport(); setTimeout(fixViewport, 300); setTimeout(fixViewport, 1000); });
+  window.addEventListener('pageshow', fixViewport);
   window.visualViewport?.addEventListener('resize', resize);
-  resize();
+  // タイトル画面の右下に、版の番号と画面サイズ（不具合を調べるため）
+  function showBuildInfo() {
+    const el = document.getElementById('buildInfo');
+    if (!el || typeof BUILD === 'undefined') return;
+    const vv = window.visualViewport;
+    el.textContent = `v${BUILD} ${window.innerWidth}×${window.innerHeight} vv${vv ? Math.round(vv.width) + '×' + Math.round(vv.height) + '@' + vv.scale.toFixed(2) : '-'} 画${screen.width}×${screen.height} ${standalone ? 'app' : 'web'}`;
+    el.classList.toggle('show', $('title').classList.contains('active'));
+  }
+  setTimeout(fixViewport, 0);
 
   const input = { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false };
   const stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
@@ -537,8 +566,14 @@
   }
 
   const playing = () => $('game').classList.contains('active') && !$('gacha').classList.contains('active') && !$('result').classList.contains('active');
+  // タップ位置を、キャンバスに描いている座標（W×H）に直す
+  function toCanvas(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) * W) / (r.width || W), y: ((e.clientY - r.top) * H) / (r.height || H) };
+  }
   function pointerDown(e) {
     if (!playing()) return;
+    const pt = toCanvas(e);
     const me = snap && snap.players.find(p => p.id === myId);
     if (me && me.esc) {
       const others = snap.players.filter(p => !p.esc);
@@ -550,17 +585,17 @@
       return;
     }
     for (const [k, b] of Object.entries(buttons())) {
-      if (Math.hypot(e.clientX - b.x, e.clientY - b.y) < b.r * 1.2) {
+      if (Math.hypot(pt.x - b.x, pt.y - b.y) < b.r * 1.2) {
         btnHold[k] = e.pointerId;
         if (k !== 'atk') navigator.vibrate?.(12);
         e.preventDefault();
         return;
       }
     }
-    if (e.clientX < W * 0.5 && !stick.active) Object.assign(stick, { active: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY });
+    if (pt.x < W * 0.5 && !stick.active) Object.assign(stick, { active: true, id: e.pointerId, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
     e.preventDefault();
   }
-  function pointerMove(e) { if (stick.active && e.pointerId === stick.id) { stick.x = e.clientX; stick.y = e.clientY; } }
+  function pointerMove(e) { if (stick.active && e.pointerId === stick.id) { const pt = toCanvas(e); stick.x = pt.x; stick.y = pt.y; } }
   function pointerUp(e) {
     if (stick.active && e.pointerId === stick.id) stick.active = false;
     for (const k in btnHold) if (btnHold[k] === e.pointerId) btnHold[k] = null;

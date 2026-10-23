@@ -57,6 +57,8 @@ const server = http.createServer((req, res) => {
     headers['Cache-Control'] = /\.(png|jpg|svg)$/.test(filePath) ? 'public, max-age=86400' : 'no-cache';
     if (path.basename(filePath) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
     res.writeHead(200, headers);
+    // index.html には版の番号を書き込む（読み込むファイルにも付けて、古いファイルが使われないようにする）
+    if (path.basename(filePath) === 'index.html') data = Buffer.from(data.toString('utf8').replace(/__BUILD__/g, VERSION));
     res.end(data);
   });
 });

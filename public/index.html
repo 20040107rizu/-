@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-build="__BUILD__">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Mochiy+Pop+One&display=swap">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=__BUILD__">
 </head>
 <body>
   <!-- 縦持ち時の案内 -->
@@ -127,6 +127,8 @@
     </div>
   </section>
 
+  <div id="buildInfo" class="build-info"></div>
+
   <!-- 更新のお知らせ -->
   <div id="updateBar" class="update-bar">
     <span>✨ 新しいバージョンがあります</span>
@@ -138,9 +140,9 @@
     <button id="btnWhatsNewClose" class="big">OK</button>
   </section>
 
-  <script src="yokai.js"></script>
-  <script src="shared.js"></script>
-  <script src="title.js"></script>
-  <script src="game.js"></script>
+  <script src="yokai.js?v=__BUILD__"></script>
+  <script src="shared.js?v=__BUILD__"></script>
+  <script src="title.js?v=__BUILD__"></script>
+  <script src="game.js?v=__BUILD__"></script>
 </body>
 </html>
