@@ -51,6 +51,9 @@ async function generate(item, refImage) {
       if (attempt >= 3) throw new Error(`画像が返ってきませんでした (${why})`);
     } else {
       const text = await res.text();
+      if (res.status === 429 && /free_tier|FreeTier|exceeded your current quota/.test(text)) {
+        throw new Error('API エラー 429: 無料プランの利用枠を超えています。画像生成には AI Studio で請求先（支払い方法）の設定が必要です');
+      }
       if (res.status === 400 || res.status === 401 || res.status === 403) throw new Error(`API エラー ${res.status}: ${text.slice(0, 300)}`);
       if (attempt >= 4) throw new Error(`API エラー ${res.status}: ${text.slice(0, 300)}`);
     }
@@ -125,6 +128,7 @@ function writeManifest() {
   };
   walk(ART_DIR);
   const manifest = Object.fromEntries(files.map(f => [f.replace(/\.(png|jpg)$/, ''), f]));
+  fs.mkdirSync(ART_DIR, { recursive: true });
   fs.writeFileSync(path.join(ART_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   return files.length;
 }
@@ -161,7 +165,7 @@ function writeManifest() {
     } catch (e) {
       failed++;
       console.error(`✗ ${it.key}: ${e.message}`);
-      if (/GEMINI_API_KEY|API エラー 40[013]/.test(e.message)) break;
+      if (/GEMINI_API_KEY|API エラー (40[013]|429)/.test(e.message)) break;
     }
   }
   console.log(`manifest: ${writeManifest()} 枚 / 失敗 ${failed}`);
