@@ -35,9 +35,10 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const crypto = require('crypto');
 function computeVersion() {
   const h = crypto.createHash('sha1');
-  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'shared.js', 'title.js', 'game.js', 'sw.js', 'art/manifest.json']) {
+  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'shared.js', 'title.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
     try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
   }
+  h.update(fs.readFileSync(__filename)); // サーバーだけの変更（ボス鬼の強さなど）でも新しい版にする
   return h.digest('hex').slice(0, 10);
 }
 const VERSION = computeVersion();

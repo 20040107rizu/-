@@ -209,11 +209,13 @@
       if (!loadedVersion) {
         loadedVersion = info.v;
         // 古い版が残っていたら、タイトル画面にいるうちに自動で新しい版にする（1回だけ）
+        // このときは「見た」記録を付けない（読み込み直したあとにお知らせを出すため）
         if (BUILD && BUILD !== '__BUILD__' && BUILD !== info.v) {
           let tried = null;
           try { tried = sessionStorage.getItem('autoUpdate'); sessionStorage.setItem('autoUpdate', info.v); } catch {}
           if (tried !== info.v && $('title').classList.contains('active') && !ws) { location.reload(); return; }
           updateReady = true; refreshUpdateBar();
+          return;
         }
         let seen = null;
         try { seen = localStorage.getItem('seenVersion'); localStorage.setItem('seenVersion', info.v); } catch {}
