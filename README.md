@@ -42,3 +42,13 @@ npm start          # http://localhost:3000
 - `server.js` — HTTP配信 + WebSocket。ルーム管理とゲームロジックはすべてサーバー側（30Hzで計算、15Hzで状態配信）
 - `public/game.js` — Canvas描画、仮想スティック、入力送信、補間・自キャラ予測
 - `public/index.html`, `style.css` — タイトル / ロビー / リザルト画面
+
+## ネットに公開する（Render・無料）
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/20040107rizu/-)
+
+1. 上のボタンを押し、GitHubアカウントでRenderにログイン
+2. リポジトリへのアクセスを許可し、「Apply」（`render.yaml` の設定が自動で使われます）
+3. 数分で `https://oni-busters-xxxx.onrender.com` のようなURLが発行されるので、仲間に共有
+
+無料プランは15分アクセスがないとスリープし、次の最初のアクセス時は起動に1分ほどかかります。
