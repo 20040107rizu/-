@@ -5,6 +5,7 @@
 //   npm run draw -- --sheet=out.png  一覧画像（確認用）も作る
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const sharp = require('sharp');
 const { all } = require('./svg-art');
 
@@ -37,7 +38,9 @@ const sheet = (args.find(a => a.startsWith('--sheet=')) || '').slice(8);
     }
   };
   walk(ART_DIR);
-  fs.writeFileSync(path.join(ART_DIR, 'manifest.json'), JSON.stringify(Object.fromEntries(files.sort().map(f => [f.replace(/\.(png|jpg)$/, ''), f])), null, 2) + '\n');
+  // 絵を描き直したらすぐ反映されるように、中身のハッシュをURLにつける
+  const tag = f => crypto.createHash('sha1').update(fs.readFileSync(path.join(ART_DIR, f))).digest('hex').slice(0, 8);
+  fs.writeFileSync(path.join(ART_DIR, 'manifest.json'), JSON.stringify(Object.fromEntries(files.sort().map(f => [f.replace(/\.(png|jpg)$/, ''), `${f}?h=${tag(f)}`])), null, 2) + '\n');
   console.log(`manifest: ${files.length} 枚`);
 
   if (sheet) {

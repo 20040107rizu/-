@@ -1,6 +1,6 @@
 // 妖怪（お友達）の一覧。サーバーとクライアントで共有する。
 // 1行: [id, 名前, ランク, タイプ, 色, 出身, 見た目]
-// 見た目は tools/yokai-gen.js が絵を描くための指定（t=体の形, 他は飾り）。最初の16体は tools/svg-art.js の手描き。
+// 見た目は tools/yokai-gen.js が絵を描くための指定（t=体の形, 他は飾り）。
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.YokaiList = factory();
@@ -9,22 +9,22 @@
   const F = 'fighter', T = 'tank', H = 'healer', R = 'ranger';
   const rows = [
     // ---- 最初からいる16体（手描き） ----
-    ['nekomata', 'ネコマタロウ', 'C', F, '#ff8a5c', '日本', ''],
-    ['kasabou', 'カサボウ', 'C', T, '#8aa0ff', '日本', ''],
-    ['chochin', 'チョウチンコ', 'C', H, '#ffb35c', '日本', ''],
-    ['hitodama', 'ヒトダマン', 'C', R, '#9ef0ff', '日本', ''],
-    ['kappado', 'カッパード', 'B', F, '#3fcf8e', '日本', ''],
-    ['nurikabe', 'ヌリカベエ', 'B', T, '#b0a080', '日本', ''],
-    ['yukinko', 'ユキンコ', 'B', H, '#d8f4ff', '日本', ''],
-    ['tenguri', 'テングリ', 'B', R, '#e05050', '日本', ''],
-    ['raijin', 'ライジン坊', 'A', F, '#ffe14a', '日本', ''],
-    ['gashadoku', 'ガシャドクロウ', 'A', T, '#e8e8e8', '日本', ''],
-    ['hakutaku', 'ハクタク姫', 'A', H, '#ffc8ec', '中国', ''],
-    ['kitsunebi', 'キツネビ', 'A', R, '#ff9a2e', '日本', ''],
-    ['susanoo', 'スサノオ丸', 'S', F, '#5c7cff', '日本', ''],
-    ['daidara', 'ダイダラ王', 'S', T, '#7a5c3a', '日本', ''],
-    ['amaterasu', 'アマテラ', 'S', H, '#fff27a', '日本', ''],
-    ['yatagarasu', 'ヤタガラス', 'S', R, '#3a2a5c', '日本', ''],
+    ['nekomata', 'ネコマタロウ', 'C', F, '#ff8a5c', '日本', 't=beast ears=cat tail=many:2 eyes=angry fx=fire scarf=1'],
+    ['kasabou', 'カサボウ', 'C', T, '#8aa0ff', '日本', 't=object kind=umbrella eyes=one'],
+    ['chochin', 'チョウチンコ', 'C', H, '#ffb35c', '日本', 't=object kind=lamp tongue=1'],
+    ['hitodama', 'ヒトダマン', 'C', R, '#9ef0ff', '日本', 't=wisp'],
+    ['kappado', 'カッパード', 'B', F, '#3fcf8e', '日本', 't=fish hat=dish shell=1 eyes=angry'],
+    ['nurikabe', 'ヌリカベエ', 'B', T, '#b0a080', '日本', 't=golem kind=wall eyes=angry'],
+    ['yukinko', 'ユキンコ', 'B', H, '#d8f4ff', '日本', 't=human hair=long skin=pale fx=ice'],
+    ['tenguri', 'テングリ', 'B', R, '#e05050', '日本', 't=human skin=c hair=long nose=long wings=feather hat=tokin acc=fan eyes=angry'],
+    ['raijin', 'ライジン坊', 'A', F, '#ffe14a', '日本', 't=human hair=spiky horns=oni skin=c ring=drum fx=spark eyes=angry'],
+    ['gashadoku', 'ガシャドクロウ', 'A', T, '#e8e8e8', '日本', 't=skull giant=1'],
+    ['hakutaku', 'ハクタク姫', 'A', H, '#ffc8ec', '中国', 't=beast ears=goat horns=goat eyes=many tail=fluffy'],
+    ['kitsunebi', 'キツネビ', 'A', R, '#ff9a2e', '日本', 't=beast ears=fox tail=many:3 fx=fire'],
+    ['susanoo', 'スサノオ丸', 'S', F, '#5c7cff', '日本', 't=human hair=long acc=sword eyes=angry scarf=1 fx=spark'],
+    ['daidara', 'ダイダラ王', 'S', T, '#7a5c3a', '日本', 't=golem kind=giant horns=oni eyes=angry'],
+    ['amaterasu', 'アマテラ', 'S', H, '#fff27a', '日本', 't=human hair=long hat=crown ring=sun fx=star'],
+    ['yatagarasu', 'ヤタガラス', 'S', R, '#3a2a5c', '日本', 't=bird legs=3 wings=feather eyes=angry fx=star'],
 
     // ---- Cランク ----
     ['azuki', 'アズキアライ', 'C', H, '#c8b090', '日本', 't=human hair=bald acc=none fx=star'],
