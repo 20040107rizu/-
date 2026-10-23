@@ -9,7 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#120a1a">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png">
+  <link rel="icon" href="icons/favicon-64.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <title>鬼バスターズ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,6 +38,7 @@
     </div>
     <div class="row">
       <p id="friendCount" class="sub"></p>
+      <button id="btnSave" class="small">💾 セーブ</button>
       <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
     </div>
     <p id="err" class="err"></p>
@@ -53,6 +54,27 @@
     </ol>
     <p class="sub">ホーム画面の「鬼バスターズ」アイコンから、全画面で遊べます。<br>Chrome で開いているときは、アドレスバーの共有ボタンから同じように追加できます。</p>
     <button id="btnInstallClose" class="big">とじる</button>
+  </section>
+
+  <!-- セーブ -->
+  <section id="saveScreen" class="screen overlay">
+    <h2>💾 セーブデータ</h2>
+    <p id="saveStats" class="sub"></p>
+    <p class="sub small-note">データはこの端末に自動で保存されています。別の端末やホーム画面のアプリに移すときは、下の引き継ぎコードを使ってね。</p>
+    <div class="save-cols">
+      <div class="save-box">
+        <b>引き継ぎコード（コピーしてメモ）</b>
+        <textarea id="saveCode" readonly rows="3"></textarea>
+        <button id="btnCopyCode" class="small">コピー</button>
+      </div>
+      <div class="save-box">
+        <b>コードを読み込む</b>
+        <textarea id="loadCode" rows="3" placeholder="ONI1- から始まるコードを貼り付け"></textarea>
+        <button id="btnLoadCode" class="small">読み込む</button>
+      </div>
+    </div>
+    <p id="saveMsg" class="sub"></p>
+    <button id="btnSaveClose" class="big">とじる</button>
   </section>
 
   <!-- ロビー -->

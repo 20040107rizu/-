@@ -4,23 +4,61 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
   }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // ---------- お友達（端末に保存） ----------
-  function loadFriends() {
-    let f = {};
-    try { f = JSON.parse(localStorage.getItem('friends') || '{}') || {}; } catch { f = {}; }
+  // ---------- セーブデータ（端末に自動保存＋引き継ぎコード） ----------
+  function loadJSON(key, def) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null') || def; } catch { return def; }
+  }
+  function loadFriends(f) {
+    f = f || loadJSON('friends', {});
+    for (const id of Object.keys(f)) if (!S.YOKAI_BY_ID[id] || !(f[id] > 0)) delete f[id];
     for (const y of S.YOKAI) if (y.starter && !f[y.id]) f[y.id] = 1;
     return f;
   }
-  function saveFriends() { try { localStorage.setItem('friends', JSON.stringify(friends)); } catch {} }
   let friends = loadFriends();
+  let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
   let selYokai = localStorage.getItem('yokai');
   if (!friends[selYokai]) selYokai = 'nekomata';
+  function saveAll() {
+    try {
+      localStorage.setItem('friends', JSON.stringify(friends));
+      localStorage.setItem('stats', JSON.stringify(stats));
+      localStorage.setItem('yokai', selYokai);
+    } catch {}
+  }
+  // ブラウザに勝手に消されにくくする
+  navigator.storage?.persist?.().catch(() => {});
+
+  // 引き継ぎコード: ONI1-<データ>-<チェック用4文字>
+  const b64 = {
+    enc: str => btoa(String.fromCharCode(...new TextEncoder().encode(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+    dec: str => new TextDecoder().decode(Uint8Array.from(atob(str.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))),
+  };
+  function checksum(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
+  }
+  function makeSaveCode() {
+    const data = { v: 1, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best] };
+    const body = b64.enc(JSON.stringify(data));
+    return `ONI1-${body}-${checksum(body)}`;
+  }
+  function readSaveCode(code) {
+    const m = String(code).replace(/\s+/g, '').match(/^ONI1-([A-Za-z0-9_-]+)-([0-9A-Z]{4})$/);
+    if (!m || checksum(m[1]) !== m[2]) throw new Error('コードが正しくありません（途中が欠けていないか確認してね）');
+    const d = JSON.parse(b64.dec(m[1]));
+    if (d.v !== 1 || !Array.isArray(d.f)) throw new Error('このコードは読み込めません');
+    const f = {};
+    S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
+    const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
+    return { name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0 } };
+  }
 
   // ---------- 状態 ----------
   let ws = null;
@@ -47,6 +85,39 @@
     $('friendCount').textContent = `お友達 ${Object.keys(friends).length} / ${S.YOKAI.length}`;
   }
   updateFriendCount();
+
+  // ---------- セーブ画面 ----------
+  function openSave() {
+    $('saveStats').textContent = `お友達 ${Object.keys(friends).length}/${S.YOKAI.length}　遊んだ回数 ${stats.plays}　脱出 ${stats.escapes}回　集めた鬼玉 ${stats.dama}個（最高 ${stats.best}個）`;
+    $('saveCode').value = makeSaveCode();
+    $('loadCode').value = '';
+    $('saveMsg').textContent = '';
+    $('btnCopyCode').textContent = 'コピー';
+    show('saveScreen');
+  }
+  $('btnSave').onclick = openSave;
+  $('btnSaveClose').onclick = () => show('title');
+  $('btnCopyCode').onclick = () => {
+    const code = $('saveCode').value;
+    const done = () => { $('btnCopyCode').textContent = 'コピーしました'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(code).then(done, () => { $('saveCode').select(); document.execCommand('copy'); done(); });
+    else { $('saveCode').select(); document.execCommand('copy'); done(); }
+  };
+  $('saveCode').onclick = () => $('saveCode').select();
+  $('btnLoadCode').onclick = () => {
+    let data;
+    try { data = readSaveCode($('loadCode').value); }
+    catch (e) { $('saveMsg').style.color = '#ff8080'; $('saveMsg').textContent = e.message; return; }
+    const n = Object.keys(data.friends).length;
+    if (!confirm(`お友達${n}体のデータを読み込みます。\nこの端末の今のデータは上書きされます。よろしいですか？`)) return;
+    friends = data.friends; stats = data.stats;
+    selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
+    if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
+    saveAll(); updateFriendCount();
+    openSave();
+    $('saveMsg').style.color = '#7dff9a';
+    $('saveMsg').textContent = `読み込みました！ お友達 ${n}体`;
+  };
 
   // ---------- ホーム画面に追加（PWA） ----------
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -178,7 +249,7 @@
         ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}<div class="face" style="background:${y.color}"></div>${y.name}<br><small>${S.ROLES[y.role].name}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span><div class="face" style="background:#333"></div>？？？<br><small>&nbsp;</small>`;
       if (owned) d.onclick = () => {
-        selYokai = y.id; localStorage.setItem('yokai', y.id);
+        selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id });
         renderFriends();
       };
@@ -188,8 +259,21 @@
 
   // ---------- 鬼ガチャ ----------
   let gachaStep = 0;
+  let gachaIsNew = false;
   function startGacha() {
     const mine = result.players.find(p => p.id === myId);
+    // ガチャ結果はこの時点で保存する（玉を開ける前にアプリを閉じても消えない）
+    if (mine) {
+      stats.plays++;
+      stats.dama += mine.dama;
+      stats.best = Math.max(stats.best, mine.dama);
+      if (mine.gacha) {
+        stats.escapes++;
+        gachaIsNew = !friends[mine.gacha.yokai];
+        friends[mine.gacha.yokai] = (friends[mine.gacha.yokai] || 0) + 1;
+      }
+      saveAll(); updateFriendCount();
+    }
     $('reveal').classList.remove('show');
     $('ball').className = 'ball';
     $('machine').classList.remove('turn');
@@ -228,9 +312,7 @@
     } else if (gachaStep === 3) {
       gachaStep = 4;
       const y = S.YOKAI_BY_ID[mine.gacha.yokai];
-      const isNew = !friends[y.id];
-      friends[y.id] = (friends[y.id] || 0) + 1;
-      saveFriends(); updateFriendCount();
+      const isNew = gachaIsNew;
       $('machine').style.display = 'none';
       $('revealIcon').style.background = y.color;
       $('revealRank').textContent = `${y.rank}ランク`;
