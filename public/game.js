@@ -433,7 +433,7 @@
     if (mine && mine.gacha) {
       const ball = S.BALLS.find(b => b.key === mine.gacha.ball);
       $('gachaTitle').textContent = '脱出成功！ 鬼ガチャ';
-      $('gachaSub').textContent = `集めた鬼玉 ${mine.dama}個 → ${ball.name}のガチャ玉`;
+      $('gachaSub').textContent = `みんなで集めた鬼玉 ${result.team ?? mine.dama}個`; // 玉の色は出てくるまで秘密
       $('ball').style.background = ball.color;
       $('ball').style.color = ball.color;
       gachaStep = 1;
@@ -485,7 +485,8 @@
   function renderResult() {
     const anyEsc = result.players.some(p => p.escaped);
     $('resTitle').textContent = anyEsc ? '鬼の世界から脱出！' : '全員脱出できなかった…';
-    $('resTable').innerHTML = '<tr><th>なまえ</th><th>お友達</th><th>脱出</th><th>鬼玉</th><th>ガチャ</th></tr>' +
+    $('resTitle').textContent += `（みんなの鬼玉 ${result.team ?? 0}個）`;
+    $('resTable').innerHTML = '<tr><th>なまえ</th><th>お友達</th><th>脱出</th><th>集めた鬼玉</th><th>ガチャ</th></tr>' +
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
@@ -935,16 +936,18 @@
     if (me) {
       ctx.textAlign = 'right';
       ctx.font = 'bold 24px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-      const label = `× ${me.dama}`;
+      const team = snap.players.reduce((a, p) => a + p.dama, 0); // みんなで集めた合計
+      const label = `× ${team}`;
       const tw = ctx.measureText(label).width;
       ctx.fillStyle = '#ff3da8'; ctx.shadowColor = '#ff3da8'; ctx.shadowBlur = 10;
       ctx.beginPath(); ctx.arc(W - 34 - tw, 30, 12, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
       ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(W - 38 - tw, 26, 4, 0, Math.PI * 2); ctx.fill();
       ctx.strokeText(label, W - 20, 39); ctx.fillStyle = '#ffd0f0'; ctx.fillText(label, W - 20, 39);
+      if (snap.players.length > 1) { ctx.font = '11px sans-serif'; ctx.fillStyle = '#fffc'; ctx.fillText(`みんなの鬼玉（自分 ${me.dama}）`, W - 20, 54); }
     }
 
     // 仲間
-    let y = 66;
+    let y = snap.players.length > 1 ? 74 : 66;
     ctx.textAlign = 'right';
     for (const p of snap.players) {
       if (p.id === myId) continue;

@@ -22,6 +22,8 @@ const DASH_MUL = 1.4;               // ダッシュでボス鬼をギリギリ�
 const BOSS_CHASE = 255;            // ボス鬼の追いかける速さ（どの妖怪の歩きより速い）
 const ESCAPE_TIME = 1.5;           // 襖の前で攻撃ボタンを長押しする時間
 const ESCAPE_RANGE = 80;
+const DAMA_RESPAWN = 2;            // 鬼玉が1個湧き直す間隔（秒）
+const TEAM_FACTOR = 0.5;           // ガチャの判定: 合計 ÷ (1 + 0.5×(人数-1))。2人なら1.5で割る
 // 開始時の演出（ボス鬼が街に到着する映像）とカウントダウン。この間はゲームを止める
 const INTRO_MOVIE = process.env.NO_INTRO ? 0 : 4.5;
 const COUNTDOWN = process.env.NO_INTRO ? 0 : 5;
@@ -270,29 +272,33 @@ class Room {
     this.gridB = new Grid(this.map, BOSS_R + 4);
     const n = this.players.size;
 
-    // 出発地点
-    const spawn = this.gridS.randomFreePoint();
-    let i = 0;
+    // 出発地点: 参加者ごとにバラバラの場所から
+    const spawns = [];
     for (const p of this.players.values()) {
+      const sp = this.farFromAll(this.gridS, spawns, 1400);
+      spawns.push(sp);
       const st = S.yokaiStats(p.yokai);
       Object.assign(p, {
-        stats: st, x: spawn.x + (i % 2) * 40 - 20, y: spawn.y + Math.floor(i / 2) * 40 - 20, face: 0,
+        stats: st, x: sp.x, y: sp.y, face: 0,
         hp: st.hp, maxHp: st.hp, atkT: 0, strongT: 0, down: false, reviveProg: 0, escaped: false,
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
       });
       S.collide(this.map, p, PLAYER_R);
-      i++;
     }
+    const spawn = spawns[0];
 
     // 襖（出発地点から遠いところ）
-    this.fusuma = process.env.TEST_FUSUMA_NEAR ? { x: spawn.x, y: spawn.y } : this.farPoint(this.gridS, spawn, 2600);
+    this.fusuma = process.env.TEST_FUSUMA_NEAR ? { x: spawn.x, y: spawn.y } : this.farFromAll(this.gridS, spawns, 1800);
 
     // 鬼玉
     this.dama = [];
     const damaCount = 60 + 20 * n;
     for (let k = 0; k < damaCount; k++) this.dama.push({ id: genId(), v: 1, ...this.gridS.randomFreePoint() });
     for (const d of this.dama) { d.x += rand(-15, 15); d.y += rand(-15, 15); }
+    // 取られた鬼玉は、少しずつ別の場所に湧き直す（街に出ている数はこの上限まで）
+    this.damaCap = damaCount;
+    this.damaRespawnT = DAMA_RESPAWN;
 
     // アイテム
     this.items = [];
@@ -302,10 +308,10 @@ class Room {
 
     // 見回り鬼
     this.patrols = [];
-    for (let k = 0; k < 12 + 2 * n; k++) this.spawnPatrol(spawn);
+    for (let k = 0; k < 12 + 2 * n; k++) this.spawnPatrol(spawns);
 
     // ボス鬼
-    const bp = this.farPoint(this.gridB, spawn, 2400);
+    const bp = this.farFromAll(this.gridB, spawns, 1800);
     const type = process.env.TEST_BOSS || S.pickBoss();
     const kind = S.BOSSES[type];
     const bossHp = Math.round((1200 + 900 * n) * kind.hp); // 2人なら赤鬼3000・青鬼4500・黒鬼6600
@@ -321,11 +327,12 @@ class Room {
     });
   }
 
-  farPoint(grid, from, minD) {
+  // points のどれからも minD 以上離れた場所（見つからなければ一番離れた場所）
+  farFromAll(grid, points, minD) {
     let best = null, bestD = -1;
-    for (let k = 0; k < 200; k++) {
+    for (let k = 0; k < 300; k++) {
       const p = grid.randomFreePoint();
-      const d = dist(p, from);
+      const d = points.length ? Math.min(...points.map(q => dist(p, q))) : Infinity;
       if (d >= minD) return p;
       if (d > bestD) { bestD = d; best = p; }
     }
@@ -338,7 +345,7 @@ class Room {
   }
 
   spawnPatrol(awayFrom) {
-    const p = this.farPoint(this.gridS, awayFrom, 600);
+    const p = this.farFromAll(this.gridS, awayFrom, 700);
     this.patrols.push({
       id: genId(), x: p.x, y: p.y, face: rand(0, Math.PI * 2), hp: 100, maxHp: 100,
       state: 'patrol', target: null, lostT: 0, wanderTo: null, path: null, whistleT: 0, hitFlash: 0,
@@ -436,8 +443,7 @@ class Room {
       if (e.hp <= 0) {
         e.respawnT -= DT;
         if (e.respawnT <= 0) {
-          const ap = this.activePlayers();
-          const p = this.farPoint(this.gridS, ap[0] || { x: 0, y: 0 }, 900);
+          const p = this.farFromAll(this.gridS, this.activePlayers(), 900);
           Object.assign(e, { x: p.x, y: p.y, hp: e.maxHp, state: 'patrol', target: null, path: null, wanderTo: null });
         }
         continue;
@@ -719,6 +725,17 @@ class Room {
 
     this.items = this.items.filter(it => !it.taken);
     this.dama = this.dama.filter(d => !d.taken);
+    this.damaRespawnT -= DT;
+    if (this.damaRespawnT <= 0) {
+      this.damaRespawnT = DAMA_RESPAWN;
+      if (this.dama.filter(d => d.v === 1).length < this.damaCap) {
+        // 誰かのすぐ近くには湧かない
+        const near = [...this.players.values()].filter(p => !p.escaped);
+        const d = { id: genId(), v: 1, ...this.farFromAll(this.gridS, near, 400) };
+        this.dama.push(d);
+        this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: 1 });
+      }
+    }
     this.itemRespawnT -= DT;
     if (this.itemRespawnT <= 0) { this.itemRespawnT = 40; if (this.items.length < this.itemCap) this.spawnItem(); }
   }
@@ -781,11 +798,15 @@ class Room {
 
   finish() {
     this.state = 'result';
+    // ガチャはみんなで集めた鬼玉の合計で引く。人数が多いほど集めやすいので、人数で割り引いて判定する
+    const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
+    const n = this.players.size;
+    const judged = team / (1 + TEAM_FACTOR * (n - 1));
     const players = [...this.players.values()].map(p => ({
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt),
-      gacha: p.escaped ? rollGacha(p.dama) : null,
+      gacha: p.escaped ? rollGacha(judged) : null,
     }));
-    this.broadcast({ t: 'result', players });
+    this.broadcast({ t: 'result', players, team });
   }
 
   snapshot() {
