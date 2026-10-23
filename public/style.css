@@ -80,3 +80,6 @@ button:disabled { opacity: .4; }
 #rotate .phone { font-size: 64px; animation: rot 1.6s infinite ease-in-out; }
 @keyframes rot { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 @media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
+
+button.install { display: none; font-size: 14px; padding: 8px 14px; background: #2f8a5a; }
+.steps { margin: 0; padding-left: 1.4em; max-width: 560px; line-height: 1.8; font-size: 15px; }

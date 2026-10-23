@@ -4,9 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="バスターズ">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#1a1030">
+  <meta name="theme-color" content="#120a1a">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <title>バスターズ</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -30,7 +34,20 @@
       <button id="btnJoin" class="big alt">参加する</button>
     </div>
     <p id="friendCount" class="sub"></p>
+    <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
     <p id="err" class="err"></p>
+  </section>
+
+  <!-- ホーム画面に追加の案内（iPhone / iPad） -->
+  <section id="installHelp" class="screen overlay">
+    <h2>ホーム画面に追加</h2>
+    <ol class="steps">
+      <li>Safari の画面下（または上）にある <b>共有ボタン</b>（□に↑のマーク）をタップ</li>
+      <li>メニューを下にスクロールして <b>「ホーム画面に追加」</b> をタップ</li>
+      <li>右上の <b>「追加」</b> をタップ</li>
+    </ol>
+    <p class="sub">ホーム画面の「バスターズ」アイコンから、全画面で遊べます。<br>Chrome で開いているときは、アドレスバーの共有ボタンから同じように追加できます。</p>
+    <button id="btnInstallClose" class="big">とじる</button>
   </section>
 
   <!-- ロビー -->

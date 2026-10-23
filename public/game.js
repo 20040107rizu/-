@@ -4,7 +4,7 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
   }
@@ -47,6 +47,26 @@
     $('friendCount').textContent = `お友達 ${Object.keys(friends).length} / ${S.YOKAI.length}`;
   }
   updateFriendCount();
+
+  // ---------- ホーム画面に追加（PWA） ----------
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone === true;
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installPrompt = e;
+    $('btnInstall').style.display = 'inline-block';
+  });
+  window.addEventListener('appinstalled', () => { installPrompt = null; $('btnInstall').style.display = 'none'; });
+  if (isIOS && !standalone) $('btnInstall').style.display = 'inline-block';
+  $('btnInstall').onclick = () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      installPrompt.userChoice.finally(() => { installPrompt = null; $('btnInstall').style.display = 'none'; });
+    } else show('installHelp');
+  };
+  $('btnInstallClose').onclick = () => show('title');
 
   // ---------- サウンド（簡易） ----------
   let actx = null;
@@ -245,7 +265,7 @@
 
   function goFullscreen() {
     const el = document.documentElement;
-    if (!document.fullscreenElement && el.requestFullscreen) {
+    if (!standalone && !document.fullscreenElement && el.requestFullscreen) {
       el.requestFullscreen().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
     }
   }

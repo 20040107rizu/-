@@ -22,7 +22,7 @@ const DASH_MUL = 1.65;
 const STAMINA_MAX = 100;
 
 // ---------- 静的ファイル配信 ----------
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const server = http.createServer((req, res) => {
@@ -31,7 +31,9 @@ const server = http.createServer((req, res) => {
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' });
+    const headers = { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' };
+    if (path.basename(filePath) === 'sw.js') { headers['Cache-Control'] = 'no-cache'; headers['Service-Worker-Allowed'] = '/'; }
+    res.writeHead(200, headers);
     res.end(data);
   });
 });
