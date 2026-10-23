@@ -144,7 +144,7 @@
     ctx.translate(x, y);
     if (flip) ctx.scale(-1, 1);
     if (flash) ctx.filter = 'brightness(2.5)';
-    ctx.drawImage(img, -size / 2, -size * 0.7, size, size);
+    ctx.drawImage(img, -size / 2, -size * 0.92, size, size); // 絵の足元（下から8%）を y に合わせる
     ctx.restore();
   }
   const faceStyle = y => (artUrl('yokai/' + y.id) ? `background:${y.color}55 url(${artUrl('yokai/' + y.id)}) center/contain no-repeat` : `background:${y.color}`);
@@ -591,12 +591,12 @@
     ctx.fillStyle = e.alert ? 'rgba(255,60,60,0.16)' : 'rgba(255,240,120,0.12)';
     ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.arc(pos.x, pos.y, range, e.face - half, e.face + half); ctx.closePath(); ctx.fill();
     const img = art('oni/patrol');
-    if (img) { ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 18, 22, 7, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 18, 72, Math.cos(e.face) < 0, e.flash); }
+    if (img) { ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 18, 22, 7, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 18, 86, Math.cos(e.face) < 0, e.flash); }
     else drawOni(pos.x, pos.y, 22, '#3a6ad8', e.face, e.flash, [0]);
-    bar(pos.x - 20, pos.y - (img ? 52 : 40), 40, 4, e.hp / e.maxHp, '#ff5050');
+    bar(pos.x - 20, pos.y - (img ? 66 : 40), 40, 4, e.hp / e.maxHp, '#ff5050');
     if (e.alert) {
       ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillStyle = '#ff5050'; ctx.fillText(bubbles.has(e.id) ? 'ピーッ！♪' : '！', pos.x, pos.y - (img ? 60 : 48) - Math.abs(Math.sin(now * 8)) * 4);
+      ctx.fillStyle = '#ff5050'; ctx.fillText(bubbles.has(e.id) ? 'ピーッ！♪' : '！', pos.x, pos.y - (img ? 74 : 48) - Math.abs(Math.sin(now * 8)) * 4);
     }
   }
 
@@ -604,7 +604,7 @@
     const wob = Math.sin(now * 5) * 3;
     if (b.st !== 'wander' && !b.stun) { ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 30; }
     const img = art('oni/boss');
-    if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 160, Math.cos(b.face) < 0, b.flash); }
+    if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 180, Math.cos(b.face) < 0, b.flash); }
     else drawOni(pos.x, pos.y + wob, 46, '#b8242a', b.face, b.flash, [-1, 1]);
     ctx.shadowBlur = 0;
     if (b.stun) {
@@ -615,7 +615,7 @@
       }
       ctx.fillStyle = '#ffe14a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ビリビリ…', pos.x, pos.y - 80);
     }
-    bar(pos.x - 50, pos.y - (img ? 86 : 72), 100, 6, b.hp / b.maxHp, '#ff8a3d');
+    bar(pos.x - 50, pos.y - (img ? 132 : 72), 100, 6, b.hp / b.maxHp, '#ff8a3d');
   }
 
   function drawPlayer(p, pos, me) {
@@ -634,7 +634,7 @@
     if (img) {
       ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(0, 16, 20, 7, 0, 0, Math.PI * 2); ctx.stroke();
-      drawSprite(img, 0, 16, 64, Math.cos(p.face) < 0);
+      drawSprite(img, 0, 16, 80, Math.cos(p.face) < 0);
     } else {
       ctx.fillStyle = y.color;
       ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
@@ -643,7 +643,7 @@
       ctx.beginPath(); ctx.arc(Math.cos(p.face) * 6 - 5, Math.sin(p.face) * 4 - 3, 3, 0, Math.PI * 2); ctx.arc(Math.cos(p.face) * 6 + 5, Math.sin(p.face) * 4 - 3, 3, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    const top = img ? -36 : -29;
+    const top = img ? -62 : -29;
     ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#fff'; ctx.fillText(p.name, 0, top - 5);
     bar(-22, top, 44, 5, p.hp / p.maxHp, '#5be07a');

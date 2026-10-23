@@ -88,7 +88,18 @@ https://busters.onrender.com/ を開き、タイトル画面の「📲 ホーム
 ホーム画面のアイコンから起動すると、アドレスバーなしの全画面・横向きで遊べます（iPhoneは向きの固定ができないため、横にして遊んでください）。
 アプリ化は PWA（`public/manifest.json`、`public/sw.js`、`public/icons/`）で行っています。
 
-## 生成AIで絵を作る（Gemini / Nano Banana）
+## ゲームの絵
+
+キャラ（妖怪16体・見回り鬼・ボス鬼）、アイテム6種、街の地面・屋根の絵は `tools/svg-art.js` にコードで描いてあります。
+`npm run draw` で PNG にして `public/art/` に書き出します（API キー不要・無料）。ゲームは `public/art/manifest.json` を見て自動で読み込みます。
+
+```bash
+npm run draw                          # 全部書き出す
+npm run draw -- --only=yokai/nekomata # 1体だけ
+npm run draw -- --sheet=sheet.png     # 一覧画像も作る（確認用）
+```
+
+## 生成AIで絵を作る（Gemini / Nano Banana・有料）
 
 キャラ（妖怪16体・見回り鬼・ボス鬼）、アイテム6種、タイトル背景、街の地面・屋根、アプリアイコンを、Gemini の画像生成でまとめて作れます。
 できた絵は `public/art/` に保存され、ゲームが自動で読み込みます（無い絵は今までの図形で表示）。
@@ -114,7 +125,8 @@ npm run art -- --process-only    # tools/raw/ の元画像から切り抜きだ�
 - `public/shared.js`：妖怪・アイテム・ガチャ玉のデータと、街の生成・当たり判定（サーバーとブラウザで共通）
 - `public/title.js`：タイトル画面の背景（夜の鬼の街）とロゴをSVGで描画
 - `public/game.js`：Canvas描画、ミニマップ、仮想スティック、ガチャ演出
-- `tools/gen-art.js`, `tools/art-prompts.js`：生成AIで絵を作るスクリプトと指示文
+- `tools/svg-art.js`, `tools/render-art.js`：コードで描いた絵と、PNG への書き出し
+- `tools/gen-art.js`, `tools/art-prompts.js`：生成AIで絵を作るスクリプトと指示文（Gemini の請求先設定が必要）
 - `public/index.html`, `style.css`：タイトル／ロビー／ガチャ／リザルト画面
 
 テスト用の環境変数：`TIME_LIMIT`（制限時間を秒で変更）、`TEST_FUSUMA_NEAR=1`（襖を出発地点に置く）

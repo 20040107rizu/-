@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "art": "node tools/gen-art.js"
+    "art": "node tools/gen-art.js",
+    "draw": "node tools/render-art.js"
   },
   "license": "MIT",
   "dependencies": {
