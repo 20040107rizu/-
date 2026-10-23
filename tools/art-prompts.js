@@ -38,11 +38,13 @@ function list() {
   for (const y of S.YOKAI) {
     out.push({
       key: `yokai/${y.id}`, kind: 'sprite', size: 256,
-      prompt: `${STYLE} ${SPRITE_BG} The character: ${YOKAI_LOOK[y.id]}. Rank ${y.rank}: ${RANK_FLAIR[y.rank]}. Main color ${y.color}.`,
+      prompt: `${STYLE} ${SPRITE_BG} The character: ${YOKAI_LOOK[y.id] || `a cute creature inspired by the folklore of ${y.origin}, named "${y.name}" (look hints: ${y.look})`}. Rank ${y.rank}: ${RANK_FLAIR[y.rank]}. Main color ${y.color}.`,
     });
   }
-  out.push({ key: 'oni/patrol', kind: 'sprite', size: 256, prompt: `${STYLE} ${SPRITE_BG} The character: a blue-skinned patrol oni guard with one horn, wearing a happi coat and holding a whistle in its mouth and a lantern, looking around suspiciously.` });
-  out.push({ key: 'oni/boss', kind: 'sprite', size: 384, prompt: `${STYLE} ${SPRITE_BG} The character: a huge intimidating red boss oni with two big horns, tiger-skin loincloth, a giant spiked iron club (kanabo), angry glowing yellow eyes, fangs, scary but still cute game boss.` });
+  out.push({ key: 'oni/patrol', kind: 'sprite', size: 256, prompt: `${STYLE} ${SPRITE_BG} The character: a creepy purple-skinned patrol oni guard with one horn, glowing red eyes and a jagged grin, wearing a happi coat and holding a whistle in its mouth and a lantern, looking around suspiciously.` });
+  for (const [type, color] of [['red', 'red'], ['blue', 'blue'], ['black', 'pitch-black with a purple evil aura']]) {
+    out.push({ key: `oni/boss-${type}`, kind: 'sprite', size: 384, prompt: `${STYLE} ${SPRITE_BG} The character: a huge terrifying ${color}-skinned boss oni with two big curved horns, wild mane, tiger-skin loincloth, a giant spiked iron club (kanabo), furious glowing eyes with slit pupils, a wide mouth full of sharp fangs, scars, menacing game boss.` });
+  }
 
   const ITEM_LOOK = {
     trap: 'an electric trap device: a round metal pad with yellow lightning sparks',

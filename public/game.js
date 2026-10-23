@@ -77,6 +77,7 @@
   let shake = 0;
   let banner = null;
   let myPred = null;
+  let bossType = 'red';
 
   $('name').value = localStorage.getItem('name') || '';
   const urlRoom = new URLSearchParams(location.search).get('room');
@@ -121,23 +122,34 @@
 
   // ---------- 生成AIの絵（public/art/、無ければ図形で描く） ----------
   const ART = {};
+  const ART_LOADING = {};
   const PATTERNS = {};
-  const art = key => ART[key] || null;
+  let MANIFEST = {};
   fetch('art/manifest.json').then(r => (r.ok ? r.json() : {})).then(m => {
-    for (const [key, file] of Object.entries(m)) {
-      const img = new Image();
-      img.onload = () => {
-        ART[key] = img;
-        if (lobby && $('lobby').classList.contains('active')) renderLobby();
-      };
-      img.src = 'art/' + file;
-    }
+    MANIFEST = m;
+    if (lobby && $('lobby').classList.contains('active')) renderLobby();
   }).catch(() => {});
-  const artUrl = key => (ART[key] ? ART[key].src : null);
-  function pattern(key) {
-    if (!ART[key]) return null;
-    return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(ART[key], 'repeat'));
+  const artUrl = key => (MANIFEST[key] ? 'art/' + MANIFEST[key] : null);
+  // 読み込み済みならその絵、まだなら読み込みを始めて null（その間は図形で描く）
+  function art(key) {
+    if (ART[key]) return ART[key];
+    if (MANIFEST[key] && !ART_LOADING[key]) {
+      ART_LOADING[key] = true;
+      const img = new Image();
+      img.onload = () => { ART[key] = img; };
+      img.src = artUrl(key);
+    }
+    return null;
   }
+  function pattern(key) {
+    const img = art(key);
+    if (!img) return null;
+    return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(img, 'repeat'));
+  }
+  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff' };
+  let view = { l: 0, r: 0, t: 0, b: 0 }; // 今画面に見えている範囲（ワールド座標）
+  const inView = (x, y, m = 0) => x > view.l - m && x < view.r + m && y > view.t - m && y < view.b + m;
+  let spectateId = null;
   // キャラ画像を足元基準で描く（左向きなら反転）
   function drawSprite(img, x, y, size, flip, flash) {
     ctx.save();
@@ -220,7 +232,9 @@
         dama = new Map(m.dama.map(d => [d.id, d]));
         snap = null; myPred = null; result = null;
         ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear();
-        banner = { text: '鬼の世界に入った！鬼玉を集めよう', t: 2.2 };
+        bossType = m.boss;
+        spectateId = null;
+        banner = { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] };
         break;
       case 'state':
         snap = m;
@@ -268,16 +282,31 @@
     $('waitMsg').style.display = isHost ? 'none' : '';
   }
 
+  let friendTab = 'own';
+  function renderFriendTabs() {
+    const tabs = [['own', 'お友達'], ['C', 'C'], ['B', 'B'], ['A', 'A'], ['S', 'S']];
+    $('friendTabs').innerHTML = tabs.map(([k, label]) => {
+      const list = k === 'own' ? S.YOKAI.filter(y => friends[y.id]) : S.YOKAI.filter(y => y.rank === k);
+      const got = list.filter(y => friends[y.id]).length;
+      return `<button class="tab${friendTab === k ? ' on' : ''}" data-k="${k}">${label} <small>${k === 'own' ? got : `${got}/${list.length}`}</small></button>`;
+    }).join('');
+    for (const b of $('friendTabs').querySelectorAll('button')) b.onclick = () => { friendTab = b.dataset.k; renderFriends(); };
+  }
+  const faceImg = (y, locked) => artUrl('yokai/' + y.id)
+    ? `<img class="face${locked ? ' sil' : ''}" loading="lazy" src="${artUrl('yokai/' + y.id)}" alt="">`
+    : `<div class="face" style="background:${locked ? '#333' : y.color}"></div>`;
   function renderFriends() {
+    renderFriendTabs();
     const el = $('friends');
     el.innerHTML = '';
-    for (const y of S.YOKAI) {
+    const list = friendTab === 'own' ? S.YOKAI.filter(y => friends[y.id]) : S.YOKAI.filter(y => y.rank === friendTab);
+    for (const y of list) {
       const owned = friends[y.id];
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = owned
-        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}<div class="face" style="${faceStyle(y)}"></div>${y.name}<br><small>${S.ROLES[y.role].name}</small>`
-        : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span><div class="face" style="background:#333"></div>？？？<br><small>&nbsp;</small>`;
+        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y)}${y.name}<br><small>${S.ROLES[y.role].name}・${y.origin}</small>`
+        : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}？？？<br><small>${y.origin}</small>`;
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id });
@@ -408,20 +437,26 @@
         break;
       case 'dg':
         dama.delete(ev.id);
-        if (ev.by === myId) beep(1200, 0.08, 'triangle', 0.05, 400);
+        if (ev.by === myId) {
+          beep(1200, 0.08, 'triangle', 0.05, 400);
+          if (ev.v > 1) { banner = { text: `どデカい鬼玉ゲット！ +${ev.v}`, t: 2.4, c: '#ff8ad8' }; [523, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.08), i * 90)); }
+        } else if (ev.v > 1) banner = { text: `${nameOf(ev.by)}がどデカい鬼玉をゲット！`, t: 1.8, c: '#ff8ad8' };
         break;
-      case 'da': dama.set(ev.id, { id: ev.id, x: ev.x, y: ev.y }); break;
+      case 'da':
+        dama.set(ev.id, { id: ev.id, x: ev.x, y: ev.y, v: ev.v || 1 });
+        if (ev.v > 1) banner = { text: `どデカい鬼玉（${ev.v}個分）が落ちた！`, t: 2.4, c: '#ff8ad8' };
+        break;
       case 'pick':
         if (ev.id === myId) { banner = { text: `${S.ITEMS[ev.item].icon} ${S.ITEMS[ev.item].name}をひろった`, t: 1.2, c: '#ffe36b' }; beep(880, 0.12, 'square', 0.04); }
         break;
       case 'use': if (ev.id === myId) beep(660, 0.1, 'square', 0.05); break;
       case 'stun': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#ffe14a', t: 0.6, max: 0.6 }); banner = { text: 'ボス鬼がしびれた！', t: 1.4, c: '#ffe14a' }; break;
       case 'oniDown': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 90, c: '#ffffff', t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) banner = { text: '見回り鬼をたおした！', t: 1.2 }; break;
-      case 'bossDown': banner = { text: 'ボス鬼をたおした！', t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
+      case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
       case 'escape':
-        banner = ev.id === myId ? { text: '脱出成功！', t: 2.5, c: '#ffd84a' } : { text: `${nameOf(ev.id)}が脱出した！`, t: 1.6 };
+        banner = ev.id === myId ? { text: '脱出成功！', sub: 'タップで観戦する仲間を切り替え', t: 2.5, c: '#ffd84a' } : { text: `${nameOf(ev.id)}が脱出した！`, t: 1.6 };
         break;
     }
   }
@@ -459,6 +494,16 @@
   const playing = () => $('game').classList.contains('active') && !$('gacha').classList.contains('active') && !$('result').classList.contains('active');
   function pointerDown(e) {
     if (!playing()) return;
+    const me = snap && snap.players.find(p => p.id === myId);
+    if (me && me.esc) {
+      const others = snap.players.filter(p => !p.esc);
+      if (others.length) {
+        const i = others.findIndex(p => p.id === spectateId);
+        spectateId = others[(i + 1) % others.length].id;
+      }
+      e.preventDefault();
+      return;
+    }
     for (const [k, b] of Object.entries(buttons())) {
       if (Math.hypot(e.clientX - b.x, e.clientY - b.y) < b.r * 1.2) {
         btnHold[k] = e.pointerId;
@@ -558,8 +603,18 @@
     }
   }
 
-  function drawFusuma(now) {
+  function drawFusuma(now, me) {
     const { x, y } = fusuma;
+    if (me && !me.esc && myPred && Math.hypot(myPred.x - x, myPred.y - y) < 90) {
+      ctx.save();
+      ctx.strokeStyle = '#00000088'; ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(x, y - 4, 62, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(x, y - 4, 62, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * me.ep); ctx.stroke();
+      ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      ctx.strokeText('攻撃ボタン長押しで脱出！', x, y + 66); ctx.fillStyle = '#ffd84a'; ctx.fillText('攻撃ボタン長押しで脱出！', x, y + 66);
+      ctx.restore();
+    }
     ctx.save(); ctx.translate(x, y);
     ctx.shadowColor = '#ffd84a'; ctx.shadowBlur = 25 + Math.sin(now * 4) * 10;
     ctx.fillStyle = '#f4ead0'; ctx.fillRect(-34, -44, 68, 80);
@@ -592,7 +647,7 @@
     ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.arc(pos.x, pos.y, range, e.face - half, e.face + half); ctx.closePath(); ctx.fill();
     const img = art('oni/patrol');
     if (img) { ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 18, 22, 7, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 18, 86, Math.cos(e.face) < 0, e.flash); }
-    else drawOni(pos.x, pos.y, 22, '#3a6ad8', e.face, e.flash, [0]);
+    else drawOni(pos.x, pos.y, 22, '#7a4ab0', e.face, e.flash, [0]);
     bar(pos.x - 20, pos.y - (img ? 66 : 40), 40, 4, e.hp / e.maxHp, '#ff5050');
     if (e.alert) {
       ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
@@ -603,9 +658,9 @@
   function drawBoss(b, pos, now) {
     const wob = Math.sin(now * 5) * 3;
     if (b.st !== 'wander' && !b.stun) { ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 30; }
-    const img = art('oni/boss');
+    const img = art('oni/boss-' + (b.type || 'red'));
     if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 180, Math.cos(b.face) < 0, b.flash); }
-    else drawOni(pos.x, pos.y + wob, 46, '#b8242a', b.face, b.flash, [-1, 1]);
+    else drawOni(pos.x, pos.y + wob, 46, S.BOSSES[b.type || 'red'].color, b.face, b.flash, [-1, 1]);
     ctx.shadowBlur = 0;
     if (b.stun) {
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 3;
@@ -647,6 +702,15 @@
     ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#fff'; ctx.fillText(p.name, 0, top - 5);
     bar(-22, top, 44, 5, p.hp / p.maxHp, '#5be07a');
+    // ダッシュのスタミナ（減っているときだけ）
+    if (!p.down && !p.inf && (p.stam < 100 || p.exh)) {
+      bar(-18, top - 24, 36, 4, p.stam / 100, p.exh ? '#ff5050' : '#5be0ff');
+      if (p.exh) {
+        ctx.font = 'bold 13px sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#000';
+        const wob = Math.sin(performance.now() / 120) * 2;
+        ctx.strokeText('ぜぇぜぇ…', 0, top - 30 + wob); ctx.fillStyle = '#ffb0b0'; ctx.fillText('ぜぇぜぇ…', 0, top - 30 + wob);
+      }
+    }
     if (p.down) {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('たすけて！', 0, 40);
       ctx.strokeStyle = '#7dff9a'; ctx.lineWidth = 5;
@@ -687,17 +751,19 @@
     // 襖
     ctx.fillStyle = '#ffd84a'; ctx.fillRect(ox + fusuma.x * sx - 5, oy + fusuma.y * sx - 6, 10, 12);
     ctx.strokeStyle = '#6a3a1a'; ctx.strokeRect(ox + fusuma.x * sx - 5, oy + fusuma.y * sx - 6, 10, 12);
-    // アイテム（近くだけ種類がわかる）
+    // どデカい鬼玉
+    for (const d of dama.values()) if (d.v > 1) dot(d.x, d.y, 3 + Math.abs(Math.sin(now * 5)) * 2.5, '#ff5ac8');
+    // アイテム（画面に見えているものだけ種類がわかる）
     ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const it of snap.items) {
-      const known = me && Math.hypot(it.x - me.x, it.y - me.y) < S.ITEM_REVEAL_DIST;
+      const known = inView(it.x, it.y);
       if (known) { ctx.font = '10px sans-serif'; ctx.fillText(S.ITEMS[it.type].icon, ox + it.x * sx, oy + it.y * sx); }
       else { dot(it.x, it.y, 4, '#d0c0ff'); ctx.fillStyle = '#301050'; ctx.font = 'bold 7px sans-serif'; ctx.fillText('?', ox + it.x * sx, oy + it.y * sx + 0.5); }
     }
     ctx.textBaseline = 'alphabetic';
-    for (const e of snap.patrols) dot(e.x, e.y, 3.5, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#5c8cff');
+    for (const e of snap.patrols) dot(e.x, e.y, 3, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#b08cff');
     if (snap.boss) {
-      dot(snap.boss.x, snap.boss.y, 6, '#ff2020');
+      dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + snap.boss.x * sx, oy + snap.boss.y * sx, 6, 0, Math.PI * 2); ctx.stroke();
     }
     for (const p of snap.players) {
@@ -705,6 +771,8 @@
       const pos = p.id === myId && myPred ? myPred : p;
       dot(pos.x, pos.y, p.id === myId ? 4.5 : 3.5, p.id === myId ? '#ffe36b' : S.YOKAI_BY_ID[p.yokai].color);
     }
+    ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 1;
+    ctx.strokeRect(ox + Math.max(0, view.l) * sx, oy + Math.max(0, view.t) * sx, (Math.min(map.w, view.r) - Math.max(0, view.l)) * sx, (Math.min(map.h, view.b) - Math.max(0, view.t)) * sx);
     ctx.restore();
     return mh + oy;
   }
@@ -723,21 +791,18 @@
 
     // 鬼玉の数
     if (me) {
-      const team = snap.players.reduce((a, p) => a + p.dama, 0);
-      const ball = S.ballFor(me.dama);
       ctx.textAlign = 'right';
-      ctx.fillStyle = ball.color; ctx.beginPath(); ctx.arc(W - 120, 30, 12, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.font = 'bold 22px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-      ctx.strokeText(`× ${me.dama}`, W - 20, 38); ctx.fillStyle = '#ffd0f0'; ctx.fillText(`× ${me.dama}`, W - 20, 38);
-      ctx.font = '11px sans-serif'; ctx.fillStyle = '#fffc';
-      ctx.fillText(`チーム ${team}個 / ガチャ玉: ${ball.name}`, W - 20, 56);
-      const next = S.BALLS.find(b => b.min > me.dama);
-      if (next) ctx.fillText(`あと${next.min - me.dama}個で${next.name}`, W - 20, 70);
+      ctx.font = 'bold 24px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      const label = `× ${me.dama}`;
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = '#ff3da8'; ctx.shadowColor = '#ff3da8'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(W - 34 - tw, 30, 12, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(W - 38 - tw, 26, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeText(label, W - 20, 39); ctx.fillStyle = '#ffd0f0'; ctx.fillText(label, W - 20, 39);
     }
 
     // 仲間
-    let y = 88;
+    let y = 66;
     ctx.textAlign = 'right';
     for (const p of snap.players) {
       if (p.id === myId) continue;
@@ -755,7 +820,8 @@
 
       const bs = buttons();
       const st = S.ROLES[S.YOKAI_BY_ID[me.yokai].role];
-      drawButton(bs.atk, btnHold.atk !== null || input.atk, me.atkCd, '#e2531f', '攻撃');
+      const atFusuma = myPred && Math.hypot(myPred.x - fusuma.x, myPred.y - fusuma.y) < 80;
+      drawButton(bs.atk, btnHold.atk !== null || input.atk, atFusuma ? 1 - me.ep : me.atkCd, atFusuma ? '#c8a020' : '#e2531f', atFusuma ? '脱出' : '攻撃', atFusuma ? '長押し' : null);
       drawButton(bs.strong, input.strong, me.stCd, '#7a3fbf', '強攻撃', st.strong);
       const it = me.item ? S.ITEMS[me.item] : null;
       const itImg = me.item ? art('item/' + me.item) : null;
@@ -784,14 +850,16 @@
       ctx.fillStyle = '#fff3'; ctx.beginPath(); ctx.arc(stick.ox, stick.oy, STICK_R, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#fffa'; ctx.beginPath(); ctx.arc(stick.x, stick.y, 26, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
-    } else if (timeLimit - snap.timeLeft < 8) {
+    } else if (timeLimit - snap.timeLeft < 8 && !(me && me.esc)) {
       ctx.fillStyle = '#ffffff66'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('左側をドラッグで移動', W * 0.22, H - 40);
     }
 
     if (me && me.esc) {
-      ctx.textAlign = 'center'; ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#ffd84a';
-      ctx.fillText('脱出済み！ 仲間の脱出を待っています…', W / 2, H - 30);
+      const watching = snap.players.find(p => p.id === spectateId && !p.esc);
+      ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      const msg = watching ? `👀 観戦中：${watching.name}（タップで切り替え）` : '脱出済み！ みんなを待っています…';
+      ctx.strokeText(msg, W / 2, H - 30); ctx.fillStyle = '#ffd84a'; ctx.fillText(msg, W / 2, H - 30);
     }
 
     if (banner) {
@@ -799,6 +867,10 @@
       ctx.font = `bold ${Math.round(Math.min(W, H) * 0.065)}px sans-serif`; ctx.textAlign = 'center';
       ctx.lineWidth = 6; ctx.strokeStyle = '#000'; ctx.strokeText(banner.text, W / 2, H * 0.34);
       ctx.fillStyle = banner.c || '#ffe36b'; ctx.fillText(banner.text, W / 2, H * 0.34);
+      if (banner.sub) {
+        ctx.font = `bold ${Math.round(Math.min(W, H) * 0.04)}px sans-serif`; ctx.lineWidth = 4;
+        ctx.strokeText(banner.sub, W / 2, H * 0.34 + 34); ctx.fillStyle = '#fff'; ctx.fillText(banner.sub, W / 2, H * 0.34 + 34);
+      }
       ctx.globalAlpha = 1;
     }
   }
@@ -846,7 +918,7 @@
         let mx = input.mx, my = input.my; const m = Math.hypot(mx, my);
         if (m > 1) { mx /= m; my /= m; }
         const run = input.dash && m > 0.15 && (me.inf || (!me.exh && me.stam > 0));
-        const spd = st.speed * (run ? 1.65 : 1);
+        const spd = st.speed * (run ? 1.4 : 1);
         myPred.x += mx * spd * dt; myPred.y += my * spd * dt;
         S.collide(map, myPred, 18);
       }
@@ -858,7 +930,13 @@
     const cam = { vw: W / scale, vh: H / scale, x: myPred ? myPred.x : map.w / 2, y: myPred ? myPred.y : map.h / 2 };
     cam.x = Math.max(cam.vw / 2 - 80, Math.min(map.w - cam.vw / 2 + 80, cam.x));
     cam.y = Math.max(cam.vh / 2 - 80, Math.min(map.h - cam.vh / 2 + 80, cam.y));
-    if (me && me.esc) { const other = snap.players.find(p => !p.esc); if (other) { const pos = ents.get('p' + other.id) || other; cam.x = pos.x; cam.y = pos.y; } }
+    if (me && me.esc) {
+      // 脱出したら、まだ鬼の世界にいる仲間を観戦する
+      let other = snap.players.find(p => p.id === spectateId && !p.esc);
+      if (!other) { other = snap.players.find(p => !p.esc); spectateId = other ? other.id : null; }
+      if (other) { const pos = ents.get('p' + other.id) || other; cam.x = pos.x; cam.y = pos.y; }
+    }
+    view = { l: cam.x - cam.vw / 2, r: cam.x + cam.vw / 2, t: cam.y - cam.vh / 2, b: cam.y + cam.vh / 2 };
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = '#120a1a'; ctx.fillRect(0, 0, W, H);
@@ -896,14 +974,21 @@
     for (const d of dama.values()) {
       if (Math.abs(d.x - cam.x) > cam.vw / 2 + 30 || Math.abs(d.y - cam.y) > cam.vh / 2 + 30) continue;
       const bob = Math.sin(now * 4 + d.id) * 3;
-      ctx.fillStyle = '#ff3da8'; ctx.shadowColor = '#ff3da8'; ctx.shadowBlur = 12;
-      ctx.beginPath(); ctx.arc(d.x, d.y + bob, 9, 0, Math.PI * 2); ctx.fill();
+      const r = d.v > 1 ? 30 + Math.sin(now * 6) * 2 : 9;
+      ctx.fillStyle = '#ff3da8'; ctx.shadowColor = d.v > 1 ? '#ffe14a' : '#ff3da8'; ctx.shadowBlur = d.v > 1 ? 40 : 12;
+      ctx.beginPath(); ctx.arc(d.x, d.y + bob, r, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(d.x - 3, d.y + bob - 3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(d.x - r / 3, d.y + bob - r / 3, r / 3, 0, Math.PI * 2); ctx.fill();
+      if (d.v > 1) {
+        ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(d.x, d.y + bob, r + 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+        ctx.strokeText(`×${d.v}`, d.x, d.y + bob - r - 10); ctx.fillStyle = '#ffe14a'; ctx.fillText(`×${d.v}`, d.x, d.y + bob - r - 10);
+      }
     }
     // アイテム
     for (const it of snap.items) {
-      const known = myPred && Math.hypot(it.x - myPred.x, it.y - myPred.y) < S.ITEM_REVEAL_DIST;
+      if (!inView(it.x, it.y, 40)) continue;
+      const known = inView(it.x, it.y);
       const bob = Math.sin(now * 3 + it.id) * 3;
       ctx.fillStyle = known ? '#2f8a5a' : '#5a3a8a'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(it.x - 16, it.y - 16 + bob, 32, 32, 8) : ctx.rect(it.x - 16, it.y - 16 + bob, 32, 32); ctx.fill(); ctx.stroke();
@@ -912,7 +997,7 @@
       else { ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText('?', it.x, it.y + bob); }
       ctx.textBaseline = 'alphabetic';
     }
-    drawFusuma(now);
+    drawFusuma(now, me);
 
     // y座標順に描画
     const list = [];

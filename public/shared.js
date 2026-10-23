@@ -22,29 +22,8 @@
     ranger:  { name: 'レンジャー', hp: 90,  speed: 225, atkDmg: 10, atkRange: 520, atkCd: 0.3,  strongCd: 5, strong: '3連ショット' },
   };
 
-  // ---------- 妖怪（お友達） ----------
-  const YOKAI = [
-    // Cランク（はじめから全員がお友達）
-    { id: 'nekomata',  name: 'ネコマタロウ', rank: 'C', role: 'fighter', color: '#ff8a5c', starter: true },
-    { id: 'kasabou',   name: 'カサボウ',     rank: 'C', role: 'tank',    color: '#8aa0ff', starter: true },
-    { id: 'chochin',   name: 'チョウチンコ', rank: 'C', role: 'healer',  color: '#ffb35c', starter: true },
-    { id: 'hitodama',  name: 'ヒトダマン',   rank: 'C', role: 'ranger',  color: '#9ef0ff', starter: true },
-    // Bランク
-    { id: 'kappado',   name: 'カッパード',   rank: 'B', role: 'fighter', color: '#3fcf8e' },
-    { id: 'nurikabe',  name: 'ヌリカベエ',   rank: 'B', role: 'tank',    color: '#b0a080' },
-    { id: 'yukinko',   name: 'ユキンコ',     rank: 'B', role: 'healer',  color: '#d8f4ff' },
-    { id: 'tenguri',   name: 'テングリ',     rank: 'B', role: 'ranger',  color: '#e05050' },
-    // Aランク
-    { id: 'raijin',    name: 'ライジン坊',   rank: 'A', role: 'fighter', color: '#ffe14a' },
-    { id: 'gashadoku', name: 'ガシャドクロウ', rank: 'A', role: 'tank',  color: '#e8e8e8' },
-    { id: 'hakutaku',  name: 'ハクタク姫',   rank: 'A', role: 'healer',  color: '#ffc8ec' },
-    { id: 'kitsunebi', name: 'キツネビ',     rank: 'A', role: 'ranger',  color: '#ff9a2e' },
-    // Sランク
-    { id: 'susanoo',   name: 'スサノオ丸',   rank: 'S', role: 'fighter', color: '#5c7cff' },
-    { id: 'daidara',   name: 'ダイダラ王',   rank: 'S', role: 'tank',    color: '#7a5c3a' },
-    { id: 'amaterasu', name: 'アマテラ',     rank: 'S', role: 'healer',  color: '#fff27a' },
-    { id: 'yatagarasu', name: 'ヤタガラス',  rank: 'S', role: 'ranger',  color: '#3a2a5c' },
-  ];
+  // ---------- 妖怪（お友達）: public/yokai.js ----------
+  const YOKAI = typeof module === 'object' && module.exports ? require('./yokai.js') : self.YokaiList;
   const YOKAI_BY_ID = Object.fromEntries(YOKAI.map(y => [y.id, y]));
 
   // 妖怪の実ステータス（ロール基本値 × ランク倍率）
@@ -56,18 +35,45 @@
   }
 
   // ---------- ガチャ玉 ----------
-  // 集めた鬼玉の数で色が決まる
+  // 集めた鬼玉が多いほど良い色が出やすくなる（必ず出るわけではない）
   const BALLS = [
-    { key: 'green', name: '緑', color: '#4fd16a', min: 0,  ranks: [['C', 1]] },
-    { key: 'blue',  name: '青', color: '#3f7cff', min: 8,  ranks: [['B', 1]] },
-    { key: 'red',   name: '赤', color: '#ff3b3b', min: 15, ranks: [['A', 1]] },
-    { key: 'gold',  name: '金', color: '#ffcc33', min: 23, ranks: [['A', 0.6], ['S', 0.4]] },
-    { key: 'black', name: '黒', color: '#1a1a1a', min: 32, ranks: [['S', 1]] },
+    { key: 'green', name: '緑', color: '#4fd16a', ranks: [['C', 1]] },
+    { key: 'blue',  name: '青', color: '#3f7cff', ranks: [['B', 1]] },
+    { key: 'red',   name: '赤', color: '#ff3b3b', ranks: [['A', 1]] },
+    { key: 'gold',  name: '金', color: '#ffcc33', ranks: [['A', 0.6], ['S', 0.4]] },
+    { key: 'black', name: '黒', color: '#1a1a1a', ranks: [['S', 1]] },
   ];
-  function ballFor(count) {
-    let b = BALLS[0];
-    for (const x of BALLS) if (count >= x.min) b = x;
-    return b;
+  // [この数以上, 緑, 青, 赤, 金, 黒 の出やすさ]
+  const BALL_ODDS = [
+    [0,   80, 17,  3,  0,  0],
+    [50,  30, 55, 12,  3,  0],
+    [100, 12, 45, 33,  9,  1],
+    [150,  4, 22, 50, 19,  5],
+    [200,  0, 15, 30, 33, 22],
+  ];
+  function ballOdds(count) {
+    let row = BALL_ODDS[0];
+    for (const r of BALL_ODDS) if (count >= r[0]) row = r;
+    return row.slice(1);
+  }
+  function rollBall(count, rnd = Math.random) {
+    const w = ballOdds(count);
+    let x = rnd() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < w.length; i++) { if (x < w[i]) return BALLS[i]; x -= w[i]; }
+    return BALLS[0];
+  }
+
+  // ---------- ボス鬼 ----------
+  const BOSSES = {
+    red:   { name: '赤鬼', color: '#c8242a', hp: 1.0, dmg: 1.0, atkGap: 1.0,  drop: 50,  weight: 50 },
+    blue:  { name: '青鬼', color: '#2a5ad8', hp: 1.5, dmg: 1.3, atkGap: 0.8,  drop: 100, weight: 35 },
+    black: { name: '黒鬼', color: '#2a2030', hp: 2.2, dmg: 1.6, atkGap: 0.65, drop: 150, weight: 15 },
+  };
+  function pickBoss(rnd = Math.random) {
+    const keys = Object.keys(BOSSES);
+    let x = rnd() * keys.reduce((a, k) => a + BOSSES[k].weight, 0);
+    for (const k of keys) { if (x < BOSSES[k].weight) return k; x -= BOSSES[k].weight; }
+    return 'red';
   }
 
   // ---------- アイテム ----------
@@ -79,10 +85,9 @@
     onigiri: { name: 'おにぎり',         icon: '🍙', color: '#ffffff' },
     jimmy:   { name: 'ジミーフィールド', icon: '👻', color: '#b08cff' },
   };
-  const ITEM_REVEAL_DIST = 170; // これより近づくと種類がわかる
 
   // ---------- 街マップ ----------
-  const MAP_W = 3000, MAP_H = 2000;
+  const MAP_W = 4950, MAP_H = 3510; // 横10×縦7ブロック
   const STREET = 150;           // 道幅
   const BLOCK = 330;            // 1ブロックの大きさ
   const CELL = 50;              // 経路探索グリッド
@@ -170,5 +175,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballFor, ITEMS, ITEM_REVEAL_DIST, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, BOSSES, pickBoss, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

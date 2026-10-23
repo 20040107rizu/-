@@ -118,3 +118,13 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .save-box { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: #2a1840; font-size: 13px; }
 .save-box textarea { font: 12px/1.3 ui-monospace, monospace; padding: 8px; border-radius: 8px; border: 2px solid #8a4f7a; background: #1a0a20; color: #fff; resize: none; word-break: break-all; user-select: text; -webkit-user-select: text; }
 .save-box button { align-self: flex-end; }
+
+/* ---- お友達一覧（170体） ---- */
+.tabs { display: flex; gap: 6px; }
+.tabs .tab { font-size: 13px; padding: 4px 12px; border-radius: 999px; background: #2a1840; border: 2px solid #5b3577; }
+.tabs .tab.on { background: #5b3577; border-color: #ffe36b; }
+.tabs .tab small { opacity: .7; font-size: 10px; }
+.friends { max-height: 34vh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 2px; }
+.yk img.face { display: block; width: 40px; height: 40px; margin: 0 auto 2px; border: none; border-radius: 0; object-fit: contain; }
+.yk img.face.sil { filter: brightness(0); opacity: .45; }
+.yk small { font-size: 9px; opacity: .8; }

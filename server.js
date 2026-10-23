@@ -11,14 +11,17 @@ const TICK_RATE = 30;              // シミュレーション回数/秒
 const SEND_RATE = 15;              // 状態送信回数/秒
 const DT = 1 / TICK_RATE;
 const MAX_PLAYERS = 4;
-const TIME_LIMIT = +process.env.TIME_LIMIT || 180; // 制限時間（秒）
+const TIME_LIMIT = +process.env.TIME_LIMIT || 240; // 制限時間（秒）
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
 const BOSS_R = 46;
 const REVIVE_TIME = 3;
 const REVIVE_RANGE = 70;
-const DASH_MUL = 1.65;
+const DASH_MUL = 1.4;               // ダッシュでボス鬼をギリギリ振り切れる速さ
+const BOSS_CHASE = 255;            // ボス鬼の追いかける速さ（どの妖怪の歩きより速い）
+const ESCAPE_TIME = 1.5;           // 襖の前で攻撃ボタンを長押しする時間
+const ESCAPE_RANGE = 80;
 const STAMINA_MAX = 100;
 
 // ---------- 静的ファイル配信 ----------
@@ -176,7 +179,7 @@ function stepToward(e, tx, ty, speed) {
 
 // ---------- ガチャ ----------
 function rollGacha(count) {
-  const ball = S.ballFor(count);
+  const ball = S.rollBall(count);
   let x = Math.random(), rank = ball.ranks[0][0];
   for (const [r, w] of ball.ranks) { if (x < w) { rank = r; break; } x -= w; }
   const pool = S.YOKAI.filter(y => y.rank === rank);
@@ -249,43 +252,45 @@ class Room {
         stats: st, x: spawn.x + (i % 2) * 40 - 20, y: spawn.y + Math.floor(i / 2) * 40 - 20, face: 0,
         hp: st.hp, maxHp: st.hp, atkT: 0, strongT: 0, down: false, reviveProg: 0, escaped: false,
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
-        item: null, dama: 0, dmgDealt: 0, prevItem: true,
+        item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
       });
       S.collide(this.map, p, PLAYER_R);
       i++;
     }
 
     // 襖（出発地点から遠いところ）
-    this.fusuma = process.env.TEST_FUSUMA_NEAR ? { x: spawn.x, y: spawn.y } : this.farPoint(this.gridS, spawn, 1300);
+    this.fusuma = process.env.TEST_FUSUMA_NEAR ? { x: spawn.x, y: spawn.y } : this.farPoint(this.gridS, spawn, 2600);
 
     // 鬼玉
     this.dama = [];
-    const damaCount = 30 + 15 * n;
-    for (let k = 0; k < damaCount; k++) this.dama.push({ id: genId(), ...this.gridS.randomFreePoint() });
+    const damaCount = 60 + 20 * n;
+    for (let k = 0; k < damaCount; k++) this.dama.push({ id: genId(), v: 1, ...this.gridS.randomFreePoint() });
     for (const d of this.dama) { d.x += rand(-15, 15); d.y += rand(-15, 15); }
 
     // アイテム
     this.items = [];
-    this.itemCap = 12 + 2 * n;
+    this.itemCap = 7 + n;
     for (let k = 0; k < this.itemCap; k++) this.spawnItem();
-    this.itemRespawnT = 20;
+    this.itemRespawnT = 40;
 
     // 見回り鬼
     this.patrols = [];
-    for (let k = 0; k < 5 + n; k++) this.spawnPatrol(spawn);
+    for (let k = 0; k < 12 + 2 * n; k++) this.spawnPatrol(spawn);
 
     // ボス鬼
-    const bp = this.farPoint(this.gridB, spawn, 1400);
-    const bossHp = 5000 + 1500 * n;
+    const bp = this.farPoint(this.gridB, spawn, 2400);
+    const type = process.env.TEST_BOSS || S.pickBoss();
+    const kind = S.BOSSES[type];
+    const bossHp = Math.round((5000 + 1500 * n) * kind.hp);
     this.boss = {
-      x: bp.x, y: bp.y, hp: bossHp, maxHp: bossHp, name: 'ボス鬼', face: 0,
+      x: bp.x, y: bp.y, hp: bossHp, maxHp: bossHp, type, kind, name: kind.name, face: 0,
       state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
       stunT: 0, chargeDir: 0, hitFlash: 0, atkT: 2,
     };
 
     this.broadcast({
-      t: 'start', seed, timeLimit: TIME_LIMIT, fusuma: this.fusuma,
-      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y) })),
+      t: 'start', seed, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: type,
+      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
     });
   }
 
@@ -357,12 +362,13 @@ class Room {
     if (p.hp > before) this.events.push({ k: 'heal', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(p.hp - before) });
   }
 
-  dropDama(x, y, n) {
+  // 鬼玉を落とす（v はその玉1個の価値。ボス鬼は v の大きい「どデカい鬼玉」1個）
+  dropDama(x, y, n, v = 1) {
     for (let k = 0; k < n; k++) {
-      const d = { id: genId(), x: x + rand(-40, 40), y: y + rand(-40, 40) };
-      S.collide(this.map, d, 10);
+      const d = { id: genId(), x: x + rand(-40, 40), y: y + rand(-40, 40), v };
+      S.collide(this.map, d, v > 1 ? 30 : 10);
       this.dama.push(d);
-      this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y) });
+      this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v });
     }
   }
 
@@ -384,7 +390,7 @@ class Room {
   killPatrol(e) {
     this.events.push({ k: 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
     this.calmPatrol(e); // 伝達はここで途切れる
-    this.dropDama(e.x, e.y, 3);
+    this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
     e.respawnT = 25;
   }
 
@@ -436,7 +442,7 @@ class Room {
   killBoss() {
     const b = this.boss;
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
-    this.dropDama(b.x, b.y, 15);
+    this.dropDama(b.x, b.y, 1, b.kind.drop);
     this.telegraphs = [];
   }
 
@@ -461,14 +467,14 @@ class Room {
         break;
       case 'hunt': // 見回り鬼の報告で居場所を知っている
         if (!t || !this.visibleTo(t)) { b.state = 'wander'; b.target = null; b.huntBy = null; break; }
-        moveAlong(this, b, this.gridB, t.x, t.y, 165, BOSS_R);
+        moveAlong(this, b, this.gridB, t.x, t.y, BOSS_CHASE, BOSS_R);
         break;
       case 'engage': {
         if (!t || !this.visibleTo(t)) { b.state = b.huntBy ? 'hunt' : 'wander'; if (!b.huntBy) b.target = null; break; }
         const sees = S.lineOfSight(this.map, b, t) && dist(b, t) < 520;
         if (sees) b.lostT = 0;
         else if ((b.lostT += DT) > 3) { b.state = b.huntBy ? 'hunt' : 'wander'; if (!b.huntBy) b.target = null; break; }
-        if (dist(b, t) > 130) moveAlong(this, b, this.gridB, t.x, t.y, 150, BOSS_R);
+        if (dist(b, t) > 130) moveAlong(this, b, this.gridB, t.x, t.y, BOSS_CHASE, BOSS_R);
         else b.face = Math.atan2(t.y - b.y, t.x - b.x);
         b.atkT -= DT;
         if (b.atkT <= 0 && sees && dist(b, t) < 420) this.bossAttack(t);
@@ -476,16 +482,16 @@ class Room {
       }
       case 'windup':
         b.stateT -= DT;
-        if (b.stateT <= 0) { b.state = 'engage'; b.atkT = rand(1.2, 2.0); }
+        if (b.stateT <= 0) { b.state = 'engage'; b.atkT = rand(1.2, 2.0) * b.kind.atkGap; }
         break;
       case 'charging': {
         b.stateT -= DT;
         const px = b.x, py = b.y;
         b.x += Math.cos(b.chargeDir) * 600 * DT; b.y += Math.sin(b.chargeDir) * 600 * DT;
         S.collide(this.map, b, BOSS_R);
-        for (const p of this.activePlayers()) if (!p.chargeHit && dist(p, b) < BOSS_R + PLAYER_R) { this.damagePlayer(p, 45); p.chargeHit = true; }
+        for (const p of this.activePlayers()) if (!p.chargeHit && dist(p, b) < BOSS_R + PLAYER_R) { this.damagePlayer(p, 45 * b.kind.dmg); p.chargeHit = true; }
         const blocked = Math.hypot(b.x - px, b.y - py) < 600 * DT * 0.5;
-        if (b.stateT <= 0 || blocked) { b.state = 'engage'; b.atkT = rand(1.2, 1.8); if (blocked) this.events.push({ k: 'boom', x: Math.round(b.x), y: Math.round(b.y), r: 60 }); }
+        if (b.stateT <= 0 || blocked) { b.state = 'engage'; b.atkT = rand(1.2, 1.8) * b.kind.atkGap; if (blocked) this.events.push({ k: 'boom', x: Math.round(b.x), y: Math.round(b.y), r: 60 }); }
         break;
       }
     }
@@ -497,7 +503,7 @@ class Room {
     const warn = 1.0;
     b.face = Math.atan2(t.y - b.y, t.x - b.x);
     if (roll < 0.4) {
-      this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x, y: t.y, r: 110, t: warn, max: warn, dmg: 40 });
+      this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x, y: t.y, r: 110, t: warn, max: warn, dmg: 40 * b.kind.dmg });
       b.state = 'windup'; b.stateT = warn + 0.3;
     } else if (roll < 0.7) {
       b.chargeDir = b.face;
@@ -505,7 +511,7 @@ class Room {
       for (const p of this.players.values()) p.chargeHit = false;
       b.state = 'windup'; b.stateT = warn + 0.2;
     } else {
-      this.telegraphs.push({ id: genId(), shape: 'circle', x: b.x, y: b.y, r: 230, t: warn + 0.2, max: warn + 0.2, dmg: 35, follow: true });
+      this.telegraphs.push({ id: genId(), shape: 'circle', x: b.x, y: b.y, r: 230, t: warn + 0.2, max: warn + 0.2, dmg: 35 * b.kind.dmg, follow: true });
       b.state = 'windup'; b.stateT = warn + 0.5;
     }
   }
@@ -621,8 +627,8 @@ class Room {
     // 拾う
     for (const d of this.dama) {
       if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < 32) {
-        d.taken = true; p.dama++;
-        this.events.push({ k: 'dg', id: d.id, by: p.id });
+        d.taken = true; p.dama += d.v;
+        this.events.push({ k: 'dg', id: d.id, by: p.id, v: d.v });
       }
     }
     if (!p.item) {
@@ -635,9 +641,11 @@ class Room {
       }
     }
 
-    // 脱出
-    if (Math.hypot(this.fusuma.x - p.x, this.fusuma.y - p.y) < 45) {
-      p.escaped = true;
+    // 脱出: 襖の前で攻撃ボタンを長押し（うっかりぶつかって出ないように）
+    if (inp.atk && Math.hypot(this.fusuma.x - p.x, this.fusuma.y - p.y) < ESCAPE_RANGE) p.escProg += DT;
+    else p.escProg = 0;
+    if (p.escProg >= ESCAPE_TIME) {
+      p.escaped = true; p.escProg = 0;
       this.events.push({ k: 'escape', id: p.id });
       for (const e of this.patrols) if (e.target === p.id) this.calmPatrol(e);
     }
@@ -652,7 +660,7 @@ class Room {
       case 'bomb': this.bombs.push({ id: genId(), owner: p.id, x: p.x, y: p.y, t: 3 }); break;
       case 'punch': this.shoot(p, aim, 620, 90, 0.8, 26, '#9ab0c8', { punch: true }); break;
       case 'stamina': p.staminaT = 10; p.stamina = STAMINA_MAX; p.exhausted = false; break;
-      case 'onigiri': this.healPlayer(p, p.maxHp); break;
+      case 'onigiri': { const lost = p.maxHp - p.hp; p.hp = p.maxHp; this.events.push({ k: 'heal', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(lost) }); break; } // 必ず全回復
       case 'jimmy':
         p.invisT = 10;
         for (const e of this.patrols) if (e.target === p.id) this.calmPatrol(e);
@@ -685,7 +693,7 @@ class Room {
     this.items = this.items.filter(it => !it.taken);
     this.dama = this.dama.filter(d => !d.taken);
     this.itemRespawnT -= DT;
-    if (this.itemRespawnT <= 0) { this.itemRespawnT = 20; if (this.items.length < this.itemCap) this.spawnItem(); }
+    if (this.itemRespawnT <= 0) { this.itemRespawnT = 40; if (this.items.length < this.itemCap) this.spawnItem(); }
   }
 
   updateRevive() {
@@ -759,11 +767,11 @@ class Room {
       players: [...this.players.values()].map(p => ({
         id: p.id, name: p.name, yokai: p.yokai, x: Math.round(p.x), y: Math.round(p.y), face: +p.face.toFixed(2),
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
-        dama: p.dama, item: p.item, stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
+        dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / p.stats.atkCd).toFixed(2), stCd: +(p.strongT / p.stats.strongCd).toFixed(2),
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
-      boss: b && b.hp > 0 ? { x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0 } : null,
+      boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0 } : null,
       items: this.items.map(it => ({ id: it.id, x: Math.round(it.x), y: Math.round(it.y), type: it.type })),
       traps: this.traps.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y) })),
       bombs: this.bombs.map(bm => ({ id: bm.id, x: Math.round(bm.x), y: Math.round(bm.y), t: +bm.t.toFixed(1) })),

@@ -18,12 +18,13 @@ const sheet = (args.find(a => a.startsWith('--sheet=')) || '').slice(8);
   if (only.length) items = items.filter(([key]) => only.some(o => key.startsWith(o)));
   const rendered = [];
   for (const [key, svg, size] of items) {
-    const buf = await sharp(Buffer.from(svg), { density: (72 * size) / 256 }).resize(size, size).png({ compressionLevel: 9 }).toBuffer();
+    let buf;
+    try { buf = await sharp(Buffer.from(svg), { density: (72 * size) / 256 }).resize(size, size).png({ compressionLevel: 9, palette: true, quality: 95 }).toBuffer(); }
+    catch (e) { console.error(`✗ ${key}: ${e.message}`); process.exitCode = 1; continue; }
     const out = path.join(ART_DIR, `${key}.png`);
     fs.mkdirSync(path.dirname(out), { recursive: true });
     fs.writeFileSync(out, buf);
     rendered.push([key, buf]);
-    console.log(`✓ ${key}`);
   }
 
   // manifest.json（public/art/ にある絵の一覧。生成AIの絵と共通）

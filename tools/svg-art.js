@@ -1,6 +1,8 @@
 // コードで描くゲームの絵（SVG）。tools/render-art.js で PNG にして public/art/ に書き出す。
 // キャラは 256×256 の枠に、足元が y=236 付近にくるように描く。
 const INK = '#2a1020';
+const YOKAI = require('../public/yokai.js');
+const { drawYokai } = require('./yokai-gen');
 const O = `stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"`;
 const O4 = `stroke="${INK}" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"`;
 
@@ -279,50 +281,75 @@ Y.yatagarasu = () => withAura('S', '#3a2a5c', '', `${shadow()}
   ${angryEye(108, 86, 11, -1, '#e8323a')}${angryEye(146, 86, 11, 1, '#e8323a')}
   <path d="M110 50 Q118 30 130 48 Q138 28 148 50" fill="#2a2040" ${O4}/>`);
 
-// ---------- 鬼 ----------
-const oniPatrol = () => svg(`${shadow(128, 54)}
-  <rect x="94" y="200" width="28" height="32" rx="10" fill="#3a6ad8" ${O}/><rect x="134" y="200" width="28" height="32" rx="10" fill="#3a6ad8" ${O}/>
-  <path d="M74 214 L84 140 L172 140 L182 214Z" fill="#2a3a7a" ${O}/>
-  <path d="M84 140 L128 180 L172 140" stroke="#fff" stroke-width="8" fill="none"/>
-  <path d="M92 196 L164 196" stroke="#fff" stroke-width="5" stroke-dasharray="10 6"/>
-  <circle cx="128" cy="168" r="13" fill="none" stroke="#fff" stroke-width="5"/><path d="M121 168 L135 168 M128 161 L128 175" stroke="#fff" stroke-width="4"/>
-  <path d="M190 150 L208 150 L208 130" ${O} fill="none"/>
-  <rect x="190" y="150" width="34" height="46" rx="14" fill="#ff5a3a" ${O}/>
-  <rect x="196" y="144" width="22" height="8" fill="${INK}"/><rect x="196" y="194" width="22" height="8" fill="${INK}"/>
-  <circle cx="207" cy="173" r="20" fill="#ffb050" opacity="0.4"/>
-  <circle cx="72" cy="170" r="16" fill="#5a8aff" ${O}/><circle cx="192" cy="146" r="14" fill="#5a8aff" ${O}/>
-  <ellipse cx="128" cy="96" rx="58" ry="52" fill="#5a8aff" ${O}/>
-  <path d="M112 50 L128 4 L144 50Z" fill="#f6e6b0" ${O}/>
-  <path d="M74 84 Q78 50 104 50 Q96 62 100 70 Q86 70 74 84Z M182 84 Q178 50 152 50 Q160 62 156 70 Q170 70 182 84Z" fill="#2a2040"/>
-  ${shine(94, 70, 14, 7)}
-  ${eye(104, 94, 13, 0.7, 0, '#c82a2a')}${eye(152, 94, 13, 0.7, 0, '#c82a2a')}
-  <path d="M90 74 L118 80 M166 74 L138 80" ${O} fill="none"/>
-  <rect x="118" y="118" width="40" height="16" rx="8" fill="#c8c8d8" ${O4}/><circle cx="158" cy="126" r="10" fill="#c8c8d8" ${O4}/>
-  <path d="M176 112 Q196 104 204 112 M180 98 Q198 86 210 92" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>`);
+// ---------- 鬼（怖い見た目） ----------
+// 光る目: 黄色い白目に縦長の瞳、周りがぼんやり光る
+const oniEye = (cx, cy, rx, ry, side, glow, pupil = '#1a0000') => `
+  <ellipse cx="${cx}" cy="${cy}" rx="${rx * 1.6}" ry="${ry * 1.8}" fill="${glow}" opacity="0.55" filter="url(#eyeGlow)"/>
+  <path d="M${cx - rx} ${cy + ry * 0.2} Q${cx} ${cy - ry * 1.3} ${cx + rx} ${cy - ry * (side > 0 ? 0.2 : -0.2)} Q${cx} ${cy + ry} ${cx - rx} ${cy + ry * 0.2}Z" fill="#ffe14a" ${O4}/>
+  <ellipse cx="${cx + side * rx * 0.1}" cy="${cy}" rx="${rx * 0.18}" ry="${ry * 0.75}" fill="${pupil}"/>`;
+const oniDefs = `<filter id="eyeGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
+  <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>`;
 
-const oniBoss = () => svg(`
-  <ellipse cx="128" cy="240" rx="86" ry="12" fill="#000" opacity="0.3"/>
-  <path d="M196 230 L232 40" stroke="${INK}" stroke-width="30" stroke-linecap="round"/>
-  <path d="M196 230 L232 40" stroke="#5a5a6a" stroke-width="20" stroke-linecap="round"/>
-  ${[60, 90, 120, 150].map(t => { const y = 230 - t * 1.1, x = 196 + t * 0.21; return `<path d="M${x - 16} ${y} L${x - 26} ${y - 6} L${x - 14} ${y - 10}Z M${x + 14} ${y - 6} L${x + 26} ${y - 12} L${x + 14} ${y - 16}Z" fill="#c8c8d8" ${O4}/>`; }).join('')}
-  <rect x="78" y="196" width="40" height="40" rx="12" fill="#c8242a" ${O}/><rect x="138" y="196" width="40" height="40" rx="12" fill="#c8242a" ${O}/>
-  <path d="M60 140 Q60 108 128 104 Q196 108 196 140 L192 206 L64 206Z" fill="#d83a3a" ${O}/>
-  <path d="M90 130 Q128 146 166 130" stroke="#a81a20" stroke-width="5" fill="none"/>
-  <path d="M64 178 L192 178 L196 214 L60 214Z" fill="#ffcc33" ${O}/>
-  <path d="M80 180 L86 212 M104 180 L100 212 M128 180 L132 212 M152 180 L148 212 M174 180 L178 212" stroke="${INK}" stroke-width="6"/>
-  <circle cx="44" cy="160" r="24" fill="#d83a3a" ${O}/><circle cx="200" cy="168" r="24" fill="#d83a3a" ${O}/>
-  <path d="M60 70 Q44 10 18 4 Q36 40 46 84Z M196 70 Q212 10 238 4 Q220 40 210 84Z" fill="#f6e6b0" ${O}/>
-  <path d="M40 92 Q30 40 128 26 Q226 40 216 92 L200 64 L188 84 L172 56 L160 80 L146 50 L128 76 L110 50 L96 80 L84 56 L68 84 L56 64Z" fill="#1a1020" ${O}/>
-  <ellipse cx="128" cy="104" rx="76" ry="62" fill="#d83a3a" ${O}/>
-  ${shine(86, 74, 18, 9)}
-  <path d="M60 66 Q90 52 116 66 L110 86Z M196 66 Q166 52 140 66 L146 86Z" fill="#1a1020"/>
-  <ellipse cx="98" cy="96" rx="18" ry="14" fill="#ffe14a" ${O4}/><ellipse cx="158" cy="96" rx="18" ry="14" fill="#ffe14a" ${O4}/>
-  <circle cx="100" cy="98" r="7" fill="${INK}"/><circle cx="156" cy="98" r="7" fill="${INK}"/>
-  <path d="M78 76 L120 88 M178 76 L136 88" stroke="${INK}" stroke-width="10" stroke-linecap="round"/>
-  <path d="M120 110 Q128 104 136 110 L132 120 L124 120Z" fill="#a81a20" ${O4}/>
-  <path d="M82 128 Q128 168 174 128 Q150 140 128 140 Q106 140 82 128Z" fill="#5a0a14" ${O}/>
-  <path d="M94 132 L100 148 L106 135Z M150 135 L156 148 L162 132Z" fill="#fff" ${O4}/>
-  <path d="M112 138 L116 128 L120 139Z M136 139 L140 128 L144 138Z" fill="#fff"/>`);
+const oniPatrol = () => svg(`
+  <ellipse cx="128" cy="238" rx="56" ry="10" fill="#000" opacity="0.3"/>
+  <rect x="94" y="200" width="28" height="34" rx="10" fill="#4a3a7a" ${O}/><rect x="134" y="200" width="28" height="34" rx="10" fill="#4a3a7a" ${O}/>
+  <path d="M72 216 L84 138 L172 138 L184 216Z" fill="#2a1a3a" ${O}/>
+  <path d="M84 138 L128 182 L172 138" stroke="#c8242a" stroke-width="8" fill="none"/>
+  <path d="M90 198 L166 198" stroke="#c8242a" stroke-width="5" stroke-dasharray="10 6"/>
+  <path d="M188 150 L206 150 L206 128" ${O} fill="none"/>
+  <circle cx="207" cy="174" r="30" fill="#ff5a2a" opacity="0.45" filter="url(#soft)"/>
+  <rect x="190" y="150" width="34" height="46" rx="14" fill="#c8242a" ${O}/>
+  <rect x="196" y="144" width="22" height="8" fill="${INK}"/><rect x="196" y="194" width="22" height="8" fill="${INK}"/>
+  <path d="M60 164 L44 150 M60 176 L40 172" ${O}/>
+  <circle cx="72" cy="168" r="16" fill="#8a6ac8" ${O}/><circle cx="190" cy="146" r="14" fill="#8a6ac8" ${O}/>
+  <path d="M64 160 L58 150 M72 156 L70 144 M80 160 L84 150" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>
+  <ellipse cx="128" cy="96" rx="60" ry="54" fill="#8a6ac8" ${O}/>
+  <path d="M110 48 Q120 0 136 -2 Q130 26 146 50Z" fill="#e8d6a0" ${O}/>
+  <path d="M110 40 L132 32 M114 28 L132 22" stroke="#a08a60" stroke-width="3"/>
+  <path d="M70 90 Q66 50 104 46 Q94 60 98 72 Q82 70 70 90Z M186 90 Q190 50 152 46 Q162 60 158 72 Q174 70 186 90Z" fill="#1a1020"/>
+  <path d="M84 70 L122 86 L120 94 L84 82Z M172 70 L134 86 L136 94 L172 82Z" fill="${INK}"/>
+  ${oniEye(104, 98, 16, 11, -1, '#ff2a2a', '#c80000')}${oniEye(152, 98, 16, 11, 1, '#ff2a2a', '#c80000')}
+  <path d="M120 64 L124 74 M136 64 L132 74" stroke="#5a3a8a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M94 124 Q128 150 162 124 L156 136 L148 128 L140 140 L132 128 L124 140 L116 128 L108 140 L100 128Z" fill="#fff" ${O4}/>
+  <rect x="150" y="118" width="34" height="14" rx="7" fill="#c8c8d8" ${O4}/><circle cx="184" cy="125" r="9" fill="#c8c8d8" ${O4}/>
+  <path d="M196 108 Q214 98 224 106 M200 92 Q218 80 232 86" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M150 74 L166 92" stroke="#c8242a" stroke-width="4" stroke-linecap="round"/>`, oniDefs);
+
+// ボス鬼（赤鬼・青鬼・黒鬼）: skin 肌、shade 影、mane たてがみ、glow 目の光
+function oniBoss({ skin, shade, mane, glow, pupil, aura }) {
+  return svg(`
+  ${aura ? `<circle cx="128" cy="120" r="118" fill="${aura}" opacity="0.55" filter="url(#soft)"/>` : ''}
+  <ellipse cx="128" cy="240" rx="88" ry="12" fill="#000" opacity="0.35"/>
+  <path d="M196 232 L234 36" stroke="${INK}" stroke-width="32" stroke-linecap="round"/>
+  <path d="M196 232 L234 36" stroke="#4a4a5a" stroke-width="22" stroke-linecap="round"/>
+  ${[50, 80, 110, 140, 168].map(t => { const y = 232 - t * 1.12, x = 196 + t * 0.22; return `<path d="M${x - 14} ${y} L${x - 30} ${y - 8} L${x - 13} ${y - 12}Z M${x + 13} ${y - 6} L${x + 30} ${y - 14} L${x + 13} ${y - 18}Z" fill="#d8d8e8" ${O4}/>`; }).join('')}
+  <rect x="76" y="196" width="42" height="40" rx="12" fill="${shade}" ${O}/><rect x="138" y="196" width="42" height="40" rx="12" fill="${shade}" ${O}/>
+  <path d="M78 232 L84 222 L90 232 M146 232 L152 222 L158 232" stroke="#f6e6b0" stroke-width="5" stroke-linejoin="round" fill="none"/>
+  <path d="M56 142 Q56 106 128 102 Q200 106 200 142 L194 206 L62 206Z" fill="${skin}" ${O}/>
+  <path d="M88 126 Q108 140 124 128 M132 128 Q148 140 168 126 M128 140 L128 176 M100 160 Q112 168 124 160 M132 160 Q144 168 156 160" stroke="${shade}" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M150 118 L176 146 M156 116 L170 132" stroke="#f0d0c0" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+  <path d="M62 176 L194 176 L198 214 L58 214Z" fill="#ffcc33" ${O}/>
+  <path d="M78 178 L86 212 M102 178 L98 212 M128 178 L132 212 M152 178 L148 212 M176 178 L180 212" stroke="${INK}" stroke-width="7"/>
+  <circle cx="40" cy="162" r="26" fill="${skin}" ${O}/><circle cx="204" cy="170" r="26" fill="${skin}" ${O}/>
+  <path d="M26 150 L18 138 M38 146 L36 132 M50 150 L56 138" stroke="#f6e6b0" stroke-width="6" stroke-linecap="round"/>
+  <path d="M58 76 Q34 10 6 2 Q30 46 40 92Z M198 76 Q222 10 250 2 Q226 46 216 92Z" fill="#f6e6b0" ${O}/>
+  <path d="M30 34 L46 30 M22 20 L36 14 M226 34 L210 30 M234 20 L220 14" stroke="#b09a6a" stroke-width="4"/>
+  <path d="M36 96 Q24 36 128 22 Q232 36 220 96 L206 62 L194 86 L178 54 L166 82 L150 46 L128 78 L106 46 L90 82 L78 54 L62 86 L50 62Z" fill="${mane}" ${O}/>
+  <ellipse cx="128" cy="106" rx="78" ry="64" fill="${skin}" ${O}/>
+  <path d="M60 70 Q96 50 122 78 L116 96 Q96 78 64 84Z M196 70 Q160 50 134 78 L140 96 Q160 78 192 84Z" fill="${mane}" ${O4}/>
+  <path d="M118 70 L124 84 M138 70 L132 84 M128 62 L128 78" stroke="${shade}" stroke-width="5" stroke-linecap="round"/>
+  ${oniEye(96, 100, 22, 14, -1, glow, pupil)}${oniEye(160, 100, 22, 14, 1, glow, pupil)}
+  <path d="M116 112 Q128 104 140 112 L136 124 L120 124Z" fill="${shade}" ${O4}/>
+  <path d="M74 132 Q128 190 182 132 Q154 146 128 146 Q102 146 74 132Z" fill="#3a0008" ${O}/>
+  <path d="M82 136 L90 150 L98 140 L106 152 L114 142 L122 154 L128 144 L134 154 L142 142 L150 152 L158 140 L166 150 L174 136" fill="#fff" ${O4}/>
+  <path d="M92 160 L96 136 L104 158Z M152 158 L160 136 L164 160Z" fill="#fff" ${O4}/>
+  <path d="M168 66 L188 92 M174 64 L180 74" stroke="#f0d0c0" stroke-width="4" stroke-linecap="round" opacity="0.8"/>`, oniDefs);
+}
+const BOSS_LOOK = {
+  red:   { skin: '#d02a2a', shade: '#7a0a14', mane: '#1a0a14', glow: '#ffb000', pupil: '#1a0000' },
+  blue:  { skin: '#2a5ad8', shade: '#142a7a', mane: '#0a0a2a', glow: '#ff3a2a', pupil: '#5a0000' },
+  black: { skin: '#2a2030', shade: '#0a0610', mane: '#5a1a5a', glow: '#ff2a2a', pupil: '#000', aura: '#8a2ad8' },
+};
 
 // ---------- アイテム ----------
 const ITEM = {
@@ -382,8 +409,10 @@ const tiles = {
 function all() {
   const out = [];
   for (const [id, f] of Object.entries(Y)) out.push([`yokai/${id}`, f(), 256]);
+  // 手描きでない妖怪は tools/yokai-gen.js で組み合わせて描く
+  for (const y of YOKAI) if (!Y[y.id]) out.push([`yokai/${y.id}`, drawYokai(y), 192]);
   out.push(['oni/patrol', oniPatrol(), 256]);
-  out.push(['oni/boss', oniBoss(), 384]);
+  for (const [type, look] of Object.entries(BOSS_LOOK)) out.push([`oni/boss-${type}`, oniBoss(look), 384]);
   for (const [id, f] of Object.entries(ITEM)) out.push([`item/${id}`, f(), 128]);
   out.push(['scene/ground', tiles.ground(), 256]);
   out.push(['scene/roof', tiles.roof(), 256]);
