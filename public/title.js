@@ -154,6 +154,14 @@
   }
 
   const title = document.getElementById('title');
-  title.prepend(buildBackground());
+  const bg = buildBackground();
+  title.prepend(bg);
+  // 生成AIの背景画像があれば差し替える
+  fetch('art/manifest.json').then(r => (r.ok ? r.json() : {})).then(m => {
+    if (!m['scene/title-bg']) return;
+    const img = new Image();
+    img.onload = () => { title.style.background = `#0b0514 url(art/${m['scene/title-bg']}) center/cover no-repeat`; bg.style.display = 'none'; };
+    img.src = 'art/' + m['scene/title-bg'];
+  }).catch(() => {});
   document.getElementById('logo').appendChild(buildLogo());
 })();

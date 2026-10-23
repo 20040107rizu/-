@@ -88,12 +88,33 @@ https://busters.onrender.com/ を開き、タイトル画面の「📲 ホーム
 ホーム画面のアイコンから起動すると、アドレスバーなしの全画面・横向きで遊べます（iPhoneは向きの固定ができないため、横にして遊んでください）。
 アプリ化は PWA（`public/manifest.json`、`public/sw.js`、`public/icons/`）で行っています。
 
+## 生成AIで絵を作る（Gemini / Nano Banana）
+
+キャラ（妖怪16体・見回り鬼・ボス鬼）、アイテム6種、タイトル背景、街の地面・屋根、アプリアイコンを、Gemini の画像生成でまとめて作れます。
+できた絵は `public/art/` に保存され、ゲームが自動で読み込みます（無い絵は今までの図形で表示）。
+
+```bash
+npm install                      # 画像加工用の sharp も入ります
+export GEMINI_API_KEY=...        # Google AI Studio で発行した API キー
+npm run art                      # まだ無い絵を全部作る（約30枚）
+npm run art -- --only=yokai/nekomata   # 1枚だけ作る（前方一致、カンマ区切り可）
+npm run art -- --force           # 全部作り直す
+npm run art -- --list            # 指示文（プロンプト）を確認する
+npm run art -- --process-only    # tools/raw/ の元画像から切り抜きだけやり直す
+```
+
+- 指示文は `tools/art-prompts.js` で編集できます（絵柄は先頭の `STYLE` で全体共通）
+- キャラは緑背景で作って自動で切り抜きます。最初に作った「ネコマタロウ」を絵柄の見本にして、ほかのキャラの絵柄をそろえます
+- `icon/app` を作ると、ホーム画面用のアイコン一式（`public/icons/`）も作り直されます
+- モデルは `GEMINI_IMAGE_MODEL` で変更できます（省略時 `gemini-2.5-flash-image`）
+
 ## 構成
 
 - `server.js`：HTTP配信＋WebSocket。ルーム管理とゲームの計算はすべてサーバー側（1秒に30回計算、15回配信）。見回り鬼とボス鬼は道を探して（A*経路探索）追いかける
 - `public/shared.js`：妖怪・アイテム・ガチャ玉のデータと、街の生成・当たり判定（サーバーとブラウザで共通）
 - `public/title.js`：タイトル画面の背景（夜の鬼の街）とロゴをSVGで描画
 - `public/game.js`：Canvas描画、ミニマップ、仮想スティック、ガチャ演出
+- `tools/gen-art.js`, `tools/art-prompts.js`：生成AIで絵を作るスクリプトと指示文
 - `public/index.html`, `style.css`：タイトル／ロビー／ガチャ／リザルト画面
 
 テスト用の環境変数：`TIME_LIMIT`（制限時間を秒で変更）、`TEST_FUSUMA_NEAR=1`（襖を出発地点に置く）

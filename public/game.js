@@ -119,6 +119,36 @@
     $('saveMsg').textContent = `読み込みました！ お友達 ${n}体`;
   };
 
+  // ---------- 生成AIの絵（public/art/、無ければ図形で描く） ----------
+  const ART = {};
+  const PATTERNS = {};
+  const art = key => ART[key] || null;
+  fetch('art/manifest.json').then(r => (r.ok ? r.json() : {})).then(m => {
+    for (const [key, file] of Object.entries(m)) {
+      const img = new Image();
+      img.onload = () => {
+        ART[key] = img;
+        if (lobby && $('lobby').classList.contains('active')) renderLobby();
+      };
+      img.src = 'art/' + file;
+    }
+  }).catch(() => {});
+  const artUrl = key => (ART[key] ? ART[key].src : null);
+  function pattern(key) {
+    if (!ART[key]) return null;
+    return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(ART[key], 'repeat'));
+  }
+  // キャラ画像を足元基準で描く（左向きなら反転）
+  function drawSprite(img, x, y, size, flip, flash) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
+    if (flash) ctx.filter = 'brightness(2.5)';
+    ctx.drawImage(img, -size / 2, -size * 0.7, size, size);
+    ctx.restore();
+  }
+  const faceStyle = y => (artUrl('yokai/' + y.id) ? `background:${y.color}55 url(${artUrl('yokai/' + y.id)}) center/contain no-repeat` : `background:${y.color}`);
+
   // ---------- ホーム画面に追加（PWA） ----------
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone === true;
@@ -227,7 +257,7 @@
       const li = document.createElement('li');
       if (p) {
         const y = S.YOKAI_BY_ID[p.yokai];
-        li.innerHTML = `<div class="dot" style="background:${y.color}"></div><b>${esc(p.name)}${p.host ? ' 👑' : ''}</b><span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span>`;
+        li.innerHTML = `<div class="dot" style="${faceStyle(y)}"></div><b>${esc(p.name)}${p.host ? ' 👑' : ''}</b><span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span>`;
       } else { li.className = 'empty'; li.textContent = 'あき'; }
       ul.appendChild(li);
     }
@@ -246,7 +276,7 @@
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = owned
-        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}<div class="face" style="background:${y.color}"></div>${y.name}<br><small>${S.ROLES[y.role].name}</small>`
+        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}<div class="face" style="${faceStyle(y)}"></div>${y.name}<br><small>${S.ROLES[y.role].name}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span><div class="face" style="background:#333"></div>？？？<br><small>&nbsp;</small>`;
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
@@ -314,7 +344,7 @@
       const y = S.YOKAI_BY_ID[mine.gacha.yokai];
       const isNew = gachaIsNew;
       $('machine').style.display = 'none';
-      $('revealIcon').style.background = y.color;
+      $('revealIcon').style.cssText = faceStyle(y);
       $('revealRank').textContent = `${y.rank}ランク`;
       $('revealRank').style.color = S.RANKS[y.rank].color;
       $('revealName').textContent = y.name;
@@ -494,7 +524,7 @@
 
   const ROOF = ['#5a3a5a', '#4a3a60', '#603a3a', '#3a4a5a'];
   function drawCity(cam) {
-    ctx.fillStyle = '#2e2236';
+    ctx.fillStyle = pattern('scene/ground') || '#2e2236';
     ctx.fillRect(0, 0, map.w, map.h);
     // 石畳っぽい模様
     ctx.strokeStyle = '#ffffff08'; ctx.lineWidth = 2;
@@ -512,11 +542,15 @@
     for (const b of map.buildings) {
       if (b.x > r || b.x + b.w < l || b.y > bt || b.y + b.h < t) continue;
       ctx.fillStyle = '#140c18'; ctx.fillRect(b.x, b.y + 14, b.w, b.h);       // 影/壁
-      ctx.fillStyle = ROOF[b.hue]; ctx.fillRect(b.x, b.y, b.w, b.h - 6);      // 屋根
-      ctx.strokeStyle = '#00000055'; ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let yy = b.y + 22; yy < b.y + b.h - 10; yy += 22) { ctx.moveTo(b.x + 6, yy); ctx.lineTo(b.x + b.w - 6, yy); }
-      ctx.stroke();
+      const roof = pattern('scene/roof');
+      ctx.fillStyle = roof || ROOF[b.hue]; ctx.fillRect(b.x, b.y, b.w, b.h - 6);      // 屋根
+      if (roof) { ctx.fillStyle = ['#0000', '#4060ff18', '#ff404018', '#40ff8012'][b.hue]; ctx.fillRect(b.x, b.y, b.w, b.h - 6); }
+      else {
+        ctx.strokeStyle = '#00000055'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let yy = b.y + 22; yy < b.y + b.h - 10; yy += 22) { ctx.moveTo(b.x + 6, yy); ctx.lineTo(b.x + b.w - 6, yy); }
+        ctx.stroke();
+      }
       // ちょうちん
       ctx.fillStyle = '#ff6a3d'; ctx.shadowColor = '#ff6a3d'; ctx.shadowBlur = 14;
       ctx.beginPath(); ctx.arc(b.x + 14, b.y + b.h + 2, 6, 0, Math.PI * 2); ctx.fill();
@@ -556,18 +590,22 @@
     const range = 300, half = 0.65;
     ctx.fillStyle = e.alert ? 'rgba(255,60,60,0.16)' : 'rgba(255,240,120,0.12)';
     ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.arc(pos.x, pos.y, range, e.face - half, e.face + half); ctx.closePath(); ctx.fill();
-    drawOni(pos.x, pos.y, 22, '#3a6ad8', e.face, e.flash, [0]);
-    bar(pos.x - 20, pos.y - 40, 40, 4, e.hp / e.maxHp, '#ff5050');
+    const img = art('oni/patrol');
+    if (img) { ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 18, 22, 7, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 18, 72, Math.cos(e.face) < 0, e.flash); }
+    else drawOni(pos.x, pos.y, 22, '#3a6ad8', e.face, e.flash, [0]);
+    bar(pos.x - 20, pos.y - (img ? 52 : 40), 40, 4, e.hp / e.maxHp, '#ff5050');
     if (e.alert) {
       ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillStyle = '#ff5050'; ctx.fillText(bubbles.has(e.id) ? 'ピーッ！♪' : '！', pos.x, pos.y - 48 - Math.abs(Math.sin(now * 8)) * 4);
+      ctx.fillStyle = '#ff5050'; ctx.fillText(bubbles.has(e.id) ? 'ピーッ！♪' : '！', pos.x, pos.y - (img ? 60 : 48) - Math.abs(Math.sin(now * 8)) * 4);
     }
   }
 
   function drawBoss(b, pos, now) {
     const wob = Math.sin(now * 5) * 3;
     if (b.st !== 'wander' && !b.stun) { ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 30; }
-    drawOni(pos.x, pos.y + wob, 46, '#b8242a', b.face, b.flash, [-1, 1]);
+    const img = art('oni/boss');
+    if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 160, Math.cos(b.face) < 0, b.flash); }
+    else drawOni(pos.x, pos.y + wob, 46, '#b8242a', b.face, b.flash, [-1, 1]);
     ctx.shadowBlur = 0;
     if (b.stun) {
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 3;
@@ -577,7 +615,7 @@
       }
       ctx.fillStyle = '#ffe14a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ビリビリ…', pos.x, pos.y - 80);
     }
-    bar(pos.x - 50, pos.y - 72, 100, 6, b.hp / b.maxHp, '#ff8a3d');
+    bar(pos.x - 50, pos.y - (img ? 86 : 72), 100, 6, b.hp / b.maxHp, '#ff8a3d');
   }
 
   function drawPlayer(p, pos, me) {
@@ -592,15 +630,23 @@
       ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 3;
       for (let k = -1; k <= 1; k++) { const a = p.face + Math.PI + k * 0.4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 22, Math.sin(a) * 22); ctx.lineTo(Math.cos(a) * 36, Math.sin(a) * 36); ctx.stroke(); }
     }
-    ctx.fillStyle = y.color;
-    ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = '#222';
-    ctx.beginPath(); ctx.arc(Math.cos(p.face) * 6 - 5, Math.sin(p.face) * 4 - 3, 3, 0, Math.PI * 2); ctx.arc(Math.cos(p.face) * 6 + 5, Math.sin(p.face) * 4 - 3, 3, 0, Math.PI * 2); ctx.fill();
+    const img = art('yokai/' + y.id);
+    if (img) {
+      ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(0, 16, 20, 7, 0, 0, Math.PI * 2); ctx.stroke();
+      drawSprite(img, 0, 16, 64, Math.cos(p.face) < 0);
+    } else {
+      ctx.fillStyle = y.color;
+      ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(Math.cos(p.face) * 6 - 5, Math.sin(p.face) * 4 - 3, 3, 0, Math.PI * 2); ctx.arc(Math.cos(p.face) * 6 + 5, Math.sin(p.face) * 4 - 3, 3, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.globalAlpha = 1;
+    const top = img ? -36 : -29;
     ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.fillText(p.name, 0, -34);
-    bar(-22, -29, 44, 5, p.hp / p.maxHp, '#5be07a');
+    ctx.fillStyle = '#fff'; ctx.fillText(p.name, 0, top - 5);
+    bar(-22, top, 44, 5, p.hp / p.maxHp, '#5be07a');
     if (p.down) {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('たすけて！', 0, 40);
       ctx.strokeStyle = '#7dff9a'; ctx.lineWidth = 5;
@@ -712,7 +758,9 @@
       drawButton(bs.atk, btnHold.atk !== null || input.atk, me.atkCd, '#e2531f', '攻撃');
       drawButton(bs.strong, input.strong, me.stCd, '#7a3fbf', '強攻撃', st.strong);
       const it = me.item ? S.ITEMS[me.item] : null;
-      drawButton(bs.item, input.item, 0, it ? '#2f8a5a' : '#333', it ? it.icon : 'アイテム', it ? it.name : 'なし', !!it);
+      const itImg = me.item ? art('item/' + me.item) : null;
+      drawButton(bs.item, input.item, 0, it ? '#2f8a5a' : '#333', it ? (itImg ? '' : it.icon) : 'アイテム', it ? it.name : 'なし', !!it);
+      if (itImg) ctx.drawImage(itImg, bs.item.x - bs.item.r * 0.5, bs.item.y - bs.item.r * 0.75, bs.item.r, bs.item.r);
       drawButton(bs.dash, input.dash, 0, me.exh ? '#552222' : '#2f62d9', 'ダッシュ', me.inf ? '∞' : null);
       // スタミナ
       const db = bs.dash;
@@ -770,7 +818,7 @@
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `bold ${Math.round(b.r * (label.length <= 2 ? 0.5 : 0.3))}px sans-serif`;
-    ctx.fillText(label, b.x, b.y - (sub ? b.r * 0.15 : 0));
+    if (label) ctx.fillText(label, b.x, b.y - (sub ? b.r * 0.15 : 0));
     if (sub) { ctx.font = `${Math.round(b.r * 0.2)}px sans-serif`; ctx.fillText(sub, b.x, b.y + b.r * 0.35); }
     ctx.textBaseline = 'alphabetic';
     ctx.restore();
@@ -860,7 +908,7 @@
       ctx.fillStyle = known ? '#2f8a5a' : '#5a3a8a'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(it.x - 16, it.y - 16 + bob, 32, 32, 8) : ctx.rect(it.x - 16, it.y - 16 + bob, 32, 32); ctx.fill(); ctx.stroke();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      if (known) { ctx.font = '20px sans-serif'; ctx.fillText(S.ITEMS[it.type].icon, it.x, it.y + bob); ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(S.ITEMS[it.type].name, it.x, it.y - 26 + bob); }
+      if (known) { const ii = art('item/' + it.type); if (ii) ctx.drawImage(ii, it.x - 18, it.y - 18 + bob, 36, 36); else { ctx.font = '20px sans-serif'; ctx.fillText(S.ITEMS[it.type].icon, it.x, it.y + bob); } ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(S.ITEMS[it.type].name, it.x, it.y - 26 + bob); }
       else { ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText('?', it.x, it.y + bob); }
       ctx.textBaseline = 'alphabetic';
     }

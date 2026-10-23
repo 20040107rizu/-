@@ -4,7 +4,8 @@
   "description": "鬼の世界で鬼玉を集めて脱出する横持ちオンライン協力ゲーム",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "art": "node tools/gen-art.js"
   },
   "license": "MIT",
   "dependencies": {
@@ -12,5 +13,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.5"
   }
 }
