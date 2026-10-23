@@ -101,23 +101,14 @@
     <canvas id="cv"></canvas>
   </section>
 
-  <!-- 鬼ガチャ -->
-  <section id="gacha" class="screen overlay">
-    <h2 id="gachaTitle">鬼ガチャ</h2>
-    <p id="gachaSub" class="sub"></p>
-    <div id="machine" class="machine">
-      <div class="dome"><div class="balls"></div></div>
-      <div class="body"><div class="slot"></div><div class="knob"></div></div>
-      <div id="ball" class="ball"></div>
+  <!-- 鬼ガチャ（演出は public/gacha.js） -->
+  <section id="gacha" class="screen overlay gacha-screen">
+    <div id="gachaStage" class="gacha-stage"></div>
+    <div id="gachaFail" class="gacha-fail" hidden>
+      <h2 id="gachaTitle">脱出失敗…</h2>
+      <p id="gachaSub" class="sub">襖から脱出できなかったので、ガチャは引けません</p>
     </div>
-    <div id="reveal" class="reveal">
-      <div id="revealIcon" class="ricon"></div>
-      <div id="revealRank" class="rrank"></div>
-      <div id="revealName" class="rname"></div>
-      <div id="revealMsg" class="sub"></div>
-    </div>
-    <p id="gachaHint" class="hint">タップしてまわす！</p>
-    <button id="btnToResult" class="big">結果を見る</button>
+    <button id="btnToResult" class="big gacha-next" hidden>結果を見る</button>
   </section>
 
   <!-- リザルト -->
@@ -146,6 +137,7 @@
   <script src="yokai.js?v=__BUILD__"></script>
   <script src="shared.js?v=__BUILD__"></script>
   <script src="title.js?v=__BUILD__"></script>
+  <script src="gacha.js?v=__BUILD__"></script>
   <script src="game.js?v=__BUILD__"></script>
 </body>
 </html>

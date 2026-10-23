@@ -408,10 +408,10 @@
   }
 
   // ---------- 鬼ガチャ ----------
-  let gachaStep = 0;
-  let gachaIsNew = false;
+  let gachaRun = 0;
   function startGacha() {
     const mine = result.players.find(p => p.id === myId);
+    let isNew = false;
     // ガチャ結果はこの時点で保存する（玉を開ける前にアプリを閉じても消えない）
     if (mine) {
       stats.plays++;
@@ -419,62 +419,33 @@
       stats.best = Math.max(stats.best, mine.dama);
       if (mine.gacha) {
         stats.escapes++;
-        gachaIsNew = !friends[mine.gacha.yokai];
+        isNew = !friends[mine.gacha.yokai];
         friends[mine.gacha.yokai] = (friends[mine.gacha.yokai] || 0) + 1;
       }
       saveAll(); updateFriendCount();
     }
-    $('reveal').classList.remove('show');
-    $('ball').className = 'ball';
-    $('machine').classList.remove('turn');
-    $('machine').style.display = '';
-    $('btnToResult').style.display = 'none';
-    $('gachaHint').style.display = '';
+    const id = ++gachaRun;
+    $('btnToResult').hidden = true;
+    $('gachaStage').innerHTML = '';
     if (mine && mine.gacha) {
+      $('gachaFail').hidden = true;
       const ball = S.BALLS.find(b => b.key === mine.gacha.ball);
-      $('gachaTitle').textContent = '脱出成功！ 鬼ガチャ';
-      $('gachaSub').textContent = `みんなで集めた鬼玉 ${result.team ?? mine.dama}個`; // 玉の色は出てくるまで秘密
-      $('ball').style.background = ball.color;
-      $('ball').style.color = ball.color;
-      gachaStep = 1;
+      const y = S.YOKAI_BY_ID[mine.gacha.yokai];
+      // 絵が無い妖怪は色の丸で代わりにする
+      const img = artUrl('yokai/' + y.id) || 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${y.color}" stroke="#fff" stroke-width="6"/></svg>`);
+      GachaShow.run($('gachaStage'), {
+        team: result.team ?? mine.dama,
+        ball: { key: ball.key, name: ball.name, color: ball.color },
+        yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img },
+        isNew, dupCount: friends[y.id],
+      }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
     } else {
       $('gachaTitle').textContent = mine && !mine.escaped ? '脱出失敗…' : '鬼ガチャ';
-      $('gachaSub').textContent = '襖から脱出できなかったので、ガチャは引けません';
-      $('machine').style.display = 'none';
-      $('gachaHint').style.display = 'none';
-      $('btnToResult').style.display = '';
-      gachaStep = 0;
+      $('gachaFail').hidden = false;
+      $('btnToResult').hidden = false;
     }
     show('gacha', true);
   }
-
-  $('gacha').addEventListener('click', e => {
-    if (e.target.id === 'btnToResult') return;
-    const mine = result && result.players.find(p => p.id === myId);
-    if (!mine || !mine.gacha) return;
-    if (gachaStep === 1) {
-      gachaStep = 2;
-      $('machine').classList.add('turn');
-      beep(300, 0.5, 'square', 0.05, 200);
-      setTimeout(() => { $('ball').classList.add('drop'); beep(600, 0.15, 'triangle'); }, 600);
-      setTimeout(() => { $('ball').className = 'ball shake'; $('gachaHint').textContent = 'タップしてあける！'; gachaStep = 3; }, 1700);
-      $('gachaHint').textContent = '…';
-    } else if (gachaStep === 3) {
-      gachaStep = 4;
-      const y = S.YOKAI_BY_ID[mine.gacha.yokai];
-      const isNew = gachaIsNew;
-      $('machine').style.display = 'none';
-      $('revealIcon').style.cssText = faceStyle(y);
-      $('revealRank').textContent = `${y.rank}ランク`;
-      $('revealRank').style.color = S.RANKS[y.rank].color;
-      $('revealName').textContent = y.name;
-      $('revealMsg').textContent = isNew ? `${S.ROLES[y.role].name}の${y.name}がお友達になった！` : `${y.name}とさらに仲良くなった！（×${friends[y.id]}）`;
-      $('reveal').classList.add('show');
-      $('gachaHint').style.display = 'none';
-      $('btnToResult').style.display = '';
-      [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, 'triangle', 0.08), i * 110));
-    }
-  });
 
   $('btnToResult').onclick = () => {
     renderResult();

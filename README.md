@@ -71,6 +71,8 @@ npm start          # http://localhost:3000
 | 150〜199 | 4% | 22% | 50% | 19% | 5% |
 | 200〜 | - | 15% | 30% | 33% | 22% |
 
+ガチャの演出（`public/gacha.js`）：鬼玉をマシンに入れる → ハンドルを回す → 良い玉ほど派手な予兆（鬼の目が光る・稲妻・暗転と雷） → お札でくるまれた玉が出る → お札をはがすと色がわかる → 割ると妖怪が登場。
+
 金のガチャ玉は Aランク60%・Sランク40%。確率は `public/shared.js` の `BALL_ODDS` で変えられます。
 
 出た妖怪はお友達になり、次からロビーで選べます。妖怪は全170体（C 52・B 50・A 40・S 28）。日本の妖怪のほか、西洋・北欧・ギリシャ・エジプト・中国・韓国・インド・中南米・アフリカ・北米・オセアニアの伝承の妖怪がいます。高ランクほどHP・攻撃力・速さが上がります。
@@ -144,7 +146,8 @@ npm run art -- --process-only    # tools/raw/ の元画像から切り抜きだ�
 - `public/yokai.js`：妖怪170体の一覧（名前・ランク・タイプ・出身・見た目）
 - `public/shared.js`：ランク・アイテム・ガチャの確率・ボス鬼のデータと、街の生成・当たり判定（サーバーとブラウザで共通）
 - `public/title.js`：タイトル画面の背景（夜の鬼の街）とロゴをSVGで描画
-- `public/game.js`：Canvas描画、ミニマップ、仮想スティック、ガチャ演出
+- `public/game.js`：Canvas描画、ミニマップ、仮想スティック
+- `public/gacha.js`：鬼ガチャの演出
 - `tools/svg-art.js`, `tools/yokai-gen.js`, `tools/render-art.js`：コードで描いた絵と、PNG への書き出し
 - `tools/gen-art.js`, `tools/art-prompts.js`：生成AIで絵を作るスクリプトと指示文（Gemini の請求先設定が必要）
 - `public/index.html`, `style.css`：タイトル／ロビー／ガチャ／リザルト画面
