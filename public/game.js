@@ -530,8 +530,20 @@
       m.setAttribute('content', c.replace('initial-scale=1', 'initial-scale=1.0001'));
       setTimeout(() => { m.setAttribute('content', c); resize(); }, 50);
     }
+    fillScreen(landscape);
     resize();
     showBuildInfo();
+  }
+  // iPhone のホーム画面アプリでは、横向きでもステータスバーの分だけ低い高さが伝えられ、
+  // 下にすき間が残ることがある。本体の画面サイズを使って画面いっぱいに広げる
+  function fillScreen(landscape) {
+    const root = document.documentElement.style;
+    if (!(isIOS && standalone)) { root.removeProperty('--app-w'); root.removeProperty('--app-h'); return; }
+    const land = landscape || window.innerWidth > window.innerHeight;
+    const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height);
+    const w = land ? long : short, h = land ? short : long;
+    root.setProperty('--app-w', Math.max(w, window.innerWidth) + 'px');
+    root.setProperty('--app-h', Math.max(h, window.innerHeight) + 'px');
   }
   window.addEventListener('resize', fixViewport);
   window.addEventListener('orientationchange', () => { fixViewport(); setTimeout(fixViewport, 300); setTimeout(fixViewport, 1000); });
