@@ -189,15 +189,17 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
   background: repeating-conic-gradient(from 0deg, var(--ball) 0 7deg, transparent 7deg 20deg); -webkit-mask: radial-gradient(circle, #000 0, transparent 60%); mask: radial-gradient(circle, #000 0, transparent 60%); animation: gsSpin 8s linear infinite; }
 .gs-t3 .gs-rays, .gs-t4 .gs-rays { background: repeating-conic-gradient(from 0deg, #ffe680 0 7deg, transparent 7deg 20deg); opacity: .8; }
 @keyframes gsSpin { to { transform: rotate(360deg); } }
-.gs-chara { position: relative; width: min(40vmin, 240px); aspect-ratio: 1; object-fit: contain; filter: brightness(0) drop-shadow(0 0 16px #fff); transform: scale(.2) translateY(40%); transition: transform .8s cubic-bezier(.3, 1.5, .6, 1), filter .45s; }
-.gs-reveal.sil .gs-chara { transform: none; }
-.gs-reveal.color .gs-chara { transform: none; filter: drop-shadow(0 0 22px var(--rank)); }
+.gs-charabox { position: relative; isolation: isolate; }
+.gs-charabox::before { content: ""; position: absolute; inset: -22%; border-radius: 50%; background: radial-gradient(circle, var(--rank) 0%, transparent 62%); opacity: .7; z-index: -1; }
+.gs-chara { display: block; width: min(40vmin, 240px); aspect-ratio: 1; object-fit: contain; opacity: 0; transform: scale(.2) translateY(40%); }
+.gs-reveal.show .gs-chara { animation: gsChara .8s cubic-bezier(.3, 1.5, .6, 1) forwards; }
+@keyframes gsChara { 0% { opacity: 0; transform: scale(.2) translateY(40%); } 25% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 .gs-stamp { position: absolute; top: 30%; left: calc(50% + min(14vmin, 84px)); width: min(15vmin, 84px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
   font-size: min(10vmin, 56px); font-weight: 900; color: var(--rank); background: #2a1020; border: 5px solid var(--rank); box-shadow: 0 0 20px var(--rank); opacity: 0; transform: scale(3) rotate(-30deg); }
 .gs-stamp.on { opacity: 1; transform: rotate(-12deg); transition: transform .22s cubic-bezier(.5, 0, .7, 1.6), opacity .1s; }
 .gs-name { position: relative; margin-top: 1vmin; padding: .2em 1.2em; font-size: clamp(20px, 7vmin, 38px); font-weight: 900; background: linear-gradient(90deg, transparent, #2a1020 15%, #2a1020 85%, transparent); opacity: 0; transform: translateY(20px); }
 .gs-name.on { opacity: 1; transform: none; transition: all .35s; }
-.gs-msg { position: relative; margin-top: .6vmin; font-size: clamp(12px, 3.8vmin, 20px); text-shadow: 0 2px 4px #000; opacity: 0; }
+.gs-msg { position: relative; margin-top: .6vmin; font-size: clamp(11px, 3.4vmin, 18px); white-space: nowrap; text-shadow: 0 2px 4px #000; opacity: 0; }
 .gs-msg.on { opacity: 1; transition: opacity .4s .15s; }
 .gs-hint { position: absolute; bottom: 3%; z-index: 7; font-size: clamp(13px, 4vmin, 20px); text-shadow: 0 2px 4px #000; animation: gsBlink 1s infinite; }
 @keyframes gsBlink { 50% { opacity: .35; } }

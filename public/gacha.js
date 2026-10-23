@@ -110,7 +110,7 @@
           </div>
           <div class="gs-reveal" hidden>
             <div class="gs-rays"></div>
-            <img class="gs-chara" alt="">
+            <div class="gs-charabox"><img class="gs-chara" alt=""></div>
             <div class="gs-stamp"></div>
             <div class="gs-name"></div>
             <div class="gs-msg"></div>
@@ -203,11 +203,11 @@
     rv.style.setProperty('--rank', o.yokai.rankColor);
     rv.style.setProperty('--ball', o.ball.color);
     ch.src = o.yokai.img;
+    try { await Promise.race([ch.decode(), wait(1500)]); } catch {} // 絵の読み込みを待ってから出す
+    // シルエットは使わず、最初からカラーの妖怪が飛び出す（iPhone で色が戻らないことがあったため）
     rv.hidden = false;
-    rv.classList.add('sil');
-    await wait(tier >= 3 ? 1300 : 900);
-    rv.classList.remove('sil'); rv.classList.add('color');
-    await wait(450);
+    rv.classList.add('show');
+    await wait(tier >= 3 ? 1100 : 800);
     const stamp = $('.gs-stamp');
     stamp.textContent = o.yokai.rank; stamp.classList.add('on'); SFX.stamp(); shakeScreen('gs-quake');
     await wait(350);
