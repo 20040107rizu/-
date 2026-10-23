@@ -397,7 +397,7 @@
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = owned
         ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y)}${y.name}<br><small>${S.ROLES[y.role].name}・${y.origin}</small>`
-        : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}？？？<br><small>${y.origin}</small>`;
+        : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk">${'？'.repeat([...y.name].length)}</span><br><small>${y.origin}</small>`; // 名前は文字数ぶんの？
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id });

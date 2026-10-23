@@ -101,7 +101,10 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .tabs .tab small { opacity: .7; font-size: 10px; }
 .friends { max-height: 34vh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 2px; }
 .yk img.face { display: block; width: 40px; height: 40px; margin: 0 auto 2px; border: none; border-radius: 0; object-fit: contain; }
-.yk img.face.sil { filter: brightness(0); opacity: .45; }
+.yk img.face.sil { filter: brightness(0) invert(.82); opacity: .28; } /* 持っていない妖怪は薄い灰色のシルエット */
+.yk.locked { opacity: 1; }
+.yk.locked .unk { opacity: .55; letter-spacing: -.05em; }
+.yk.locked small, .yk.locked .rk { opacity: .55; }
 .yk small { font-size: 9px; opacity: .8; }
 
 /* ---- 更新のお知らせ ---- */
