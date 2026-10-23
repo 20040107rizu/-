@@ -22,6 +22,7 @@ const REVIVE_TIME = 3;
 const REVIVE_RANGE = 70;
 const DASH_MUL = 1.4;               // ダッシュでボス鬼をギリギリ振り切れる速さ
 const BOSS_CHASE = 255;            // ボス鬼の追いかける速さ（どの妖怪の歩きより速い）
+const NOTICE_RANGE = 300;        // 攻撃してきた相手に見回り鬼が気づける距離（見張りの視界と同じ）
 const ESCAPE_TIME = 1.5;           // 襖の前で攻撃ボタンを長押しする時間
 const ESCAPE_RANGE = 80;
 const DAMA_RESPAWN = 2;            // 鬼玉が1個湧き直す間隔（秒）
@@ -380,8 +381,12 @@ class Room {
     e.hitFlash = 0.1;
     if (src) src.dmgDealt += amount;
     this.events.push({ k: 'dmg', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 30), v: Math.round(amount) });
-    // 攻撃された見回り鬼は攻撃者に気づく
-    if (e.isPatrol && e.hp > 0 && e.state !== 'alert' && src && this.visibleTo(src)) this.alertPatrol(e, src);
+    // 攻撃された見回り鬼は、攻撃した人が近くに見えているときだけ気づく
+    // （竜巻・追尾弾・砲台・燃焼などで遠くや壁の向こうから当てたときは、攻撃が来た方を振り向くだけ）
+    if (e.isPatrol && e.hp > 0 && e.state !== 'alert' && src && this.visibleTo(src)) {
+      if (dist(e, src) < NOTICE_RANGE && S.lineOfSight(this.map, e, src)) this.alertPatrol(e, src);
+      else e.face = Math.atan2(src.y - e.y, src.x - e.x);
+    }
     if (e.hp <= 0) {
       if (e.isPatrol) this.killPatrol(e);
       else this.killBoss();

@@ -1089,9 +1089,29 @@
     return mh + oy;
   }
 
+  // 画面の外から自分を見つけた見回り鬼の方向を、画面のふちに赤い矢印で出す
+  function drawSpotterArrows(now) {
+    if (!myPred) return;
+    const cx = W / 2, cy = H / 2;
+    for (const e of snap.patrols) {
+      if (!e.alert || e.target !== myId || inView(e.x, e.y, -30)) continue;
+      const a = Math.atan2(e.y - myPred.y, e.x - myPred.x);
+      const k = Math.min((W / 2 - 46) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 46) / Math.abs(Math.sin(a) || 1e-6));
+      const x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k;
+      const pulse = 1 + Math.sin(now * 10) * 0.12;
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = '#ff3a3acc'; ctx.beginPath(); ctx.arc(0, 0, 20 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(a); ctx.fillStyle = '#ff3a3a'; ctx.beginPath(); ctx.moveTo(34 * pulse, 0); ctx.lineTo(18, -11); ctx.lineTo(18, 11); ctx.closePath(); ctx.fill();
+      ctx.rotate(-a); ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', 0, 1);
+      ctx.restore();
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
   function drawHUD(me, now) {
     Stages.drawTint(ctx, W, H, stage);
     drawMinimap(me, now);
+    drawSpotterArrows(now);
 
     // タイマー
     const tl = Math.max(0, snap.timeLeft);
