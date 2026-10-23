@@ -22,6 +22,9 @@ const DASH_MUL = 1.4;               // ダッシュでボス鬼をギリギリ�
 const BOSS_CHASE = 255;            // ボス鬼の追いかける速さ（どの妖怪の歩きより速い）
 const ESCAPE_TIME = 1.5;           // 襖の前で攻撃ボタンを長押しする時間
 const ESCAPE_RANGE = 80;
+// 開始時の演出（ボス鬼が街に到着する映像）とカウントダウン。この間はゲームを止める
+const INTRO_MOVIE = process.env.NO_INTRO ? 0 : 4.5;
+const COUNTDOWN = process.env.NO_INTRO ? 0 : 5;
 const STAMINA_MAX = 100;
 
 // ---------- 静的ファイル配信 ----------
@@ -32,7 +35,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const crypto = require('crypto');
 function computeVersion() {
   const h = crypto.createHash('sha1');
-  for (const f of ['index.html', 'style.css', 'yokai.js', 'shared.js', 'title.js', 'game.js', 'sw.js', 'art/manifest.json']) {
+  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'shared.js', 'title.js', 'game.js', 'sw.js', 'art/manifest.json']) {
     try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
   }
   return h.digest('hex').slice(0, 10);
@@ -252,6 +255,7 @@ class Room {
     this.state = 'battle';
     this.time = 0;
     this.timeLeft = TIME_LIMIT;
+    this.introT = INTRO_MOVIE + COUNTDOWN;
     this.events = [];
     this.projectiles = [];
     this.telegraphs = [];
@@ -311,7 +315,7 @@ class Room {
     };
 
     this.broadcast({
-      t: 'start', seed, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: type,
+      t: 'start', seed, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
     });
   }
@@ -758,6 +762,7 @@ class Room {
 
   tick() {
     if (this.state !== 'battle') return;
+    if (this.introT > 0) { this.introT -= DT; return; }
     this.time += DT;
     this.timeLeft -= DT;
     for (const p of this.players.values()) this.updatePlayer(p);
@@ -785,7 +790,7 @@ class Room {
   snapshot() {
     const b = this.boss;
     const snap = {
-      t: 'state', timeLeft: +this.timeLeft.toFixed(1),
+      t: 'state', timeLeft: +this.timeLeft.toFixed(1), intro: +Math.max(0, this.introT).toFixed(2),
       players: [...this.players.values()].map(p => ({
         id: p.id, name: p.name, yokai: p.yokai, x: Math.round(p.x), y: Math.round(p.y), face: +p.face.toFixed(2),
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,

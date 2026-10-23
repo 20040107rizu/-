@@ -80,6 +80,8 @@
   let banner = null;
   let myPred = null;
   let bossType = 'red';
+  // 開始時の演出: introMovie 秒の映像 → introCount 秒のカウントダウン（サーバーの intro が残り時間）
+  let introMovie = 0, introCount = 0, landed = false, lastCount = 0, started = true, chaseHold = 0;
 
   $('name').value = localStorage.getItem('name') || '';
   const urlRoom = new URLSearchParams(location.search).get('room');
@@ -250,11 +252,13 @@
     $('err').textContent = '';
     goFullscreen();
     beep(1, 0.01, 'sine', 0.0001); // iOSで音を有効にする
+    Music.unlock();
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     ws.onopen = () => send({ ...first, name, yokai: selYokai });
     ws.onmessage = e => onMessage(JSON.parse(e.data));
     ws.onclose = () => {
       ws = null; myId = null; snap = null;
+      Music.stop();
       show('title');
       $('err').textContent = '接続が切れました';
     };
@@ -281,13 +285,17 @@
         ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear();
         bossType = m.boss;
         spectateId = null;
-        banner = { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] };
+        introMovie = m.movie || 0; introCount = m.countdown || 0;
+        landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0;
+        banner = started ? { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
+        Music.play(introMovie > 0 ? 'intro' : 'normal');
         break;
       case 'state':
         snap = m;
         for (const ev of m.ev) handleEvent(ev);
         break;
       case 'result':
+        Music.stop();
         result = m;
         startGacha();
         break;
@@ -301,6 +309,17 @@
     connect({ t: 'join', code });
   };
   $('btnStart').onclick = () => send({ t: 'start' });
+  // ルームを抜けてタイトルへ
+  $('btnLeave').onclick = () => {
+    if (ws) { ws.onclose = null; ws.close(); }
+    ws = null; myId = null; lobby = null; snap = null;
+    Music.stop();
+    $('err').textContent = '';
+    show('title');
+  };
+  function renderBgmButton() { $('btnBgm').textContent = Music.enabled ? '🔊 BGM ON' : '🔇 BGM OFF'; }
+  $('btnBgm').onclick = () => { Music.unlock(); Music.setEnabled(!Music.enabled); renderBgmButton(); };
+  renderBgmButton();
   $('btnAgain').onclick = () => send({ t: 'toLobby' });
   $('btnShare').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${lobby.code}`;
@@ -967,6 +986,38 @@
     }
   }
 
+  // ボス鬼が街に到着する映像（上下に黒い帯＋文字）
+  function drawMovie(p, now) {
+    const bar = H * 0.12 * Math.min(1, p * 6, (1 - p) * 8);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, bar); ctx.fillRect(0, H - bar, W, bar);
+    const kind = S.BOSSES[bossType];
+    ctx.textAlign = 'center';
+    if (p < 0.4) {
+      ctx.globalAlpha = Math.min(1, p * 5);
+      ctx.font = `bold ${Math.round(H * 0.05)}px sans-serif`; ctx.fillStyle = '#fff';
+      ctx.fillText('…ゴゴゴゴゴ', W / 2 + Math.sin(now * 40) * 2, H * 0.3);
+    } else if (p < 0.95) {
+      ctx.globalAlpha = Math.min(1, (p - 0.4) * 6, (0.95 - p) * 8);
+      ctx.font = `bold ${Math.round(Math.min(W, H) * 0.1)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
+      ctx.strokeText(`${kind.name}が街に到着した…！`, W / 2, H * 0.24); ctx.fillStyle = BOSS_UI[bossType]; ctx.fillText(`${kind.name}が街に到着した…！`, W / 2, H * 0.24);
+      ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`; ctx.lineWidth = 5;
+      ctx.strokeText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09); ctx.fillStyle = '#fff'; ctx.fillText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawCountdown(intro) {
+    const n = Math.ceil(intro), f = intro - Math.floor(intro); // f: 1→0 で数字が縮む
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `bold ${Math.round(Math.min(W, H) * (0.28 + f * 0.12))}px sans-serif`;
+    ctx.globalAlpha = Math.min(1, f * 3 + 0.3);
+    ctx.lineWidth = 10; ctx.strokeStyle = '#000'; ctx.strokeText(n, W / 2, H * 0.45);
+    ctx.fillStyle = n <= 3 ? '#ff5050' : '#ffe36b'; ctx.fillText(n, W / 2, H * 0.45);
+    ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`; ctx.lineWidth = 5; ctx.globalAlpha = 1;
+    ctx.strokeText('鬼玉を集めて、襖から脱出しよう', W / 2, H * 0.68); ctx.fillStyle = '#fff'; ctx.fillText('鬼玉を集めて、襖から脱出しよう', W / 2, H * 0.68);
+    ctx.restore();
+  }
+
   function drawButton(b, pressed, cd, color, label, sub, glow) {
     ctx.save();
     ctx.globalAlpha = 0.85;
@@ -1002,11 +1053,30 @@
     if (playing()) sendInput(dt);
 
     const me = snap.players.find(p => p.id === myId);
+    const intro = snap.intro || 0;
+    const movieLeft = intro - introCount;             // > 0 なら映像中
+    const movieP = movieLeft > 0 && introMovie > 0 ? 1 - movieLeft / introMovie : 1; // 映像の進み具合 0→1
+    if (intro <= 0 && !started) {
+      started = true;
+      banner = { text: 'スタート！', sub: '鬼玉を集めて、襖から脱出しよう', t: 1.6, c: '#ffe36b' };
+      beep(1320, 0.35, 'square', 0.07);
+      Music.play('normal');
+    }
+    if (movieLeft <= 0 && intro > 0) {
+      const n = Math.ceil(intro);
+      if (n !== lastCount) { lastCount = n; beep(660, 0.15, 'square', 0.06); if (n === introCount) Music.play('normal'); }
+    }
+    // ボス鬼に追われている間は BGM を変える（見失って2.5秒たったら元に戻す）
+    if (started && me && !me.esc) {
+      const chased = snap.boss && snap.boss.target === myId;
+      chaseHold = chased ? 2.5 : Math.max(0, chaseHold - dt);
+      Music.play(chaseHold > 0 ? 'chase' : 'normal');
+    }
 
     // 自キャラは入力で先に動かし、サーバー位置へ寄せる
     if (me) {
       if (!myPred) myPred = { x: me.x, y: me.y };
-      if (!me.down && !me.dash && !me.esc && playing()) {
+      if (!me.down && !me.dash && !me.esc && playing() && intro <= 0) {
         const st = S.yokaiStats(me.yokai);
         let mx = input.mx, my = input.my; const m = Math.hypot(mx, my);
         if (m > 1) { mx /= m; my /= m; }
@@ -1028,6 +1098,22 @@
       let other = snap.players.find(p => p.id === spectateId && !p.esc);
       if (!other) { other = snap.players.find(p => !p.esc); spectateId = other ? other.id : null; }
       if (other) { const pos = ents.get('p' + other.id) || other; cam.x = pos.x; cam.y = pos.y; }
+    }
+    // 映像中はボス鬼を映し、最後に自分のところへカメラを戻す
+    let bossDrop = 0;
+    if (movieLeft > 0 && snap.boss) {
+      const back = Math.max(0, (movieP - 0.78) / 0.22);
+      const e = back * back * (3 - 2 * back);
+      cam.x = snap.boss.x + (cam.x - snap.boss.x) * e;
+      cam.y = snap.boss.y + (cam.y - snap.boss.y) * e;
+      const fall = Math.min(1, Math.max(0, (movieP - 0.12) / 0.26));
+      bossDrop = movieP < 0.12 ? -2000 : -900 * (1 - fall * fall);
+      if (!landed && fall >= 1) {
+        landed = true; shake = 0.8;
+        fx.push({ k: 'ring', x: snap.boss.x, y: snap.boss.y, r: 360, c: BOSS_UI[bossType], t: 0.8, max: 0.8 });
+        fx.push({ k: 'boom', x: snap.boss.x, y: snap.boss.y + 30, r: 140, t: 0.6, max: 0.6 });
+        beep(55, 0.7, 'sawtooth', 0.12, -20); navigator.vibrate?.(200);
+      }
     }
     view = { l: cam.x - cam.vw / 2, r: cam.x + cam.vw / 2, t: cam.y - cam.vh / 2, b: cam.y + cam.vh / 2 };
 
@@ -1095,7 +1181,16 @@
     // y座標順に描画
     const list = [];
     for (const e of snap.patrols) { const pos = lerpEnt('e' + e.id, e.x, e.y, k); list.push({ y: pos.y, f: () => drawPatrol(e, pos, now) }); }
-    if (snap.boss) { const pos = lerpEnt('boss', snap.boss.x, snap.boss.y, snap.boss.st === 'charging' ? 0.6 : k); list.push({ y: pos.y, f: () => drawBoss(snap.boss, pos, now) }); }
+    if (snap.boss) {
+      const pos = lerpEnt('boss', snap.boss.x, snap.boss.y, snap.boss.st === 'charging' ? 0.6 : k);
+      if (bossDrop) {
+        // 空から降ってくる途中: 地面に影だけ先に出す
+        const sc = 1 + bossDrop / 900;
+        ctx.fillStyle = `rgba(0,0,0,${0.15 + 0.35 * Math.max(0, sc)})`;
+        ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 60 * Math.max(0.2, sc), 18 * Math.max(0.2, sc), 0, 0, Math.PI * 2); ctx.fill();
+        if (bossDrop > -1500) { const dp = { x: pos.x, y: pos.y + bossDrop }; list.push({ y: 1e9, f: () => drawBoss(snap.boss, dp, now) }); }
+      } else list.push({ y: pos.y, f: () => drawBoss(snap.boss, pos, now) });
+    }
     for (const p of snap.players) {
       if (p.esc) continue;
       const pos = p.id === myId && myPred ? myPred : lerpEnt('p' + p.id, p.x, p.y, k);
@@ -1139,7 +1234,11 @@
       for (const key of ents.keys()) if (!live.has(key)) ents.delete(key);
     }
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
-    drawHUD(me, now);
+    if (movieLeft > 0) drawMovie(movieP, now);
+    else {
+      drawHUD(me, now);
+      if (intro > 0) drawCountdown(intro);
+    }
   }
   requestAnimationFrame(frame);
 })();

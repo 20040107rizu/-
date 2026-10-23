@@ -39,6 +39,7 @@
     <div class="row">
       <p id="friendCount" class="sub"></p>
       <button id="btnSave" class="small">💾 セーブ</button>
+      <button id="btnBgm" class="small">🔊 BGM ON</button>
       <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
     </div>
     <p id="err" class="err"></p>
@@ -80,6 +81,7 @@
   <!-- ロビー -->
   <section id="lobby" class="screen">
     <div class="lobby-head">
+      <button id="btnLeave" class="small">🏠 ホームに戻る</button>
       <span>ルームコード</span>
       <strong id="roomCode">----</strong>
       <button id="btnShare" class="small">招待リンクをコピー</button>
@@ -140,6 +142,7 @@
     <button id="btnWhatsNewClose" class="big">OK</button>
   </section>
 
+  <script src="music.js?v=__BUILD__"></script>
   <script src="yokai.js?v=__BUILD__"></script>
   <script src="shared.js?v=__BUILD__"></script>
   <script src="title.js?v=__BUILD__"></script>
