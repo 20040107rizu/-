@@ -11,7 +11,7 @@ const TICK_RATE = 30;              // シミュレーション回数/秒
 const SEND_RATE = 15;              // 状態送信回数/秒
 const DT = 1 / TICK_RATE;
 const MAX_PLAYERS = 4;
-const TIME_LIMIT = +process.env.TIME_LIMIT || 240; // 制限時間（秒）
+const TIME_LIMIT = +process.env.TIME_LIMIT || 300; // 制限時間（秒）
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
@@ -307,7 +307,7 @@ class Room {
     const bp = this.farPoint(this.gridB, spawn, 2400);
     const type = process.env.TEST_BOSS || S.pickBoss();
     const kind = S.BOSSES[type];
-    const bossHp = Math.round((5000 + 1500 * n) * kind.hp);
+    const bossHp = Math.round((1200 + 900 * n) * kind.hp); // 2人なら赤鬼3000・青鬼4500・黒鬼6600
     this.boss = {
       x: bp.x, y: bp.y, hp: bossHp, maxHp: bossHp, type, kind, name: kind.name, face: 0,
       state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
