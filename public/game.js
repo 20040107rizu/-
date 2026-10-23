@@ -4,7 +4,7 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -12,7 +12,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -33,6 +33,10 @@
   let friends = loadFriends();
   let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
+  // フレンド機能用の、この人のID（引き継ぎコードにも入る）
+  const newPid = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'[b & 63]).join('');
+  let pid = localStorage.getItem('pid');
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(pid || '')) { pid = newPid(); try { localStorage.setItem('pid', pid); } catch {} }
   let selYokai = localStorage.getItem('yokai');
   if (!friends[selYokai]) selYokai = 'nekomata';
   function saveAll() {
@@ -56,7 +60,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
+    const data = { v: 1, p: pid, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -68,8 +72,110 @@
     const f = {};
     S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
-    return { name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
+    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
   }
+
+  // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
+  // ホーム画面にいる間はサーバーとつないで、みんなが今どうしているかを受け取る
+  let pws = null, pwsWait = 2000, buddyLive = [];
+  let buddies = loadJSON('buddies', {}); // 一度会った人（サーバーが再起動しても一覧に残す） pid → { name, yokai, seen }
+  function presenceConnect() {
+    if (pws && pws.readyState <= 1) return;
+    pws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+    pws.onopen = () => { pwsWait = 2000; helloAgain(); };
+    pws.onmessage = e => {
+      const m = JSON.parse(e.data);
+      if (m.t !== 'friends') return;
+      buddyLive = m.list;
+      for (const f of m.list) buddies[f.pid] = { name: f.name, yokai: f.yokai, seen: Math.max(f.seen, buddies[f.pid]?.seen || 0) };
+      const keep = Object.entries(buddies).sort((a, b) => b[1].seen - a[1].seen).slice(0, 200);
+      buddies = Object.fromEntries(keep);
+      try { localStorage.setItem('buddies', JSON.stringify(buddies)); } catch {}
+      renderBuddies();
+    };
+    pws.onclose = () => {
+      pws = null; buddyLive = [];
+      renderBuddies();
+      setTimeout(presenceConnect, pwsWait);
+      pwsWait = Math.min(pwsWait * 2, 30000);
+    };
+  }
+  function helloAgain() {
+    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai }));
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) presenceConnect(); });
+  const STATUS = { home: 'ホームにいる', lobby: '募集中', battle: '出撃中', result: '結果を見ている', off: 'オフライン' };
+  const ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 60 ? `${Math.max(1, m)}分前` : m < 1440 ? `${Math.floor(m / 60)}時間前` : `${Math.floor(m / 1440)}日前`; };
+  function renderBuddies() {
+    const live = new Map(buddyLive.map(f => [f.pid, f]));
+    const list = Object.entries(buddies).filter(([id]) => id !== pid).map(([id, b]) => live.get(id) || { pid: id, ...b, status: 'off' });
+    const order = { lobby: 0, battle: 1, result: 2, home: 3, off: 4 };
+    list.sort((a, b) => order[a.status] - order[b.status] || b.seen - a.seen);
+    const online = list.filter(f => f.status !== 'off').length;
+    const open = list.filter(f => f.room && f.status === 'lobby').length;
+    $('buddyBadge').hidden = !online;
+    $('buddyBadge').textContent = open ? `募集中 ${open}` : `${online}人`;
+    if (!$('buddyScreen').classList.contains('active')) return;
+    const ul = $('buddyList');
+    if (!list.length) { ul.innerHTML = `<li class="buddy-empty">${pws ? 'まだフレンドがいません。だれかがこのゲームを遊ぶと、ここに出てきます' : 'サーバーにつないでいます…'}</li>`; return; }
+    ul.innerHTML = list.map(f => {
+      const y = S.YOKAI_BY_ID[f.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
+      const st = f.status === 'off' ? `オフライン（${ago(f.seen)}）` : f.status === 'lobby' ? `募集中（${f.n}/4人）` : STATUS[f.status];
+      const btn = f.room && f.status === 'lobby' ? `<button class="join" data-code="${f.room}">参加</button>`
+        : f.room && f.status === 'battle' ? `<button class="watch" data-code="${f.room}">観戦</button>` : '';
+      return `<li class="${f.status}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${esc(f.name)}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
+    }).join('');
+    for (const b of ul.querySelectorAll('button.join')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'join', code: b.dataset.code }); };
+    for (const b of ul.querySelectorAll('button.watch')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'watch', code: b.dataset.code }); };
+  }
+  $('btnBuddies').onclick = () => { $('buddyMsg').textContent = ''; show('buddyScreen'); renderBuddies(); presenceConnect(); };
+  $('btnBuddyClose').onclick = () => show('title');
+  $('name').addEventListener('change', helloAgain);
+
+  // ---------- 妖怪図鑑 ----------
+  let zukanRank = 'all', zukanRole = 'all', zukanSel = null;
+  function renderZukan() {
+    const got = S.YOKAI.filter(y => friends[y.id]).length;
+    $('zukanCount').textContent = `${got} / ${S.YOKAI.length} 体`;
+    $('zukanTabs').innerHTML = [['all', 'ぜんぶ'], ['C', 'C'], ['B', 'B'], ['A', 'A'], ['S', 'S']].map(([k, label]) => {
+      const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
+      return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
+    }).join('');
+    $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
+      `<button class="tab${zukanRole === k ? ' on' : ''}" data-k="${k}">${label}</button>`).join('');
+    for (const b of $('zukanTabs').querySelectorAll('button')) b.onclick = () => { zukanRank = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
+    for (const b of $('zukanRoles').querySelectorAll('button')) b.onclick = () => { zukanRole = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
+    const list = S.YOKAI.filter(y => (zukanRank === 'all' || y.rank === zukanRank) && (zukanRole === 'all' || y.role === zukanRole));
+    const grid = $('zukanGrid'), keep = grid.scrollTop;
+    grid.innerHTML = '';
+    for (const y of list) {
+      const owned = friends[y.id];
+      const d = document.createElement('div');
+      d.className = 'yk' + (y.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y, !owned)}`
+        + (owned ? `<span class="nm">${y.name}</span>` : `<span class="unk nm">${'？'.repeat([...y.name].length)}</span>`) + `<small class="nm">${y.origin}</small>`;
+      d.onclick = () => { zukanSel = y.id; renderZukan(); };
+      grid.appendChild(d);
+    }
+    grid.scrollTop = keep;
+    renderZukanInfo();
+  }
+  function renderZukanInfo() {
+    const y = S.YOKAI_BY_ID[zukanSel];
+    if (!y) { $('zukanInfo').innerHTML = '<div class="pv">妖怪をタップすると、くわしく見られるよ<br><small>まだお友達になっていない妖怪はシルエットで表示されます</small></div>'; return; }
+    const owned = friends[y.id], url = artUrl('yokai/' + y.id);
+    const img = url ? `<img class="big-face${owned ? '' : ' sil'}" src="${url}" alt="">` : `<div class="big-face" style="background:${owned ? y.color : '#333'}"></div>`;
+    if (!owned) {
+      $('zukanInfo').innerHTML = `${img}<div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${'？'.repeat([...y.name].length)}</b><div>出身：${y.origin}</div><small>まだお友達になっていません。鬼ガチャで出会えるかも</small></div>`;
+      return;
+    }
+    const at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
+    $('zukanInfo').innerHTML = `${img}<div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>
+      <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>・${y.origin}</div>
+      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd><dt>仲間</dt><dd>${owned}体</dd></dl></div>`;
+  }
+  $('btnZukan').onclick = () => { show('zukan'); renderZukan(); };
+  $('btnZukanClose').onclick = () => show('title');
 
   // ---------- 状態 ----------
   let ws = null;
@@ -91,6 +197,7 @@
   let bossType = 'red';
   let stage = 'oni';
   let offline = false;        // 試合のあとで接続が切れた（結果はそのまま見られる）
+  let watcher = false;        // フレンドのバトルを観戦している
   let serverUpdating = false; // サーバーの更新で切れた
   // 開始時の演出: introMovie 秒の映像 → introCount 秒のカウントダウン（サーバーの intro が残り時間）
   let introMovie = 0, introCount = 0, landed = false, lastCount = 0, started = true, chaseHold = 0;
@@ -130,6 +237,7 @@
     friends = data.friends; stats = data.stats;
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
+    if (data.pid) { pid = data.pid; try { localStorage.setItem('pid', pid); } catch {} helloAgain(); }
     saveAll(); updateFriendCount();
     openSave();
     $('saveMsg').style.color = '#7dff9a';
@@ -268,7 +376,8 @@
     beep(1, 0.01, 'sine', 0.0001); // iOSで音を有効にする
     Music.unlock();
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-    ws.onopen = () => send({ ...first, name, yokai: selYokai });
+    watcher = first.t === 'watch';
+    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid });
     ws.onmessage = e => onMessage(JSON.parse(e.data));
     ws.onclose = () => {
       ws = null;
@@ -278,7 +387,7 @@
         renderResult();
         return;
       }
-      myId = null; snap = null;
+      myId = null; snap = null; watcher = false;
       Music.stop();
       show('title');
       $('err').textContent = serverUpdating ? 'サーバーが更新されました。もう一度ルームを作ってね' : '接続が切れました';
@@ -291,6 +400,7 @@
       case 'error':
         $('err').textContent = m.msg;
         ws.onclose = null; ws.close(); ws = null;
+        if (watcher || $('buddyScreen').classList.contains('active')) { $('buddyMsg').textContent = m.msg; if (watcher) { watcher = false; snap = null; show('buddyScreen'); } }
         break;
       case 'welcome': myId = m.id; offline = false; serverUpdating = false; break;
       case 'serverUpdate': serverUpdating = true; break;
@@ -313,6 +423,7 @@
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0;
         banner = started ? { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
+        if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
         break;
       case 'state':
         snap = m;
@@ -321,6 +432,7 @@
       case 'result':
         Music.stop();
         result = m;
+        if (watcher) { renderResult(); show('result', true); menuMusic(); break; } // 観戦していた人はガチャなしで結果だけ
         startGacha();
         break;
     }
@@ -334,17 +446,19 @@
   };
   $('btnStart').onclick = () => send({ t: 'start' });
   // ルームを抜けてタイトルへ
-  $('btnLeave').onclick = () => {
+  function leaveRoom() {
     if (ws) { ws.onclose = null; ws.close(); }
-    ws = null; myId = null; lobby = null; snap = null;
+    ws = null; myId = null; lobby = null; snap = null; watcher = false; result = null;
     Music.stop();
     $('err').textContent = '';
     show('title');
-  };
+  }
+  $('btnLeave').onclick = leaveRoom;
   function renderBgmButton() { $('btnBgm').textContent = Music.enabled ? '🔊 BGM ON' : '🔇 BGM OFF'; }
   $('btnBgm').onclick = () => { Music.unlock(); Music.setEnabled(!Music.enabled); renderBgmButton(); menuMusic(); };
   renderBgmButton();
   $('btnAgain').onclick = () => {
+    if (watcher) { leaveRoom(); return; }
     if (offline) { offline = false; myId = null; snap = null; result = null; show('title'); if (serverUpdating) checkVersion(); return; }
     send({ t: 'toLobby' });
   };
@@ -433,6 +547,7 @@
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id });
+        helloAgain();
         renderFriends();
       };
       el.appendChild(d);
@@ -505,6 +620,11 @@
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
         return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${g ? `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}` : '-'}</td></tr>`;
       }).join('');
+    if (watcher) {
+      $('btnAgain').disabled = false;
+      $('btnAgain').textContent = 'ホームにもどる';
+      return;
+    }
     const me = lobby && lobby.players.find(p => p.id === myId);
     if (offline) {
       $('btnAgain').disabled = false;
@@ -658,6 +778,7 @@
     };
   }
 
+  const watchExitBtn = () => ({ x: W - 150, y: 12, w: 138, h: 40 });
   const playing = () => $('game').classList.contains('active') && !$('gacha').classList.contains('active') && !$('result').classList.contains('active');
   // タップ位置を、キャンバスに描いている座標（W×H）に直す
   function toCanvas(e) {
@@ -668,7 +789,11 @@
     if (!playing()) return;
     const pt = toCanvas(e);
     const me = snap && snap.players.find(p => p.id === myId);
-    if (me && me.esc) {
+    if (watcher) {
+      const b = watchExitBtn();
+      if (pt.x > b.x && pt.x < b.x + b.w && pt.y > b.y && pt.y < b.y + b.h) { e.preventDefault(); leaveRoom(); return; }
+    }
+    if (watcher || (me && me.esc)) {
       const others = snap.players.filter(p => !p.esc);
       if (others.length) {
         const i = others.findIndex(p => p.id === spectateId);
@@ -1042,16 +1167,23 @@
       ctx.fillStyle = '#fff3'; ctx.beginPath(); ctx.arc(stick.ox, stick.oy, STICK_R, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#fffa'; ctx.beginPath(); ctx.arc(stick.x, stick.y, 26, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
-    } else if (timeLimit - snap.timeLeft < 8 && !(me && me.esc)) {
+    } else if (timeLimit - snap.timeLeft < 8 && !watcher && !(me && me.esc)) {
       ctx.fillStyle = '#ffffff66'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('左側をドラッグで移動', W * 0.22, H - 64);
     }
 
-    if (me && me.esc) {
+    if (watcher || (me && me.esc)) {
       const watching = snap.players.find(p => p.id === spectateId && !p.esc);
       ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-      const msg = watching ? `👀 観戦中：${watching.name}（タップで切り替え）` : '脱出済み！ みんなを待っています…';
+      const msg = watching ? `👀 観戦中：${watching.name}（タップで切り替え）` : watcher ? '👀 観戦中' : '脱出済み！ みんなを待っています…';
       ctx.strokeText(msg, W / 2, H - 30); ctx.fillStyle = '#ffd84a'; ctx.fillText(msg, W / 2, H - 30);
+    }
+    if (watcher) { // 観戦をやめるボタン（右上）
+      const b = watchExitBtn();
+      ctx.fillStyle = '#000a'; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
+      ctx.strokeStyle = '#fff8'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✕ 観戦をやめる', b.x + b.w / 2, b.y + b.h / 2); ctx.textBaseline = 'alphabetic';
     }
 
     if (banner) {
@@ -1177,7 +1309,7 @@
     const cam = { vw: W / scale, vh: H / scale, x: myPred ? myPred.x : map.w / 2, y: myPred ? myPred.y : map.h / 2 };
     cam.x = Math.max(cam.vw / 2 - 80, Math.min(map.w - cam.vw / 2 + 80, cam.x));
     cam.y = Math.max(cam.vh / 2 - 80, Math.min(map.h - cam.vh / 2 + 80, cam.y));
-    if (me && me.esc) {
+    if (watcher || (me && me.esc)) {
       // 脱出したら、まだ鬼の世界にいる仲間を観戦する
       let other = snap.players.find(p => p.id === spectateId && !p.esc);
       if (!other) { other = snap.players.find(p => !p.esc); spectateId = other ? other.id : null; }
@@ -1354,4 +1486,5 @@
     }
   }
   requestAnimationFrame(frame);
+  presenceConnect();
 })();

@@ -228,11 +228,21 @@ class Room {
     this.players = new Map();
     this.state = 'lobby'; // lobby | battle | result
     this.bossSel = 'red';  // ホストが選んだボス鬼
+    this.watchers = new Set(); // 観戦している人の接続
   }
 
   broadcast(msg) {
     const data = JSON.stringify(msg);
     for (const p of this.players.values()) if (p.ws.readyState === 1) p.ws.send(data);
+    for (const w of this.watchers) if (w.readyState === 1) w.send(data);
+  }
+
+  // 途中から観戦する人に、今のバトルの様子を送る
+  watchStart(ws) {
+    ws.send(JSON.stringify({
+      t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch: true,
+      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
+    }));
   }
 
   lobbyInfo() {
@@ -242,9 +252,9 @@ class Room {
     };
   }
 
-  addPlayer(ws, name, yokai) {
+  addPlayer(ws, name, yokai, pid) {
     const p = {
-      id: genId(), ws, name: (name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yokai] ? yokai : 'nekomata',
+      id: genId(), ws, pid, name: (name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yokai] ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
       input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false }, prevItem: false,
     };
@@ -779,6 +789,7 @@ class Room {
     }));
     const b = this.boss;
     this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });
+    this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
   }
 
   snapshot() {
@@ -814,6 +825,8 @@ const wss = new WebSocketServer({ server });
 wss.on('connection', ws => {
   let room = null;
   let me = null;
+  let watching = false;
+  let pid = null; // フレンド機能用のプレイヤーID（端末ごと）
   const send = msg => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 
   ws.on('message', raw => {
@@ -821,6 +834,26 @@ wss.on('connection', ws => {
     try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.t) {
+      case 'hello': { // ホーム画面にいる間つないでおく接続（フレンドの一覧用）
+        pid = cleanPid(msg.pid);
+        if (!pid) return;
+        touchPlayer(pid, msg.name, msg.yokai);
+        presence.set(ws, pid);
+        sendFriends(ws);
+        break;
+      }
+      case 'watch': {
+        if (room) return;
+        if (draining) { send({ t: 'serverUpdate' }); return ws.close(); }
+        const target = rooms.get(String(msg.code || '').toUpperCase());
+        if (!target || target.state !== 'battle') return send({ t: 'error', msg: 'いまは観戦できません（バトルが終わったかも）' });
+        if (target.watchers.size >= MAX_WATCHERS) return send({ t: 'error', msg: '観戦している人がいっぱいです' });
+        room = target; watching = true;
+        room.watchers.add(ws);
+        send({ t: 'welcome', id: null, watch: true });
+        room.watchStart(ws);
+        break;
+      }
       case 'create':
       case 'join': {
         if (room) return;
@@ -836,7 +869,9 @@ wss.on('connection', ws => {
           if (target.state !== 'lobby') return send({ t: 'error', msg: 'プレイ中のため参加できません' });
         }
         room = target;
-        me = room.addPlayer(ws, msg.name, msg.yokai);
+        pid = cleanPid(msg.pid);
+        if (pid) touchPlayer(pid, msg.name, msg.yokai);
+        me = room.addPlayer(ws, msg.name, msg.yokai, pid);
         send({ t: 'welcome', id: me.id });
         room.broadcast(room.lobbyInfo());
         break;
@@ -868,12 +903,65 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
+    presence.delete(ws);
+    if (room && watching) { room.watchers.delete(ws); return; }
     if (!room || !me) return;
     room.removePlayer(me.id);
-    if (room.players.size === 0) rooms.delete(room.code);
+    if (room.players.size === 0) {
+      rooms.delete(room.code);
+      // だれもいなくなったバトルを観戦していた人はホームへ
+      room.broadcast({ t: 'error', msg: 'みんながいなくなったので、観戦を終わりました' });
+      for (const w of room.watchers) w.close();
+    }
     else room.broadcast(room.lobbyInfo());
   });
 });
+
+// ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
+const MAX_WATCHERS = 8;
+const known = new Map();    // pid → { name, yokai, seen }
+const presence = new Map(); // ホーム画面の接続 → pid
+const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);
+function touchPlayer(pid, name, yokai) {
+  const k = known.get(pid) || {};
+  known.set(pid, {
+    name: String(name || k.name || 'プレイヤー').slice(0, 10),
+    yokai: S.YOKAI_BY_ID[yokai] ? yokai : k.yokai || 'nekomata',
+    seen: Date.now(),
+  });
+  if (known.size > 500) { // 古い人から忘れる
+    const old = [...known.entries()].sort((a, b) => a[1].seen - b[1].seen).slice(0, known.size - 500);
+    for (const [id] of old) known.delete(id);
+  }
+}
+// それぞれの人が今どうしているか
+function friendList() {
+  const where = new Map();
+  for (const room of rooms.values()) for (const p of room.players.values()) {
+    if (!p.pid) continue;
+    where.set(p.pid, { room: room.code, state: room.state, n: room.players.size, yokai: p.yokai, name: p.name });
+    touchPlayer(p.pid, p.name, p.yokai);
+  }
+  const online = new Set(presence.values());
+  return [...known.entries()].sort((a, b) => b[1].seen - a[1].seen).slice(0, 100).map(([id, k]) => {
+    const w = where.get(id);
+    const status = w ? w.state : online.has(id) ? 'home' : 'off';
+    return {
+      pid: id, name: w ? w.name : k.name, yokai: w ? w.yokai : k.yokai, status, seen: k.seen,
+      room: w && (w.state === 'battle' || (w.state === 'lobby' && w.n < MAX_PLAYERS)) ? w.room : null,
+      n: w ? w.n : 0,
+    };
+  });
+}
+function sendFriends(ws, list = friendList()) {
+  const me = presence.get(ws);
+  if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'friends', list: list.filter(f => f.pid !== me), now: Date.now() }));
+}
+setInterval(() => {
+  if (!presence.size) return;
+  const list = friendList();
+  for (const ws of presence.keys()) sendFriends(ws, list);
+}, 3000);
 
 // ---------- 更新時の入れ替え ----------
 // Render は新しいサーバーに切り替えたあと、古いサーバーに SIGTERM を送ってくる。

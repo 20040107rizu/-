@@ -37,12 +37,37 @@
       <button id="btnJoin" class="big alt">参加する</button>
     </div>
     <div class="row">
+      <button id="btnBuddies" class="mid">👥 フレンド <span id="buddyBadge" class="badge" hidden></span></button>
+      <button id="btnZukan" class="mid">📖 妖怪図鑑</button>
+    </div>
+    <div class="row">
       <p id="friendCount" class="sub"></p>
       <button id="btnSave" class="small">💾 セーブ</button>
       <button id="btnBgm" class="small">🔊 BGM ON</button>
       <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
     </div>
     <p id="err" class="err"></p>
+  </section>
+
+  <!-- フレンド（このゲームで遊んだ人） -->
+  <section id="buddyScreen" class="screen overlay">
+    <div class="ov-head"><h2>👥 フレンド</h2><span class="sub">このゲームで遊んだ人は、みんな自動でフレンドになります</span><button id="btnBuddyClose" class="small">✕ とじる</button></div>
+    <ul id="buddyList" class="buddy-list"></ul>
+    <p id="buddyMsg" class="sub"></p>
+  </section>
+
+  <!-- 妖怪図鑑 -->
+  <section id="zukan" class="screen overlay">
+    <div class="lb-left">
+      <div class="ov-head"><h2>📖 妖怪図鑑</h2><span id="zukanCount" class="sub"></span></div>
+      <div id="zukanInfo" class="lb-preview"></div>
+      <button id="btnZukanClose" class="big">とじる</button>
+    </div>
+    <div class="lb-right">
+      <div id="zukanTabs" class="tabs"></div>
+      <div id="zukanRoles" class="tabs"></div>
+      <div id="zukanGrid" class="friends"></div>
+    </div>
   </section>
 
   <!-- ホーム画面に追加の案内（iPhone / iPad） -->

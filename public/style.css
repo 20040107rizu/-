@@ -248,3 +248,41 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .yk { padding: 2px 2px 3px; font-size: 10px; }
 .yk img.face { display: block; width: 100%; max-width: 64px; aspect-ratio: 1; height: auto; margin: 0 auto; border: none; border-radius: 0; object-fit: contain; }
 .yk .nm { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ホームのボタン（フレンド・図鑑） */
+button.mid { font-size: 15px; font-weight: bold; padding: 8px 16px; background: #3a2456; border: 2px solid #8a4f7a; position: relative; }
+.badge { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 999px; background: #2fbf6a; color: #fff; font-size: 11px; line-height: 18px; }
+
+/* 重なる画面の見出し */
+.ov-head { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 760px; }
+.ov-head h2 { font-size: 22px; white-space: nowrap; }
+.ov-head .sub { font-size: 11px; flex: 1; }
+
+/* フレンド一覧 */
+#buddyScreen.active { justify-content: flex-start; }
+.buddy-list { list-style: none; margin: 0; padding: 2px; width: 100%; max-width: 760px; flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 6px; align-content: start; }
+.buddy-list li { display: flex; align-items: center; gap: 8px; background: #2a1840; border-radius: 12px; padding: 4px 8px 4px 4px; min-width: 0; }
+.buddy-list li.off { opacity: .55; }
+.buddy-list img, .buddy-list .noimg { width: 44px; height: 44px; object-fit: contain; flex: none; }
+.buddy-list .who { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 11px; line-height: 1.3; }
+.buddy-list .who b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.buddy-list .st { white-space: nowrap; }
+.buddy-list .st::before { content: "●"; margin-right: 3px; }
+.st.home::before, .st.lobby::before { color: #2fbf6a; }
+.st.battle::before { color: #ff6a3d; }
+.st.result::before { color: #ffd23a; }
+.st.off::before { color: #777; }
+.buddy-list button { font-size: 13px; font-weight: bold; padding: 7px 12px; flex: none; }
+.buddy-list .join { background: linear-gradient(#ff9b3d, #e2531f); box-shadow: 0 3px 0 #7a2a0a; }
+.buddy-list .watch { background: linear-gradient(#5aa7ff, #2f62d9); box-shadow: 0 3px 0 #142d6e; }
+.buddy-empty { grid-column: 1 / -1; text-align: center; opacity: .7; font-size: 13px; padding: 20px; background: none !important; }
+
+/* 妖怪図鑑（ロビーと同じ2列） */
+#zukan.active { flex-direction: row; align-items: stretch; gap: 12px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
+#zukan .ov-head h2 { font-size: 18px; }
+#zukan .lb-preview { flex-direction: column; justify-content: center; text-align: center; }
+#zukan .lb-preview .big-face { width: min(60%, 150px); }
+#zukan .lb-preview .big-face.sil { filter: brightness(0) invert(.82); opacity: .28; }
+#zukan .lb-preview dl { text-align: left; }
+#zukan .tabs .tab { cursor: pointer; }
