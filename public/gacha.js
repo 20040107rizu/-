@@ -1,5 +1,5 @@
 // 鬼ガチャの演出。GachaShow.run(root, opts) で root の中に演出を作り、終わったら resolve する。
-// opts: { team, ball: {key, name, color}, yokai: {name, rank, rankColor, role, img}, isNew, dupCount }
+// opts: { team, failed: {from} | null（脱出失敗で半分になったとき）, ball: {key, name, color}, yokai: {name, rank, rankColor, role, img}, isNew, dupCount }
 (function () {
   'use strict';
   const TIER = { green: 0, blue: 1, red: 2, gold: 3, black: 4 };
@@ -99,7 +99,9 @@
         <div class="gs-bg"></div>
         <div class="gs-flash"></div>
         <div class="gs-bolts"></div>
-        <div class="gs-info">みんなで集めた鬼玉 <b class="gs-count">0</b>個</div>
+        <div class="gs-info">${o.failed
+          ? `<span class="gs-failed">脱出失敗… 鬼玉が半分に！</span> みんなの鬼玉 <s>${o.failed.from}</s> → <b class="gs-count">0</b>個`
+          : 'みんなで集めた鬼玉 <b class="gs-count">0</b>個'}</div>
         <div class="gs-stage">
           <div class="gs-machine">${MACHINE}</div>
           <div class="gs-orbs"></div>

@@ -565,8 +565,8 @@
       stats.plays++;
       stats.dama += mine.dama;
       stats.best = Math.max(stats.best, mine.dama);
+      if (mine.escaped) stats.escapes++;
       if (mine.gacha) {
-        stats.escapes++;
         isNew = !friends[mine.gacha.yokai];
         friends[mine.gacha.yokai] = (friends[mine.gacha.yokai] || 0) + 1;
       }
@@ -585,7 +585,8 @@
       // 絵が無い妖怪は色の丸で代わりにする
       const img = artUrl('yokai/' + y.id) || 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${y.color}" stroke="#fff" stroke-width="6"/></svg>`);
       GachaShow.run($('gachaStage'), {
-        team: result.team ?? mine.dama,
+        team: mine.count ?? result.team ?? mine.dama,
+        failed: mine.escaped ? null : { from: result.team ?? 0 },
         ball: { key: ball.key, name: ball.name, color: ball.color },
         yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img },
         isNew, dupCount: friends[y.id],
@@ -618,7 +619,7 @@
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
-        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${g ? `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}` : '-'}</td></tr>`;
+        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${g ? `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}${p.escaped ? '' : ` <small>（鬼玉${p.count ?? '半分'}個で）</small>`}` : '-'}</td></tr>`;
       }).join('');
     if (watcher) {
       $('btnAgain').disabled = false;

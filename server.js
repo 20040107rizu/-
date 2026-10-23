@@ -785,7 +785,9 @@ class Room {
     const judged = team / (1 + TEAM_FACTOR * (n - 1));
     const players = [...this.players.values()].map(p => ({
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt),
-      gacha: p.escaped ? rollGacha(judged) : null,
+      // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
+      count: p.escaped ? team : Math.floor(team / 2),
+      gacha: rollGacha(p.escaped ? judged : judged / 2),
     }));
     const b = this.boss;
     this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });

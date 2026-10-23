@@ -286,3 +286,5 @@ button.mid { font-size: 15px; font-weight: bold; padding: 8px 16px; background: 
 #zukan .lb-preview .big-face.sil { filter: brightness(0) invert(.82); opacity: .28; }
 #zukan .lb-preview dl { text-align: left; }
 #zukan .tabs .tab { cursor: pointer; }
+.gs-failed { color: #ff7070; font-weight: bold; margin-right: 6px; }
+.gs-info s { opacity: .6; }
