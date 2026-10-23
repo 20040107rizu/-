@@ -1,7 +1,7 @@
 // 鬼バスターズ Service Worker
 // 画面ファイルはネット優先で取得し、つながらないときだけ保存版を使う（更新がすぐ反映されるように）。
-const CACHE = 'busters-v11';
-const ASSETS = ['/', '/index.html', '/style.css', '/music.js', '/yokai.js', '/shared.js', '/title.js', '/gacha.js', '/game.js', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE = 'busters-v12';
+const ASSETS = ['/', '/index.html', '/style.css', '/music.js', '/yokai.js', '/attacks.js', '/shared.js', '/title.js', '/gacha.js', '/game.js', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

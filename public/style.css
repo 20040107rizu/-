@@ -208,3 +208,6 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .gs-cf { position: absolute; top: 45%; width: 1.4vmin; height: 2.4vmin; border-radius: 2px; animation: gsCf 2.4s cubic-bezier(.2, .6, .4, 1) forwards; }
 @keyframes gsCf { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 40% { transform: translate(calc(var(--dx) * .7), var(--dy)) rotate(var(--r)); } 100% { transform: translate(var(--dx), 60vmin) rotate(calc(var(--r) * 2)); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gs *, .gs { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+.yokai-info { margin: 0; font-size: 12px; line-height: 1.5; text-align: center; max-width: 760px; }
+.yokai-info small { opacity: .75; font-size: 11px; }

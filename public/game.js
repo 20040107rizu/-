@@ -386,8 +386,13 @@
   const faceImg = (y, locked) => artUrl('yokai/' + y.id)
     ? `<img class="face${locked ? ' sil' : ''}" loading="lazy" src="${artUrl('yokai/' + y.id)}" alt="">`
     : `<div class="face" style="background:${locked ? '#333' : y.color}"></div>`;
+  function renderYokaiInfo() {
+    const y = S.YOKAI_BY_ID[selYokai], at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
+    $('yokaiInfo').innerHTML = `<b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>（${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>）　通常：${esc(at.normalName)}　強攻撃：${esc(at.strongName)}　スキル：${sk.label}<br><small>${el.name}属性：${el.effect}／${sk.label}：${sk.desc}</small>`;
+  }
   function renderFriends() {
     renderFriendTabs();
+    renderYokaiInfo();
     const el = $('friends');
     el.innerHTML = '';
     const list = friendTab === 'own' ? S.YOKAI.filter(y => friends[y.id]) : S.YOKAI.filter(y => y.rank === friendTab);
@@ -482,6 +487,13 @@
 
   // ---------- 演出イベント ----------
   function nameOf(id) { const p = snap && snap.players.find(q => q.id === id); return p ? p.name : ''; }
+  // キャラの頭の上に文字を出す（強攻撃の名前など）
+  function floatOn(id, text, c) {
+    const p = snap && snap.players.find(q => q.id === id);
+    if (!p) return;
+    const pos = id === myId && myPred ? myPred : p;
+    floats.push({ x: pos.x, y: pos.y - 70, text, c: c || '#fff', t: 1.1, small: true });
+  }
   function handleEvent(ev) {
     const near = (x, y) => myPred && Math.hypot(x - myPred.x, y - myPred.y) < 700;
     switch (ev.k) {
@@ -491,10 +503,17 @@
         if (ev.id === myId) { shake = 0.25; navigator.vibrate?.(40); }
         break;
       case 'heal': floats.push({ x: ev.x, y: ev.y, text: '+' + ev.v, c: '#7dff9a', t: 0.8 }); break;
-      case 'slash': fx.push({ k: 'slash', x: ev.x, y: ev.y, a: ev.a, t: 0.15, max: 0.15 }); break;
+      case 'slash': fx.push({ k: 'slash', x: ev.x, y: ev.y, a: ev.a, c: ev.c, big: ev.big, t: 0.15, max: 0.15 }); break;
+      case 'beam': fx.push({ k: 'beam', x: ev.x, y: ev.y, x2: ev.x2, y2: ev.y2, w: ev.w, c: ev.c, t: 0.22, max: 0.22 }); break;
+      case 'cone': fx.push({ k: 'cone', x: ev.x, y: ev.y, a: ev.a, r: ev.r, c: ev.c, t: 0.25, max: 0.25 }); break;
+      case 'blink': fx.push({ k: 'beam', x: ev.x, y: ev.y, x2: ev.x2, y2: ev.y2, w: 26, c: ev.c, t: 0.3, max: 0.3 }); fx.push({ k: 'ring', x: ev.x2, y: ev.y2, r: 110, c: ev.c, t: 0.35, max: 0.35 }); break;
+      case 'bolt': fx.push({ k: 'bolt', x: ev.x, y: ev.y, c: ev.c, t: 0.3, max: 0.3 }); if (near(ev.x, ev.y)) shake = Math.max(shake, 0.12); break;
+      case 'buff': fx.push({ k: 'buff', id: ev.id, t: 0.8, max: 0.8 }); if (ev.id === myId) floatOn(ev.id, '攻撃・速さアップ！', '#ffd84a'); break;
+      case 'dodge': fx.push({ k: 'after', id: ev.id, t: 0.3, max: 0.3 }); break;
+      case 'strong': floatOn(ev.id, ev.name, ev.c); break;
       case 'ring': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: ev.r, c: ev.c, t: 0.4, max: 0.4 }); break;
       case 'boom':
-        fx.push({ k: 'boom', x: ev.x, y: ev.y, r: ev.r || 80, t: ev.big ? 0.5 : 0.35, max: ev.big ? 0.5 : 0.35 });
+        fx.push({ k: 'boom', x: ev.x, y: ev.y, r: ev.r || 80, c: ev.c, t: ev.big ? 0.5 : 0.35, max: ev.big ? 0.5 : 0.35 });
         if (near(ev.x, ev.y)) { shake = Math.max(shake, ev.big ? 0.4 : 0.15); beep(90, 0.3, 'sawtooth', 0.06, -40); }
         break;
       case 'whistle':
@@ -581,9 +600,9 @@
   }
   setTimeout(fixViewport, 0);
 
-  const input = { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false };
+  const input = { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false };
   const stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
-  const btnHold = { atk: null, strong: null, item: null, dash: null };
+  const btnHold = { atk: null, strong: null, item: null, dash: null, skill: null };
   const keys = new Set();
 
   // 右側のボタン配置
@@ -591,11 +610,13 @@
     const s = Math.min(W, H);
     const big = s * 0.13, mid = s * 0.088;
     const bx = W - big - 26, by = H - big - 22;
+    // アイテムは右上（鬼玉の数の下）、元のアイテムの場所はタイプ別のスキル
     return {
       atk:    { x: bx, y: by, r: big },
       strong: { x: bx - big * 0.25, y: by - big * 1.85, r: mid },
-      item:   { x: bx - big * 1.95, y: by + big * 0.25, r: mid },
+      skill:  { x: bx - big * 1.95, y: by + big * 0.25, r: mid },
       dash:   { x: bx - big * 1.75, y: by - big * 1.35, r: mid },
+      item:   { x: W - 20 - s * 0.075, y: 66 + s * 0.075, r: s * 0.072 },
     };
   }
 
@@ -660,6 +681,7 @@
     input.strong = btnHold.strong !== null || keys.has('KeyK');
     input.item = btnHold.item !== null || keys.has('KeyL');
     input.dash = btnHold.dash !== null || keys.has('ShiftLeft') || keys.has('ShiftRight');
+    input.skill = btnHold.skill !== null || keys.has('KeyU') || keys.has('KeyI');
   }
 
   let lastSent = '', sendT = 0;
@@ -791,8 +813,10 @@
     const y = S.YOKAI_BY_ID[p.yokai];
     ctx.save();
     ctx.translate(pos.x, pos.y);
-    ctx.globalAlpha = p.down ? 0.5 : p.invis ? (me ? 0.35 : 0.15) : 1;
-    ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 16, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = p.down ? 0.5 : p.invis ? (me ? 0.35 : 0.15) : p.dodge ? 0.55 : 1;
+    ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 16, 18 * (1 - (p.jump || 0) * 0.5), 6, 0, 0, Math.PI * 2); ctx.fill();
+    if (p.jump) ctx.translate(0, -p.jump * 70); // 大ジャンプ中は浮く
+    if (p.au || p.su) { ctx.fillStyle = 'rgba(255,200,60,0.22)'; ctx.beginPath(); ctx.arc(0, -10, 38 + Math.sin(performance.now() / 120) * 3, 0, Math.PI * 2); ctx.fill(); }
     if (me) { ctx.strokeStyle = '#ffe36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 27, 0, Math.PI * 2); ctx.stroke(); }
     if (p.sh) { ctx.fillStyle = 'rgba(100,160,255,0.3)'; ctx.beginPath(); ctx.arc(0, 0, 31, 0, Math.PI * 2); ctx.fill(); }
     if (p.run || p.dash) {
@@ -829,6 +853,34 @@
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('たすけて！', 0, 40);
       ctx.strokeStyle = '#7dff9a'; ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(0, 0, 36, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.rv); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 回復・ダメージのエリアや隕石の目印
+  function drawZone(z, now) {
+    ctx.save();
+    if (z.kind === 'heal') {
+      ctx.fillStyle = 'rgba(91,224,122,0.18)'; ctx.strokeStyle = 'rgba(125,255,154,0.8)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (0.95 + Math.sin(now * 5) * 0.05), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (z.kind === 'mark') {
+      // 隕石が落ちてくる場所
+      ctx.strokeStyle = z.c; ctx.lineWidth = 3; ctx.setLineDash([12, 8]);
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = z.c; ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (1 - z.life / 0.9), 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(z.x, z.y - 400 * (z.life / 0.9), 30, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.fillStyle = z.c || '#fff'; ctx.strokeStyle = z.c || '#fff';
+      if (z.shape === 'tornado' || z.shape === 'vortex') {
+        ctx.lineWidth = 4;
+        for (let k = 0; k < 3; k++) {
+          ctx.globalAlpha = 0.5 - k * 0.12;
+          ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (1 - k * 0.28), now * (z.shape === 'vortex' ? -8 : 10) + k, now * (z.shape === 'vortex' ? -8 : 10) + k + 4.2); ctx.stroke();
+        }
+      } else {
+        ctx.globalAlpha = 0.22 + Math.sin(now * 4) * 0.05;
+        for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(z.x + Math.cos(k * 1.3 + now) * z.r * 0.4, z.y + Math.sin(k * 1.7 + now) * z.r * 0.3, z.r * 0.55, 0, Math.PI * 2); ctx.fill(); }
+      }
     }
     ctx.restore();
   }
@@ -918,7 +970,7 @@
     }
 
     // 仲間
-    let y = snap.players.length > 1 ? 74 : 66;
+    let y = buttons().item.y + buttons().item.r + 34;
     ctx.textAlign = 'right';
     for (const p of snap.players) {
       if (p.id === myId) continue;
@@ -938,11 +990,14 @@
       const st = S.ROLES[S.YOKAI_BY_ID[me.yokai].role];
       const atFusuma = myPred && Math.hypot(myPred.x - fusuma.x, myPred.y - fusuma.y) < 80;
       drawButton(bs.atk, btnHold.atk !== null || input.atk, atFusuma ? 1 - me.ep : me.atkCd, atFusuma ? '#c8a020' : '#e2531f', atFusuma ? '脱出' : '攻撃', atFusuma ? '長押し' : null);
-      drawButton(bs.strong, input.strong, me.stCd, '#7a3fbf', '強攻撃', st.strong);
+      const at = Attacks.of(me.yokai), sk = Attacks.SKILL[S.YOKAI_BY_ID[me.yokai].role];
+      drawButton(bs.strong, input.strong, me.stCd, '#7a3fbf', '強攻撃', at.strongName.replace(/^.+?の/, ''));
+      drawButton(bs.skill, input.skill, me.skCd, { fighter: '#2a8a8a', healer: '#c8a020', tank: '#4a6ad8', ranger: '#a8402a' }[S.YOKAI_BY_ID[me.yokai].role], sk.label);
       const it = me.item ? S.ITEMS[me.item] : null;
       const itImg = me.item ? art('item/' + me.item) : null;
-      drawButton(bs.item, input.item, 0, it ? '#2f8a5a' : '#333', it ? (itImg ? '' : it.icon) : 'アイテム', it ? it.name : 'なし', !!it);
-      if (itImg) ctx.drawImage(itImg, bs.item.x - bs.item.r * 0.5, bs.item.y - bs.item.r * 0.75, bs.item.r, bs.item.r);
+      drawButton(bs.item, input.item, 0, it ? '#2f8a5a' : '#333', it ? (itImg ? '' : it.icon) : 'なし', it ? null : null, !!it);
+      if (itImg) ctx.drawImage(itImg, bs.item.x - bs.item.r * 0.6, bs.item.y - bs.item.r * 0.6, bs.item.r * 1.2, bs.item.r * 1.2);
+      ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fffc'; ctx.fillText(it ? it.name : 'アイテム', bs.item.x, bs.item.y + bs.item.r + 12);
       drawButton(bs.dash, input.dash, 0, me.exh ? '#552222' : '#2f62d9', 'ダッシュ', me.inf ? '∞' : null);
       // スタミナ
       const db = bs.dash;
@@ -1086,7 +1141,7 @@
         let mx = input.mx, my = input.my; const m = Math.hypot(mx, my);
         if (m > 1) { mx /= m; my /= m; }
         const run = input.dash && m > 0.15 && (me.inf || (!me.exh && me.stam > 0));
-        const spd = st.speed * (run ? 1.4 : 1);
+        const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1);
         myPred.x += mx * spd * dt; myPred.y += my * spd * dt;
         S.collide(map, myPred, 18);
       }
@@ -1137,9 +1192,11 @@
     drawBuildings(cam);
     const k = 1 - Math.pow(0.001, dt);
 
-    for (const z of snap.zones) {
-      ctx.fillStyle = 'rgba(91,224,122,0.18)'; ctx.strokeStyle = 'rgba(125,255,154,0.8)'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (0.95 + Math.sin(now * 5) * 0.05), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    for (const z of snap.zones) drawZone(z, now);
+    for (const t of snap.turrets || []) {
+      ctx.fillStyle = '#3a2a4a'; ctx.strokeStyle = t.c; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(t.x, t.y, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = t.c; ctx.beginPath(); ctx.arc(t.x, t.y - 4, 7 + Math.sin(now * 10) * 2, 0, Math.PI * 2); ctx.fill();
     }
     for (const t of snap.traps) {
       ctx.fillStyle = '#ffe14a33'; ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 2;
@@ -1206,8 +1263,16 @@
     for (const pr of snap.proj) {
       const pos = lerpEnt('j' + pr.id, pr.x, pr.y, 0.5);
       if (pr.punch) { ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👊', pos.x, pos.y); ctx.textBaseline = 'alphabetic'; continue; }
+      if (pr.bomb) { ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💣', pos.x, pos.y - 16); ctx.textBaseline = 'alphabetic'; continue; }
       ctx.fillStyle = pr.c; ctx.shadowColor = pr.c; ctx.shadowBlur = 12;
-      ctx.beginPath(); ctx.arc(pos.x, pos.y, pr.r, 0, Math.PI * 2); ctx.fill();
+      if (pr.spin) {
+        // ブーメラン: くるくる回る
+        ctx.save(); ctx.translate(pos.x, pos.y); ctx.rotate(now * 18);
+        ctx.beginPath(); ctx.moveTo(-pr.r, -pr.r * 0.3); ctx.quadraticCurveTo(0, -pr.r * 1.4, pr.r, -pr.r * 0.3); ctx.lineTo(pr.r * 0.6, 0); ctx.quadraticCurveTo(0, -pr.r * 0.6, -pr.r * 0.6, 0); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.beginPath(); ctx.arc(pos.x, pos.y - (pr.lob ? 18 : 0), pr.r, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.shadowBlur = 0;
     }
 
@@ -1216,8 +1281,27 @@
       if (e.t <= 0) { fx.splice(i, 1); continue; }
       const a = e.t / e.max;
       ctx.globalAlpha = a;
-      if (e.k === 'slash') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(e.x, e.y, 40, e.a - 1.1, e.a + 1.1); ctx.stroke(); }
-      else if (e.k === 'boom') { ctx.fillStyle = '#ff6a3d'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1.1 - a * 0.3), 0, Math.PI * 2); ctx.fill(); }
+      if (e.k === 'slash') {
+        ctx.strokeStyle = e.c || '#fff'; ctx.lineWidth = e.big ? 14 : 8; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 1.1, e.a + 1.1); ctx.stroke();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 0.9, e.a + 0.9); ctx.stroke();
+      }
+      else if (e.k === 'boom') { ctx.fillStyle = e.c || '#ff6a3d'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1.1 - a * 0.3), 0, Math.PI * 2); ctx.fill(); }
+      else if (e.k === 'beam') {
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = e.c; ctx.lineWidth = e.w * (0.6 + a * 0.6); ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, e.w * 0.3 * a); ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+      else if (e.k === 'cone') { ctx.fillStyle = e.c; ctx.globalAlpha = a * 0.45; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, e.r * (1.1 - a * 0.3), e.a - 0.65, e.a + 0.65); ctx.closePath(); ctx.fill(); }
+      else if (e.k === 'bolt') {
+        ctx.strokeStyle = e.c; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(e.x + 20, e.y - 260);
+        for (let k = 1; k <= 6; k++) ctx.lineTo(e.x + (k % 2 ? -18 : 18) * (1 - k / 7), e.y - 260 + k * 43);
+        ctx.stroke(); ctx.fillStyle = e.c; ctx.beginPath(); ctx.arc(e.x, e.y, 40 * (1.2 - a), 0, Math.PI * 2); ctx.fill();
+      }
+      else if (e.k === 'buff' || e.k === 'after') {
+        const p = snap.players.find(q => q.id === e.id);
+        if (p) { const pos = p.id === myId && myPred ? myPred : (ents.get('p' + p.id) || p); ctx.strokeStyle = e.k === 'buff' ? '#ffd84a' : '#ffffff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(pos.x, pos.y - 10, 30 + (1 - a) * 30, 0, Math.PI * 2); ctx.stroke(); }
+      }
       else if (e.k === 'ring') { ctx.strokeStyle = e.c; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1 - a), 0, Math.PI * 2); ctx.stroke(); }
       ctx.globalAlpha = 1;
     }
@@ -1227,7 +1311,7 @@
       const f = floats[i]; f.t -= dt; f.y -= 50 * dt;
       if (f.t <= 0) { floats.splice(i, 1); continue; }
       ctx.globalAlpha = Math.min(1, f.t * 3);
-      ctx.font = 'bold 22px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      ctx.font = f.small ? 'bold 15px sans-serif' : 'bold 22px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
       ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle = f.c; ctx.fillText(f.text, f.x, f.y);
       ctx.globalAlpha = 1;
     }

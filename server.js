@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
+const Combat = require('./combat.js');
+const A = Combat.A;
 
 const PORT = process.env.PORT || 3000;
 const TICK_RATE = 30;              // シミュレーション回数/秒
@@ -37,10 +39,11 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const crypto = require('crypto');
 function computeVersion() {
   const h = crypto.createHash('sha1');
-  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'shared.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
+  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'attacks.js', 'shared.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
     try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
   }
-  h.update(fs.readFileSync(__filename)); // サーバーだけの変更（ボス鬼の強さなど）でも新しい版にする
+  h.update(fs.readFileSync(__filename));
+  h.update(fs.readFileSync(path.join(__dirname, 'combat.js'))); // サーバーだけの変更（ボス鬼の強さなど）でも新しい版にする
   return h.digest('hex').slice(0, 10);
 }
 const VERSION = computeVersion();
@@ -176,6 +179,7 @@ class Grid {
 
 // 経路にそって移動（見通せるなら直進）
 function moveAlong(room, e, grid, tx, ty, speed, r) {
+  if (e.slowT > 0) speed *= e.slowMul || 0.6; // 氷・水などで遅くなっている
   if (S.lineOfSight(room.map, e, { x: tx, y: ty }) && clearPath(room.map, e, { x: tx, y: ty }, r)) {
     e.path = null;
     stepToward(e, tx, ty, speed);
@@ -241,7 +245,7 @@ class Room {
     const p = {
       id: genId(), ws, name: (name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yokai] ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
-      input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false }, prevItem: false,
+      input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false }, prevItem: false,
     };
     this.players.set(p.id, p);
     return p;
@@ -263,6 +267,7 @@ class Room {
     this.projectiles = [];
     this.telegraphs = [];
     this.zones = [];
+    this.turrets = [];
     this.traps = [];
     this.bombs = [];
     this.result = null;
@@ -283,6 +288,7 @@ class Room {
         hp: st.hp, maxHp: st.hp, atkT: 0, strongT: 0, down: false, reviveProg: 0, escaped: false,
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
+        skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
       });
       S.collide(this.map, p, PLAYER_R);
     }
@@ -440,6 +446,7 @@ class Room {
     for (const e of this.patrols) {
       e.isPatrol = true;
       e.hitFlash = Math.max(0, e.hitFlash - DT);
+      if (e.hp > 0 && e.stunT > 0) { e.stunT -= DT; continue; } // 雷・盾の一撃でしびれている
       if (e.hp <= 0) {
         e.respawnT -= DT;
         if (e.respawnT <= 0) {
@@ -577,12 +584,13 @@ class Room {
   }
 
   shoot(p, angle, speed, dmg, life, r, c, extra) {
-    this.projectiles.push({ id: genId(), owner: p.id, x: p.x, y: p.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, dmg, life, r, c, ...extra });
+    this.projectiles.push({ id: genId(), owner: p.id, x: p.x, y: p.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, dmg, life, r, c, t: 0, hits: new Set(), ...extra });
   }
+  newId() { return genId(); }
 
   updatePlayer(p) {
     const st = p.stats;
-    for (const k of ['atkT', 'strongT', 'shieldT', 'invulT', 'staminaT', 'invisT']) p[k] = Math.max(0, p[k] - DT);
+    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT']) p[k] = Math.max(0, p[k] - DT);
     if (p.down || p.escaped) return;
     const inp = p.input;
 
@@ -601,57 +609,32 @@ class Room {
     }
     p.dashing = dashing;
 
-    if (p.dashT > 0) {
+    if (Combat.preMove(this, p)) {
+      // 大ジャンプ中など
+    } else if (p.dashT > 0) {
       p.dashT -= DT;
       p.x += Math.cos(p.dashDir) * 700 * DT;
       p.y += Math.sin(p.dashDir) * 700 * DT;
-      for (const e of this.enemies()) {
-        if (!p.dashHits.has(e) && dist(p, e) < this.enemyR(e) + 40) { p.dashHits.add(e); this.damageOni(p, e, 40 * st.strongMul); }
-      }
+      Combat.dashHit(this, p);
+      if (p.dashT <= 0) p.dodge = false;
     } else {
       let mx = inp.mx, my = inp.my;
       const m = Math.hypot(mx, my);
       if (m > 1) { mx /= m; my /= m; }
-      const spd = st.speed * (dashing ? DASH_MUL : 1);
+      const spd = st.speed * (dashing ? DASH_MUL : 1) * (p.spdUpT > 0 ? 1.15 : 1);
       p.x += mx * spd * DT; p.y += my * spd * DT;
       if (m > 0.15) p.face = Math.atan2(my, mx);
     }
     S.collide(this.map, p, PLAYER_R);
 
-    const target = this.nearestEnemy(p, st.atkRange + 150);
+    const at = A.of(p.yokai);
+    const target = this.nearestEnemy(p, A.NORMAL[at.normal].range + 150);
     const aim = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.face;
-
-    // 通常攻撃
-    if (inp.atk && p.atkT <= 0) {
-      p.atkT = st.atkCd;
-      p.face = aim;
-      if (p.stats.atkRange < 200) {
-        const ax = p.x + Math.cos(aim) * st.atkRange * 0.6, ay = p.y + Math.sin(aim) * st.atkRange * 0.6;
-        this.hitEnemiesInCircle(p, ax, ay, st.atkRange * 0.55, st.atkDmg);
-        this.events.push({ k: 'slash', x: Math.round(ax), y: Math.round(ay), a: +aim.toFixed(2) });
-      } else {
-        const c = S.YOKAI_BY_ID[p.yokai].color;
-        this.shoot(p, aim, 650, st.atkDmg, st.atkRange / 650, 10, c, { heal: S.YOKAI_BY_ID[p.yokai].role === 'healer' });
-      }
-    }
-
-    // 強攻撃
-    if (inp.strong && p.strongT <= 0) {
-      p.strongT = st.strongCd;
-      const role = S.YOKAI_BY_ID[p.yokai].role;
-      const m = st.strongMul;
-      if (role === 'fighter') {
-        p.dashT = 0.25; p.dashDir = aim; p.dashHits = new Set();
-      } else if (role === 'tank') {
-        p.shieldT = 3;
-        this.hitEnemiesInCircle(p, p.x, p.y, 170, 30 * m);
-        this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 170, c: '#8aa0ff' });
-      } else if (role === 'healer') {
-        this.zones.push({ id: genId(), x: p.x, y: p.y, r: 140, life: 5, tick: 0, amt: 8 * m });
-      } else {
-        for (let k = -1; k <= 1; k++) this.shoot(p, aim + k * 0.18, 800, 22 * m, 0.8, 13, '#fff27a');
-      }
-    }
+    // 通常攻撃・強攻撃・スキル（中身は combat.js）
+    const busy = p.leap || p.dashT > 0;
+    if (inp.atk && p.atkT <= 0 && !busy) Combat.normal(this, p, aim, target);
+    if (inp.strong && p.strongT <= 0 && !busy) Combat.strong(this, p, aim, target);
+    if (inp.skill && p.skillT <= 0 && !p.leap) Combat.skill(this, p, aim);
 
     // アイテム（押した瞬間に使う）
     if (inp.item && !p.prevItem && p.item) this.useItem(p, aim);
@@ -752,32 +735,6 @@ class Room {
     }
   }
 
-  updateProjectiles() {
-    for (const pr of this.projectiles) {
-      pr.x += pr.vx * DT; pr.y += pr.vy * DT; pr.life -= DT;
-      if (!S.isFree(this.map, pr.x, pr.y, 1)) { pr.life = 0; continue; }
-      const owner = this.players.get(pr.owner);
-      for (const e of this.enemies()) {
-        if (dist(pr, e) < this.enemyR(e) + pr.r) { this.damageOni(owner, e, pr.dmg); pr.life = 0; break; }
-      }
-      // ヒーラーの弾は味方に当たると回復
-      if (pr.life > 0 && pr.heal) {
-        for (const q of this.activePlayers()) {
-          if (q.id !== pr.owner && dist(pr, q) < PLAYER_R + pr.r && q.hp < q.maxHp) { this.healPlayer(q, 10 * (owner ? owner.stats.strongMul : 1)); pr.life = 0; break; }
-        }
-      }
-    }
-    this.projectiles = this.projectiles.filter(pr => pr.life > 0);
-  }
-
-  updateZones() {
-    for (const z of this.zones) {
-      z.life -= DT; z.tick -= DT;
-      if (z.tick <= 0) { z.tick = 0.5; for (const q of this.activePlayers()) if (dist(q, z) <= z.r) this.healPlayer(q, z.amt); }
-    }
-    this.zones = this.zones.filter(z => z.life > 0);
-  }
-
   tick() {
     if (this.state !== 'battle') return;
     if (this.introT > 0) { this.introT -= DT; return; }
@@ -789,8 +746,8 @@ class Room {
     this.updateBoss();
     this.updateTelegraphs();
     this.updateItemsOnField();
-    this.updateProjectiles();
-    this.updateZones();
+    Combat.updateProjectiles(this);
+    Combat.updateEffects(this);
     // 全員が脱出 or 倒れた、または時間切れで終了
     const remaining = [...this.players.values()].filter(p => !p.escaped && !p.down);
     if (this.timeLeft <= 0 || remaining.length === 0) this.finish();
@@ -817,16 +774,18 @@ class Room {
         id: p.id, name: p.name, yokai: p.yokai, x: Math.round(p.x), y: Math.round(p.y), face: +p.face.toFixed(2),
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
-        sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / p.stats.atkCd).toFixed(2), stCd: +(p.strongT / p.stats.strongCd).toFixed(2),
+        sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0 } : null,
       items: this.items.map(it => ({ id: it.id, x: Math.round(it.x), y: Math.round(it.y), type: it.type })),
       traps: this.traps.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y) })),
       bombs: this.bombs.map(bm => ({ id: bm.id, x: Math.round(bm.x), y: Math.round(bm.y), t: +bm.t.toFixed(1) })),
-      proj: this.projectiles.map(pr => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), r: pr.r, c: pr.c, punch: pr.punch, a: +Math.atan2(pr.vy, pr.vx).toFixed(2) })),
+      proj: this.projectiles.map(pr => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), r: pr.r, c: pr.c, punch: pr.punch, spin: pr.spin, lob: pr.lob, bomb: pr.bomb, a: +Math.atan2(pr.vy, pr.vx).toFixed(2) })),
+      turrets: this.turrets.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), c: t.c })),
       tele: this.telegraphs.map(tg => ({ id: tg.id, shape: tg.shape, x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r, a: tg.a, len: tg.len, w: tg.w, p: +(1 - tg.t / tg.max).toFixed(2) })),
-      zones: this.zones.map(z => ({ id: z.id, x: Math.round(z.x), y: Math.round(z.y), r: z.r })),
+      zones: this.zones.map(z => ({ id: z.id, x: Math.round(z.x), y: Math.round(z.y), r: z.r, kind: z.kind || 'heal', c: z.c, shape: z.shape, life: +z.life.toFixed(1) })),
       ev: this.events,
     };
     this.events = [];
@@ -884,7 +843,7 @@ wss.on('connection', ws => {
           const i = me.input;
           i.mx = clamp(+msg.mx || 0, -1, 1);
           i.my = clamp(+msg.my || 0, -1, 1);
-          i.atk = !!msg.atk; i.strong = !!msg.strong; i.item = !!msg.item; i.dash = !!msg.dash;
+          i.atk = !!msg.atk; i.strong = !!msg.strong; i.item = !!msg.item; i.dash = !!msg.dash; i.skill = !!msg.skill;
         }
         break;
     }
