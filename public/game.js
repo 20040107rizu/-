@@ -88,6 +88,8 @@
   let banner = null;
   let myPred = null;
   let bossType = 'red';
+  let offline = false;        // 試合のあとで接続が切れた（結果はそのまま見られる）
+  let serverUpdating = false; // サーバーの更新で切れた
   // 開始時の演出: introMovie 秒の映像 → introCount 秒のカウントダウン（サーバーの intro が残り時間）
   let introMovie = 0, introCount = 0, landed = false, lastCount = 0, started = true, chaseHold = 0;
 
@@ -226,6 +228,7 @@
         }
       } else if (info.v !== loadedVersion) {
         updateReady = true;
+        if (serverUpdating && !ws && $('title').classList.contains('active')) { location.reload(); return; }
         refreshUpdateBar();
       }
     }).catch(() => {});
@@ -267,10 +270,18 @@
     ws.onopen = () => send({ ...first, name, yokai: selYokai });
     ws.onmessage = e => onMessage(JSON.parse(e.data));
     ws.onclose = () => {
-      ws = null; myId = null; snap = null;
+      ws = null;
+      // 試合が終わったあと（ガチャ・結果画面）なら、そのまま見られるようにする
+      if (result && ($('gacha').classList.contains('active') || $('result').classList.contains('active'))) {
+        offline = true;
+        renderResult();
+        return;
+      }
+      myId = null; snap = null;
       Music.stop();
       show('title');
-      $('err').textContent = '接続が切れました';
+      $('err').textContent = serverUpdating ? 'サーバーが更新されました。もう一度ルームを作ってね' : '接続が切れました';
+      if (serverUpdating) checkVersion();
     };
   }
 
@@ -280,7 +291,8 @@
         $('err').textContent = m.msg;
         ws.onclose = null; ws.close(); ws = null;
         break;
-      case 'welcome': myId = m.id; break;
+      case 'welcome': myId = m.id; offline = false; serverUpdating = false; break;
+      case 'serverUpdate': serverUpdating = true; break;
       case 'lobby':
         lobby = m;
         if (m.state === 'lobby') { renderLobby(); show('lobby'); }
@@ -330,7 +342,10 @@
   function renderBgmButton() { $('btnBgm').textContent = Music.enabled ? '🔊 BGM ON' : '🔇 BGM OFF'; }
   $('btnBgm').onclick = () => { Music.unlock(); Music.setEnabled(!Music.enabled); renderBgmButton(); menuMusic(); };
   renderBgmButton();
-  $('btnAgain').onclick = () => send({ t: 'toLobby' });
+  $('btnAgain').onclick = () => {
+    if (offline) { offline = false; myId = null; snap = null; result = null; show('title'); if (serverUpdating) checkVersion(); return; }
+    send({ t: 'toLobby' });
+  };
   $('btnShare').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${lobby.code}`;
     if (navigator.share) navigator.share({ title: '鬼バスターズ', text: '一緒に鬼の世界へ行こう！', url }).catch(() => {});
@@ -477,6 +492,11 @@
         return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${g ? `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}` : '-'}</td></tr>`;
       }).join('');
     const me = lobby && lobby.players.find(p => p.id === myId);
+    if (offline) {
+      $('btnAgain').disabled = false;
+      $('btnAgain').textContent = serverUpdating ? 'サーバー更新のためタイトルへ' : 'タイトルへもどる';
+      return;
+    }
     $('btnAgain').disabled = !(me && me.host);
     $('btnAgain').textContent = me && me.host ? 'ロビーへもどる' : 'ホストを待っています…';
   }

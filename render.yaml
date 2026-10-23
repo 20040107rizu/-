@@ -6,3 +6,4 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /
+    maxShutdownDelaySeconds: 300  # 更新のとき、プレイ中の試合が終わるまで古いサーバーを待つ

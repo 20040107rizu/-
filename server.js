@@ -829,6 +829,7 @@ wss.on('connection', ws => {
       case 'create':
       case 'join': {
         if (room) return;
+        if (draining) { send({ t: 'serverUpdate' }); return ws.close(); }
         let target;
         if (msg.t === 'create') {
           target = new Room(genRoomCode());
@@ -849,7 +850,7 @@ wss.on('connection', ws => {
         if (room && me && room.state === 'lobby' && S.YOKAI_BY_ID[msg.id]) { me.yokai = msg.id; room.broadcast(room.lobbyInfo()); }
         break;
       case 'start':
-        if (room && me && me.host && room.state === 'lobby') {
+        if (room && me && me.host && room.state === 'lobby' && !draining) {
           room.start();
           room.broadcast(room.lobbyInfo());
         }
@@ -876,6 +877,33 @@ wss.on('connection', ws => {
   });
 });
 
+// ---------- 更新時の入れ替え ----------
+// Render は新しいサーバーに切り替えたあと、古いサーバーに SIGTERM を送ってくる。
+// プレイ中の部屋があれば試合が終わるまで動かし続け、終わった部屋から順に「サーバー更新」を伝えて閉じる。
+const DRAIN_MAX = (+process.env.DRAIN_MAX || 295) * 1000;
+let draining = false, drainStart = 0, exiting = false;
+function startDrain() {
+  if (draining) return;
+  draining = true; drainStart = Date.now();
+  const playing = [...rooms.values()].filter(r => r.state === 'battle').length;
+  console.log(`更新のため終了準備: プレイ中の部屋 ${playing}`);
+  server.close();
+}
+function drainStep() {
+  for (const [code, room] of rooms) {
+    if (room.state === 'battle') continue;
+    // ロビー・結果画面の部屋は、新しいサーバーで入り直してもらう
+    room.broadcast({ t: 'serverUpdate' });
+    for (const p of room.players.values()) setTimeout(() => p.ws.close(), 300);
+    rooms.delete(code);
+  }
+  if (!exiting && (rooms.size === 0 || Date.now() - drainStart > DRAIN_MAX)) {
+    exiting = true;
+    console.log('終了します');
+    setTimeout(() => process.exit(0), 500);
+  }
+}
+
 // ---------- ゲームループ ----------
 let sendAcc = 0;
 setInterval(() => {
@@ -886,7 +914,12 @@ setInterval(() => {
     try { room.tick(); } catch (e) { console.error(e); }
     if (doSend && room.state === 'battle') room.broadcast(room.snapshot());
   }
+  if (draining) drainStep();
 }, 1000 / TICK_RATE);
 
-if (require.main === module) server.listen(PORT, () => console.log(`鬼バスターズ server: http://localhost:${PORT}`));
+if (require.main === module) {
+  server.listen(PORT, () => console.log(`鬼バスターズ server: http://localhost:${PORT}`));
+  process.on('SIGTERM', startDrain);
+  process.on('SIGINT', startDrain);
+}
 module.exports = { Room, rollGacha, server };
