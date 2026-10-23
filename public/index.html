@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="バスターズ">
+  <meta name="apple-mobile-web-app-title" content="鬼バスターズ">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#120a1a">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <title>バスターズ</title>
+  <title>鬼バスターズ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Mochiy+Pop+One&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -23,8 +26,8 @@
 
   <!-- タイトル -->
   <section id="title" class="screen active">
-    <h1>バスターズ</h1>
-    <p class="sub">鬼の世界で鬼玉を集めて、襖から脱出せよ！</p>
+    <h1 id="logo" class="logo-wrap"></h1>
+    <p class="sub catch">鬼の世界で鬼玉を集めて、襖から脱出せよ！</p>
     <div class="row">
       <input id="name" maxlength="10" placeholder="なまえ">
     </div>
@@ -33,8 +36,10 @@
       <input id="code" maxlength="4" placeholder="コード" autocapitalize="characters">
       <button id="btnJoin" class="big alt">参加する</button>
     </div>
-    <p id="friendCount" class="sub"></p>
-    <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
+    <div class="row">
+      <p id="friendCount" class="sub"></p>
+      <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
+    </div>
     <p id="err" class="err"></p>
   </section>
 
@@ -46,7 +51,7 @@
       <li>メニューを下にスクロールして <b>「ホーム画面に追加」</b> をタップ</li>
       <li>右上の <b>「追加」</b> をタップ</li>
     </ol>
-    <p class="sub">ホーム画面の「バスターズ」アイコンから、全画面で遊べます。<br>Chrome で開いているときは、アドレスバーの共有ボタンから同じように追加できます。</p>
+    <p class="sub">ホーム画面の「鬼バスターズ」アイコンから、全画面で遊べます。<br>Chrome で開いているときは、アドレスバーの共有ボタンから同じように追加できます。</p>
     <button id="btnInstallClose" class="big">とじる</button>
   </section>
 
@@ -100,6 +105,7 @@
   </section>
 
   <script src="shared.js"></script>
+  <script src="title.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

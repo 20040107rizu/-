@@ -1,4 +1,4 @@
-// バスターズ: 鬼の世界から鬼玉を集めて脱出する協力ゲームのサーバー
+// 鬼バスターズ: 鬼の世界から鬼玉を集めて脱出する協力ゲームのサーバー
 // HTTP で public/ を配信し、WebSocket でサーバー権威のゲームループを回す。
 const http = require('http');
 const fs = require('fs');
@@ -852,5 +852,5 @@ setInterval(() => {
   }
 }, 1000 / TICK_RATE);
 
-if (require.main === module) server.listen(PORT, () => console.log(`バスターズ server: http://localhost:${PORT}`));
+if (require.main === module) server.listen(PORT, () => console.log(`鬼バスターズ server: http://localhost:${PORT}`));
 module.exports = { Room, rollGacha, server };

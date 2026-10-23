@@ -83,3 +83,30 @@ button:disabled { opacity: .4; }
 
 button.install { display: none; font-size: 14px; padding: 8px 14px; background: #2f8a5a; }
 .steps { margin: 0; padding-left: 1.4em; max-width: 560px; line-height: 1.8; font-size: 15px; }
+
+/* ---- タイトル画面 ---- */
+#title { overflow: hidden; background: #0b0514; gap: 6px; justify-content: flex-end; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+#title > *:not(.title-bg) { position: relative; z-index: 1; }
+.title-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.logo-wrap { margin: 0 0 auto; padding-top: 2vh; width: min(92vw, 125vh); filter: none; background: none; }
+.logo { display: block; width: 100%; height: auto; overflow: visible; }
+.lc { transform-box: fill-box; transform-origin: 50% 80%; animation: logoIn .6s cubic-bezier(.3, 1.6, .5, 1) backwards, logoBob 2.4s ease-in-out infinite; }
+@keyframes logoIn { from { transform: translateY(-120px) scale(.3); opacity: 0; } }
+@keyframes logoBob { 50% { transform: translateY(-8px) rotate(2deg); } }
+.band { animation: logoIn .6s .8s backwards; transform-box: fill-box; transform-origin: center; }
+.catch { font-weight: bold; text-shadow: 0 2px 4px #000, 0 0 12px #000; opacity: 1; }
+#title input { background: #1a0a20dd; }
+#title #friendCount { text-shadow: 0 1px 3px #000; }
+.twinkle { animation: twinkle 3s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: .2; } }
+.flicker { animation: flicker 4s steps(1) infinite; }
+@keyframes flicker { 0%, 100% { opacity: 1; } 46% { opacity: .55; } 48% { opacity: 1; } 80% { opacity: .8; } }
+.swing { animation: swing 3s ease-in-out infinite; }
+@keyframes swing { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+.orb { animation: orbUp 9s linear infinite; }
+@keyframes orbUp { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(-620px); opacity: 0; } }
+.peek { animation: peek 6s ease-in-out infinite; }
+@keyframes peek { 0%, 100% { transform: translateY(40px); } 50% { transform: translateY(0); } }
+.blink { transform-box: fill-box; transform-origin: center; animation: blink2 5s infinite; }
+@keyframes blink2 { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@media (prefers-reduced-motion: reduce) { .lc, .orb, .swing, .peek, .twinkle, .flicker, .blink { animation: none; } }

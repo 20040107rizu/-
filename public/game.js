@@ -1,4 +1,4 @@
-// バスターズ クライアント
+// 鬼バスターズ クライアント
 (() => {
   'use strict';
   const S = window.Shared;
@@ -142,7 +142,7 @@
   $('btnAgain').onclick = () => send({ t: 'toLobby' });
   $('btnShare').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${lobby.code}`;
-    if (navigator.share) navigator.share({ title: 'バスターズ', text: '一緒に鬼の世界へ行こう！', url }).catch(() => {});
+    if (navigator.share) navigator.share({ title: '鬼バスターズ', text: '一緒に鬼の世界へ行こう！', url }).catch(() => {});
     else navigator.clipboard?.writeText(url).then(() => { $('btnShare').textContent = 'コピーしました'; });
   };
 

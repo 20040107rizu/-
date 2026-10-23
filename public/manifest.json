@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "バスターズ",
-  "short_name": "バスターズ",
+  "name": "鬼バスターズ",
+  "short_name": "鬼バスターズ",
   "description": "鬼の世界で鬼玉を集めて脱出する横持ちオンライン協力ゲーム",
   "lang": "ja",
   "start_url": "/?source=pwa",
