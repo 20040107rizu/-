@@ -80,21 +80,22 @@
 
   <!-- ロビー -->
   <section id="lobby" class="screen">
-    <div class="lobby-head">
-      <button id="btnLeave" class="small">🏠 ホームに戻る</button>
-      <span>ルームコード</span>
-      <strong id="roomCode">----</strong>
-      <button id="btnShare" class="small">招待リンクをコピー</button>
-    </div>
-    <ul id="plist" class="plist"></ul>
-    <p class="sub">連れていくお友達を選んでね</p>
-    <div id="friendTabs" class="tabs"></div>
-    <div id="friends" class="friends"></div>
-    <p id="yokaiInfo" class="yokai-info"></p>
-    <div class="row">
+    <div class="lb-left">
+      <div class="lobby-head">
+        <button id="btnLeave" class="small">🏠 ホーム</button>
+        <span>ルーム</span>
+        <strong id="roomCode">----</strong>
+        <button id="btnShare" class="small">招待</button>
+      </div>
+      <div id="yokaiInfo" class="lb-preview"></div>
+      <ul id="plist" class="plist"></ul>
       <div id="bossPick" class="boss-pick"></div>
       <button id="btnStart" class="big">鬼の世界へ！</button>
-      <span id="waitMsg" class="sub">ホストの開始を待っています…</span>
+      <span id="waitMsg" class="sub wait">ホストの開始を待っています…</span>
+    </div>
+    <div class="lb-right">
+      <div id="friendTabs" class="tabs"></div>
+      <div id="friends" class="friends"></div>
     </div>
   </section>
 

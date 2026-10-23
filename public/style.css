@@ -33,14 +33,7 @@ button.big:active { transform: translateY(3px); box-shadow: 0 1px 0 #7a2a0a; }
 button.small { font-size: 12px; padding: 6px 10px; background: #5b3577; }
 button:disabled { opacity: .4; }
 
-.lobby-head { display: flex; align-items: center; gap: 12px; }
-.lobby-head strong { font-size: 32px; letter-spacing: .25em; color: #ffe36b; }
-.plist { list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; }
-.plist li { width: 120px; height: 72px; border-radius: 12px; background: #2a1840; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; }
-.plist li.empty { opacity: .35; border: 2px dashed #8a4f7a; background: none; }
-.plist .dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; }
 
-.friends { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; width: min(100%, 760px); }
 .yk { position: relative; padding: 4px 2px; border-radius: 10px; background: #2a1840; border: 3px solid transparent; text-align: center; cursor: pointer; font-size: 11px; line-height: 1.2; }
 .yk.sel { border-color: #ffe36b; background: #4a2a66; }
 .yk.locked { opacity: .35; cursor: default; }
@@ -99,8 +92,6 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .tabs .tab { font-size: 13px; padding: 4px 12px; border-radius: 999px; background: #2a1840; border: 2px solid #5b3577; }
 .tabs .tab.on { background: #5b3577; border-color: #ffe36b; }
 .tabs .tab small { opacity: .7; font-size: 10px; }
-.friends { max-height: 34vh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 2px; }
-.yk img.face { display: block; width: 40px; height: 40px; margin: 0 auto 2px; border: none; border-radius: 0; object-fit: contain; }
 .yk img.face.sil { filter: brightness(0) invert(.82); opacity: .28; } /* 持っていない妖怪は薄い灰色のシルエット */
 .yk.locked { opacity: 1; }
 .yk.locked .unk { opacity: .55; letter-spacing: -.05em; }
@@ -209,15 +200,13 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 @keyframes gsCf { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 40% { transform: translate(calc(var(--dx) * .7), var(--dy)) rotate(var(--r)); } 100% { transform: translate(var(--dx), 60vmin) rotate(calc(var(--r) * 2)); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .gs *, .gs { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 
-.yokai-info { margin: 0; font-size: 12px; line-height: 1.5; text-align: center; max-width: 760px; }
-.yokai-info small { opacity: .75; font-size: 11px; }
 
 /* ボス鬼えらび */
-.boss-pick { display: flex; gap: 6px; }
-.boss-card { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 92px; padding: 5px 10px; border-radius: 12px;
+.boss-pick { display: flex; gap: 5px; }
+.boss-card { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-width: 0; padding: 3px 4px; border-radius: 10px;
   border: 2px solid #ffffff30; color: #fff; font-weight: bold; line-height: 1.15; opacity: .55; }
-.boss-card .bname { font-size: 17px; }
-.boss-card small { font-size: 10px; font-weight: normal; opacity: .9; white-space: nowrap; }
+.boss-card .bname { font-size: 15px; }
+.boss-card small { font-size: 9px; font-weight: normal; opacity: .9; white-space: nowrap; }
 .boss-card.red { background: linear-gradient(#a8222a, #5a0e14); }
 .boss-card.blue { background: linear-gradient(#2a56c8, #0e1e5a); }
 .boss-card.black { background: linear-gradient(#3a2e44, #0c0810); }
@@ -226,3 +215,36 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .boss-card:disabled { cursor: default; }
 .res-unlock { margin: 4px 0; font-weight: bold; color: #ffe36b; font-size: 16px; text-align: center; animation: unlockPop .6s ease-out; }
 @keyframes unlockPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ロビー: 左に選んだ妖怪とみんな、右にお友達の一覧 */
+#lobby.active { flex-direction: row; align-items: stretch; gap: 12px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
+.lb-left { width: min(44%, 330px); flex: none; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.lb-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.lobby-head { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.lobby-head strong { font-size: 20px; letter-spacing: .15em; color: #ffe36b; }
+.lobby-head button.small { padding: 5px 8px; font-size: 11px; }
+.lb-preview { flex: 1; min-height: 0; display: flex; align-items: center; gap: 8px; background: #2a184099; border-radius: 14px; padding: 4px 8px 4px 4px; overflow: hidden; }
+.lb-preview .big-face { width: min(42%, 120px); aspect-ratio: 1; flex: none; object-fit: contain; filter: drop-shadow(0 4px 6px #000a); border-radius: 12px; }
+.lb-preview .pv { font-size: 11px; line-height: 1.4; min-width: 0; }
+.lb-preview .pv b { font-size: 15px; }
+.lb-preview dl { display: grid; grid-template-columns: auto 1fr; gap: 0 6px; margin: 3px 0; }
+.lb-preview dt { opacity: .65; }
+.lb-preview dd { margin: 0; }
+.lb-preview small { opacity: .7; font-size: 10px; }
+.plist { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.plist li { height: 80px; border-radius: 10px; background: #2a1840; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; line-height: 1.2; overflow: hidden; position: relative; }
+.plist li.me { border-color: #ffe36b88; }
+.plist li .face { width: 50px; height: 50px; object-fit: contain; border-radius: 50%; flex: none; }
+.plist li .pinfo { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 0 2px; }
+.plist li .pinfo > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist li b { font-size: 11px; }
+.plist li small { display: none; }
+.plist li.empty { opacity: .35; border: 2px dashed #8a4f7a; background: none; font-size: 12px; }
+#btnStart { width: 100%; padding: 9px; }
+.wait { text-align: center; font-size: 12px; padding: 8px 0; }
+.lb-right .tabs { flex-wrap: wrap; }
+.friends { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); grid-auto-rows: max-content; gap: 6px; align-content: start;
+  overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 2px 4px 2px 2px; }
+.yk { padding: 2px 2px 3px; font-size: 10px; }
+.yk img.face { display: block; width: 100%; max-width: 64px; aspect-ratio: 1; height: auto; margin: 0 auto; border: none; border-radius: 0; object-fit: contain; }
+.yk .nm { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

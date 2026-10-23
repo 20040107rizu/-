@@ -175,7 +175,6 @@
     ctx.drawImage(img, -size / 2, -size * 0.92, size, size); // 絵の足元（下から8%）を y に合わせる
     ctx.restore();
   }
-  const faceStyle = y => (artUrl('yokai/' + y.id) ? `background:${y.color}55 url(${artUrl('yokai/' + y.id)}) center/contain no-repeat` : `background:${y.color}`);
 
   // ---------- ホーム画面に追加（PWA） ----------
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -352,7 +351,7 @@
   $('btnShare').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${lobby.code}`;
     if (navigator.share) navigator.share({ title: '鬼バスターズ', text: '一緒に鬼の世界へ行こう！', url }).catch(() => {});
-    else navigator.clipboard?.writeText(url).then(() => { $('btnShare').textContent = 'コピーしました'; });
+    else navigator.clipboard?.writeText(url).then(() => { $('btnShare').textContent = 'コピー済'; });
   };
 
   // ---------- ロビー ----------
@@ -364,8 +363,10 @@
       const p = lobby.players[i];
       const li = document.createElement('li');
       if (p) {
+        // みんなが連れていく妖怪が絵でわかるように
         const y = S.YOKAI_BY_ID[p.yokai];
-        li.innerHTML = `<div class="dot" style="${faceStyle(y)}"></div><b>${esc(p.name)}${p.host ? ' 👑' : ''}</b><span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span>`;
+        if (p.id === myId) li.className = 'me';
+        li.innerHTML = `${faceImg(y)}<div class="pinfo"><b>${esc(p.name)}${p.host ? '👑' : ''}</b><span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span><small>${S.ROLES[y.role].name}</small></div>`;
       } else { li.className = 'empty'; li.textContent = 'あき'; }
       ul.appendChild(li);
     }
@@ -401,19 +402,25 @@
       const got = list.filter(y => friends[y.id]).length;
       return `<button class="tab${friendTab === k ? ' on' : ''}" data-k="${k}">${label} <small>${k === 'own' ? got : `${got}/${list.length}`}</small></button>`;
     }).join('');
-    for (const b of $('friendTabs').querySelectorAll('button')) b.onclick = () => { friendTab = b.dataset.k; renderFriends(); };
+    for (const b of $('friendTabs').querySelectorAll('button')) b.onclick = () => { friendTab = b.dataset.k; $('friends').scrollTop = 0; renderFriends(); };
   }
   const faceImg = (y, locked) => artUrl('yokai/' + y.id)
     ? `<img class="face${locked ? ' sil' : ''}" loading="lazy" src="${artUrl('yokai/' + y.id)}" alt="">`
     : `<div class="face" style="background:${locked ? '#333' : y.color}"></div>`;
   function renderYokaiInfo() {
     const y = S.YOKAI_BY_ID[selYokai], at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
-    $('yokaiInfo').innerHTML = `<b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>（${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>）　通常：${esc(at.normalName)}　強攻撃：${esc(at.strongName)}　スキル：${sk.label}<br><small>${el.name}属性：${el.effect}／${sk.label}：${sk.desc}</small>`;
+    const url = artUrl('yokai/' + y.id);
+    $('yokaiInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : `<div class="big-face" style="background:${y.color}"></div>`}
+      <div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>
+      <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span></div>
+      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd></dl>
+      <small>${el.name}属性：${el.effect}</small></div>`;
   }
   function renderFriends() {
     renderFriendTabs();
     renderYokaiInfo();
     const el = $('friends');
+    const keep = el.scrollTop; // 選び直してもスクロール位置はそのまま
     el.innerHTML = '';
     const list = friendTab === 'own' ? S.YOKAI.filter(y => friends[y.id]) : S.YOKAI.filter(y => y.rank === friendTab);
     for (const y of list) {
@@ -421,8 +428,8 @@
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = owned
-        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y)}${y.name}<br><small>${S.ROLES[y.role].name}・${y.origin}</small>`
-        : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk">${'？'.repeat([...y.name].length)}</span><br><small>${y.origin}</small>`; // 名前は文字数ぶんの？
+        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
+        : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id });
@@ -430,6 +437,7 @@
       };
       el.appendChild(d);
     }
+    el.scrollTop = keep;
   }
 
   // ---------- 鬼ガチャ ----------
