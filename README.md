@@ -107,6 +107,7 @@ npm run art -- --process-only    # tools/raw/ の元画像から切り抜きだ�
 - キャラは緑背景で作って自動で切り抜きます。最初に作った「ネコマタロウ」を絵柄の見本にして、ほかのキャラの絵柄をそろえます
 - `icon/app` を作ると、ホーム画面用のアイコン一式（`public/icons/`）も作り直されます
 - モデルは `GEMINI_IMAGE_MODEL` で変更できます（省略時 `gemini-2.5-flash-image`）
+- 画像生成モデルは無料枠では使えません（割り当て 0）。Google AI Studio でキーのプロジェクトに課金（Tier 1 以上）を設定してください
 
 ## 構成
 

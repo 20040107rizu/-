@@ -9,6 +9,11 @@
 //   npm run art -- --process-only                tools/raw/ の元画像から加工だけやり直す（APIは使わない）
 //
 // 環境変数: GEMINI_API_KEY（必須）、GEMINI_IMAGE_MODEL（省略時 gemini-2.5-flash-image）
+// プロキシ環境では Node の fetch が HTTPS_PROXY を見ないので、見るようにして起動し直す
+if ((process.env.HTTPS_PROXY || process.env.https_proxy) && !process.env.NODE_USE_ENV_PROXY) {
+  const r = require('child_process').spawnSync(process.execPath, process.argv.slice(1), { stdio: 'inherit', env: { ...process.env, NODE_USE_ENV_PROXY: '1' } });
+  process.exit(r.status ?? 1);
+}
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
@@ -42,7 +47,8 @@ async function generate(item, refImage) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(body),
-    });
+      signal: AbortSignal.timeout(180000),
+    }).catch(e => ({ ok: false, status: 0, text: async () => String(e.cause?.message || e.message) }));
     if (res.ok) {
       const json = await res.json();
       const img = (json.candidates?.[0]?.content?.parts || []).find(p => p.inlineData);
@@ -51,6 +57,8 @@ async function generate(item, refImage) {
       if (attempt >= 3) throw new Error(`画像が返ってきませんでした (${why})`);
     } else {
       const text = await res.text();
+      // 無料枠に画像生成の割り当てが無い（limit: 0）ときは待っても直らないので即中止
+      if (res.status === 429 && /limit: 0\b/.test(text)) throw new Error(`API エラー 429: このキーでは ${MODEL} の割り当てが 0 です（Google AI Studio で課金を有効にしてください）`);
       if (res.status === 400 || res.status === 401 || res.status === 403) throw new Error(`API エラー ${res.status}: ${text.slice(0, 300)}`);
       if (attempt >= 4) throw new Error(`API エラー ${res.status}: ${text.slice(0, 300)}`);
     }
@@ -124,6 +132,7 @@ function writeManifest() {
     }
   };
   walk(ART_DIR);
+  if (!files.length) return 0;
   const manifest = Object.fromEntries(files.map(f => [f.replace(/\.(png|jpg)$/, ''), f]));
   fs.writeFileSync(path.join(ART_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   return files.length;
@@ -161,7 +170,7 @@ function writeManifest() {
     } catch (e) {
       failed++;
       console.error(`✗ ${it.key}: ${e.message}`);
-      if (/GEMINI_API_KEY|API エラー 40[013]/.test(e.message)) break;
+      if (/GEMINI_API_KEY|API エラー 40[013]|割り当てが 0/.test(e.message)) break;
     }
   }
   console.log(`manifest: ${writeManifest()} 枚 / 失敗 ${failed}`);
