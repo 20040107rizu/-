@@ -4,9 +4,10 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
+    refreshUpdateBar();
   }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -180,6 +181,43 @@
     } else show('installHelp');
   };
   $('btnInstallClose').onclick = () => show('title');
+
+  // ---------- 更新のお知らせ ----------
+  // サーバーのバージョンが変わったら「今すぐ更新」を出す（プレイ中は出さない）
+  var loadedVersion = null; // show() から先に呼ばれても大丈夫なように var
+  var updateReady = false;
+  function refreshUpdateBar() {
+    const bar = document.getElementById('updateBar');
+    if (!bar) return;
+    const busy = ['game', 'gacha', 'whatsNew'].some(id => document.getElementById(id).classList.contains('active')) && !document.getElementById('result').classList.contains('active');
+    bar.classList.toggle('show', updateReady && !busy);
+  }
+  function checkVersion() {
+    fetch('version', { cache: 'no-store' }).then(r => r.json()).then(info => {
+      if (!loadedVersion) {
+        loadedVersion = info.v;
+        let seen = null;
+        try { seen = localStorage.getItem('seenVersion'); localStorage.setItem('seenVersion', info.v); } catch {}
+        // 更新したあとに開いたら、変わったところを見せる
+        if (seen && seen !== info.v && Array.isArray(info.notes) && info.notes.length && $('title').classList.contains('active')) {
+          $('whatsNewList').innerHTML = info.notes.map(n => `<li>${esc(n)}</li>`).join('');
+          show('whatsNew');
+        }
+      } else if (info.v !== loadedVersion) {
+        updateReady = true;
+        refreshUpdateBar();
+      }
+    }).catch(() => {});
+  }
+  checkVersion();
+  setInterval(checkVersion, 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
+  $('btnUpdate').onclick = () => {
+    $('btnUpdate').textContent = '更新中…';
+    const reg = navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null);
+    reg.then(r => r && r.update()).catch(() => {}).finally(() => location.reload());
+  };
+  $('btnWhatsNewClose').onclick = () => show('title');
 
   // ---------- サウンド（簡易） ----------
   let actx = null;

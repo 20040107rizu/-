@@ -28,14 +28,34 @@ const STAMINA_MAX = 100;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// 公開中のバージョン（画面のファイルの中身から作る）。変わるとアプリに「更新」ボタンが出る
+const crypto = require('crypto');
+function computeVersion() {
+  const h = crypto.createHash('sha1');
+  for (const f of ['index.html', 'style.css', 'yokai.js', 'shared.js', 'title.js', 'game.js', 'sw.js', 'art/manifest.json']) {
+    try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
+  }
+  return h.digest('hex').slice(0, 10);
+}
+const VERSION = computeVersion();
+function whatsNew() {
+  try { return JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'whatsnew.json'), 'utf8')); } catch { return {}; }
+}
+
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
+  if (urlPath === '/version') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ v: VERSION, ...whatsNew() }));
+  }
   const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath === '/' ? 'index.html' : urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     const headers = { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' };
-    if (path.basename(filePath) === 'sw.js') { headers['Cache-Control'] = 'no-cache'; headers['Service-Worker-Allowed'] = '/'; }
+    // 画面のファイルは毎回新しいか確かめる（古いまま使い回さない）。絵は1日キャッシュ
+    headers['Cache-Control'] = /\.(png|jpg|svg)$/.test(filePath) ? 'public, max-age=86400' : 'no-cache';
+    if (path.basename(filePath) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
     res.writeHead(200, headers);
     res.end(data);
   });
