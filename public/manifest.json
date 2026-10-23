@@ -1,0 +1,9 @@
+{
+  "name": "オニバスターズ",
+  "short_name": "オニバスターズ",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#120a22",
+  "theme_color": "#1a1030"
+}

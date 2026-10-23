@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1030">
+  <link rel="manifest" href="manifest.json">
+  <title>オニバスターズ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 縦持ち時の案内 -->
+  <div id="rotate">
+    <div class="phone">📱</div>
+    <p>スマホを横向きにしてね</p>
+  </div>
+
+  <!-- タイトル -->
+  <section id="title" class="screen active">
+    <h1>オニバスターズ</h1>
+    <p class="sub">4人で力を合わせて大鬼をたおせ！</p>
+    <div class="row">
+      <input id="name" maxlength="10" placeholder="なまえ">
+    </div>
+    <div id="roles" class="roles"></div>
+    <div class="row">
+      <button id="btnCreate" class="big">ルームを作る</button>
+      <input id="code" maxlength="4" placeholder="コード" autocapitalize="characters">
+      <button id="btnJoin" class="big alt">参加する</button>
+    </div>
+    <p id="err" class="err"></p>
+  </section>
+
+  <!-- ロビー -->
+  <section id="lobby" class="screen">
+    <div class="lobby-head">
+      <span>ルームコード</span>
+      <strong id="roomCode">----</strong>
+      <button id="btnShare" class="small">招待リンクをコピー</button>
+    </div>
+    <ul id="plist" class="plist"></ul>
+    <div id="lobbyRoles" class="roles small"></div>
+    <div class="row">
+      <button id="btnStart" class="big">バトル開始！</button>
+      <span id="waitMsg" class="sub">ホストの開始を待っています…</span>
+    </div>
+  </section>
+
+  <!-- バトル -->
+  <section id="game" class="screen">
+    <canvas id="cv"></canvas>
+  </section>
+
+  <!-- リザルト -->
+  <section id="result" class="screen overlay">
+    <h2 id="resTitle">クリア！</h2>
+    <p id="resTime" class="sub"></p>
+    <table id="resTable"></table>
+    <div class="row">
+      <button id="btnAgain" class="big">ロビーへもどる</button>
+    </div>
+  </section>
+
+  <script src="game.js"></script>
+</body>
+</html>

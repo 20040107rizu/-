@@ -1,0 +1,13 @@
+{
+  "name": "oni-busters",
+  "version": "0.1.0",
+  "description": "横持ちオンライン協力ボスバトル（スマホブラウザ向けプロトタイプ）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
