@@ -7,9 +7,17 @@
   const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
+    if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
     refreshUpdateBar();
     try { showBuildInfo(); } catch {}
   }
+  // タイトル・ロビー・結果などではタイトルの曲を流す
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew'];
+  function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
+  const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
+  // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
+  document.addEventListener('pointerdown', () => { Music.unlock(); if (onMenu()) menuMusic(); }, true);
+  document.addEventListener('keydown', () => { Music.unlock(); if (onMenu()) menuMusic(); }, true);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- セーブデータ（端末に自動保存＋引き継ぎコード） ----------
@@ -318,7 +326,7 @@
     show('title');
   };
   function renderBgmButton() { $('btnBgm').textContent = Music.enabled ? '🔊 BGM ON' : '🔇 BGM OFF'; }
-  $('btnBgm').onclick = () => { Music.unlock(); Music.setEnabled(!Music.enabled); renderBgmButton(); };
+  $('btnBgm').onclick = () => { Music.unlock(); Music.setEnabled(!Music.enabled); renderBgmButton(); menuMusic(); };
   renderBgmButton();
   $('btnAgain').onclick = () => send({ t: 'toLobby' });
   $('btnShare').onclick = () => {
@@ -454,6 +462,7 @@
   $('btnToResult').onclick = () => {
     renderResult();
     show('result', true);
+    menuMusic();
   };
 
   function renderResult() {
@@ -1067,7 +1076,7 @@
       if (n !== lastCount) { lastCount = n; beep(660, 0.15, 'square', 0.06); if (n === introCount) Music.play('normal'); }
     }
     // ボス鬼に追われている間は BGM を変える（見失って2.5秒たったら元に戻す）
-    if (started && me && !me.esc) {
+    if (started && me && !me.esc && playing()) {
       const chased = snap.boss && snap.boss.target === myId;
       chaseHold = chased ? 2.5 : Math.max(0, chaseHold - dt);
       Music.play(chaseHold > 0 ? 'chase' : 'normal');
