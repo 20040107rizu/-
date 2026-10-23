@@ -503,12 +503,19 @@
   const cv = $('cv');
   const ctx = cv.getContext('2d');
   let W = 0, H = 0, DPR = 1;
+  // 実際に表示されている大きさに合わせる。iPhone のホーム画面アプリでは起動直後や回転直後に
+  // window.innerWidth/innerHeight が古い値のことがあり、ずれると絵が引き伸ばされるので毎フレーム確かめる
   function resize() {
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    cv.width = W * DPR; cv.height = H * DPR;
+    const r = cv.getBoundingClientRect();
+    const w = Math.round(r.width) || window.innerWidth, h = Math.round(r.height) || window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (w === W && h === H && dpr === DPR) return;
+    W = w; H = h; DPR = dpr;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   }
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => { resize(); setTimeout(resize, 300); setTimeout(resize, 1000); });
+  window.visualViewport?.addEventListener('resize', resize);
   resize();
 
   const input = { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false };
@@ -890,7 +897,7 @@
       ctx.globalAlpha = 1;
     } else if (timeLimit - snap.timeLeft < 8 && !(me && me.esc)) {
       ctx.fillStyle = '#ffffff66'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('左側をドラッグで移動', W * 0.22, H - 40);
+      ctx.fillText('左側をドラッグで移動', W * 0.22, H - 64);
     }
 
     if (me && me.esc) {
@@ -941,6 +948,7 @@
     last = nowMs;
     const now = nowMs / 1000;
     requestAnimationFrame(frame);
+    if ($('game').classList.contains('active')) resize();
 
     if (!$('game').classList.contains('active') || !snap || !map) return;
     readInput();

@@ -1,16 +1,18 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; background: #120a1a; }
 html, body {
   margin: 0; height: 100%; overflow: hidden;
-  background: radial-gradient(circle at 50% 30%, #4a1f3c, #120a1a);
+  background-color: #120a1a;
+  background-image: radial-gradient(circle at 50% 30%, #4a1f3c, #120a1a);
   color: #fff; font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", system-ui, sans-serif;
   user-select: none; -webkit-user-select: none; touch-action: none;
 }
 
-.screen { display: none; position: fixed; inset: 0; padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+.screen { display: none; position: fixed; inset: 0; height: 100vh; height: 100dvh; padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
   flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 .screen.active { display: flex; }
 .overlay { background: rgba(10, 5, 20, .88); z-index: 5; }
-#game { padding: 0; }
+#game { padding: 0; background: #120a1a; }
 canvas { display: block; width: 100%; height: 100%; }
 
 h1 { margin: 0; font-size: clamp(32px, 10vh, 64px); letter-spacing: .12em;
