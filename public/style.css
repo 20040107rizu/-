@@ -211,3 +211,18 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 
 .yokai-info { margin: 0; font-size: 12px; line-height: 1.5; text-align: center; max-width: 760px; }
 .yokai-info small { opacity: .75; font-size: 11px; }
+
+/* ボス鬼えらび */
+.boss-pick { display: flex; gap: 6px; }
+.boss-card { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 92px; padding: 5px 10px; border-radius: 12px;
+  border: 2px solid #ffffff30; color: #fff; font-weight: bold; line-height: 1.15; opacity: .55; }
+.boss-card .bname { font-size: 17px; }
+.boss-card small { font-size: 10px; font-weight: normal; opacity: .9; white-space: nowrap; }
+.boss-card.red { background: linear-gradient(#a8222a, #5a0e14); }
+.boss-card.blue { background: linear-gradient(#2a56c8, #0e1e5a); }
+.boss-card.black { background: linear-gradient(#3a2e44, #0c0810); }
+.boss-card.on { opacity: 1; border-color: #ffe36b; box-shadow: 0 0 12px #ffe36b88; }
+.boss-card.lock { background: #222; color: #aaa; opacity: .8; }
+.boss-card:disabled { cursor: default; }
+.res-unlock { margin: 4px 0; font-weight: bold; color: #ffe36b; font-size: 16px; text-align: center; animation: unlockPop .6s ease-out; }
+@keyframes unlockPop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }

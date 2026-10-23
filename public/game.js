@@ -32,6 +32,7 @@
   }
   let friends = loadFriends();
   let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
+  stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
   let selYokai = localStorage.getItem('yokai');
   if (!friends[selYokai]) selYokai = 'nekomata';
   function saveAll() {
@@ -55,7 +56,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best] };
+    const data = { v: 1, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -67,7 +68,7 @@
     const f = {};
     S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
-    return { name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0 } };
+    return { name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
   }
 
   // ---------- 状態 ----------
@@ -88,6 +89,7 @@
   let banner = null;
   let myPred = null;
   let bossType = 'red';
+  let stage = 'oni';
   let offline = false;        // 試合のあとで接続が切れた（結果はそのまま見られる）
   let serverUpdating = false; // サーバーの更新で切れた
   // 開始時の演出: introMovie 秒の映像 → introCount 秒のカウントダウン（サーバーの intro が残り時間）
@@ -306,6 +308,7 @@
         snap = null; myPred = null; result = null;
         ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear();
         bossType = m.boss;
+        stage = S.STAGES[m.stage] ? m.stage : 'oni';
         spectateId = null;
         introMovie = m.movie || 0; introCount = m.countdown || 0;
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0;
@@ -369,8 +372,25 @@
     renderFriends();
     const me = lobby.players.find(p => p.id === myId);
     const isHost = me && me.host;
+    // ホストが挑戦できない鬼が選ばれていたら、挑戦できるいちばん強い鬼に戻す
+    if (isHost && !S.bossUnlocked(lobby.boss, stats.cleared)) {
+      const ok = S.BOSS_ORDER.filter(k => S.bossUnlocked(k, stats.cleared));
+      send({ t: 'boss', type: ok[ok.length - 1] });
+    }
+    renderBossPick(isHost);
     $('btnStart').style.display = isHost ? '' : 'none';
     $('waitMsg').style.display = isHost ? 'none' : '';
+  }
+
+  function renderBossPick(isHost) {
+    $('bossPick').innerHTML = S.BOSS_ORDER.map(k => {
+      const b = S.BOSSES[k], open = S.bossUnlocked(k, stats.cleared), sel = lobby.boss === k;
+      const lock = isHost && !open;
+      const sub = lock ? `🔒 ${S.BOSSES[b.need].name}を倒すと解放` : stats.cleared[k] ? '✔ たおした' : `大鬼玉 ${b.drop}個`;
+      return `<button class="boss-card ${k}${sel ? ' on' : ''}${lock ? ' lock' : ''}" data-k="${k}" ${isHost && open ? '' : 'disabled'}>
+        <span class="bname">${lock ? '？？' : b.name}</span><small>${sub}</small></button>`;
+    }).join('');
+    for (const el of $('bossPick').querySelectorAll('button')) el.onclick = () => send({ t: 'boss', type: el.dataset.k });
   }
 
   let friendTab = 'own';
@@ -427,8 +447,11 @@
         isNew = !friends[mine.gacha.yokai];
         friends[mine.gacha.yokai] = (friends[mine.gacha.yokai] || 0) + 1;
       }
-      saveAll(); updateFriendCount();
     }
+    // ボス鬼を倒したら次の鬼が解放される（その回に参加していた全員）
+    result.newClear = false;
+    if (mine && result.bossDown && !stats.cleared[result.boss]) { stats.cleared[result.boss] = true; result.newClear = true; }
+    if (mine) { saveAll(); updateFriendCount(); }
     const id = ++gachaRun;
     $('btnToResult').hidden = true;
     $('gachaStage').innerHTML = '';
@@ -462,6 +485,12 @@
     const anyEsc = result.players.some(p => p.escaped);
     $('resTitle').textContent = anyEsc ? '鬼の世界から脱出！' : '全員脱出できなかった…';
     $('resTitle').textContent += `（みんなの鬼玉 ${result.team ?? 0}個）`;
+    $('resUnlock').hidden = !result.newClear;
+    if (result.newClear) {
+      const next = S.BOSS_ORDER.find(k => S.BOSSES[k].need === result.boss);
+      $('resUnlock').textContent = next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
+        : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`;
+    }
     $('resTable').innerHTML = '<tr><th>なまえ</th><th>お友達</th><th>脱出</th><th>集めた鬼玉</th><th>ガチャ</th></tr>' +
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];
@@ -540,6 +569,7 @@
       case 'use': if (ev.id === myId) beep(660, 0.1, 'square', 0.05); break;
       case 'stun': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#ffe14a', t: 0.6, max: 0.6 }); banner = { text: 'ボス鬼がしびれた！', t: 1.4, c: '#ffe14a' }; break;
       case 'oniDown': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 90, c: '#ffffff', t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) banner = { text: '見回り鬼をたおした！', t: 1.2 }; break;
+      case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: '攻撃がはげしくなるぞ', t: 2.2, c: '#ff4a3a' }; shake = 0.5; break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
@@ -703,39 +733,20 @@
     ctx.fillStyle = c; ctx.fillRect(x, y, w * Math.max(0, Math.min(1, v)), h);
   }
 
-  const ROOF = ['#5a3a5a', '#4a3a60', '#603a3a', '#3a4a5a'];
   function drawCity(cam) {
-    ctx.fillStyle = pattern('scene/ground') || '#2e2236';
-    ctx.fillRect(0, 0, map.w, map.h);
-    // 石畳っぽい模様
-    ctx.strokeStyle = '#ffffff08'; ctx.lineWidth = 2;
-    const g = 75;
-    const x0 = Math.max(0, Math.floor((cam.x - cam.vw / 2) / g) * g), x1 = Math.min(map.w, cam.x + cam.vw / 2 + g);
-    const y0 = Math.max(0, Math.floor((cam.y - cam.vh / 2) / g) * g), y1 = Math.min(map.h, cam.y + cam.vh / 2 + g);
-    ctx.beginPath();
-    for (let x = x0; x <= x1; x += g) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
-    for (let y = y0; y <= y1; y += g) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
-    ctx.stroke();
-    ctx.strokeStyle = '#ff4a3a'; ctx.lineWidth = 10; ctx.strokeRect(0, 0, map.w, map.h);
+    const v = { l: cam.x - cam.vw / 2 - 50, r: cam.x + cam.vw / 2 + 50, t: cam.y - cam.vh / 2 - 50, b: cam.y + cam.vh / 2 + 50 };
+    Stages.drawGround(ctx, map, v, stage, pattern);
+    for (const pl of map.plazas || []) {
+      if (pl.x > v.r + 150 || pl.x + pl.w < v.l - 150 || pl.y > v.b + 300 || pl.y + pl.h < v.t - 150) continue;
+      Stages.drawPlaza(ctx, pl, stage, performance.now() / 1000);
+    }
   }
   function drawBuildings(cam) {
     const l = cam.x - cam.vw / 2 - 50, r = cam.x + cam.vw / 2 + 50, t = cam.y - cam.vh / 2 - 50, bt = cam.y + cam.vh / 2 + 50;
+    const now = performance.now() / 1000;
     for (const b of map.buildings) {
       if (b.x > r || b.x + b.w < l || b.y > bt || b.y + b.h < t) continue;
-      ctx.fillStyle = '#140c18'; ctx.fillRect(b.x, b.y + 14, b.w, b.h);       // 影/壁
-      const roof = pattern('scene/roof');
-      ctx.fillStyle = roof || ROOF[b.hue]; ctx.fillRect(b.x, b.y, b.w, b.h - 6);      // 屋根
-      if (roof) { ctx.fillStyle = ['#0000', '#4060ff18', '#ff404018', '#40ff8012'][b.hue]; ctx.fillRect(b.x, b.y, b.w, b.h - 6); }
-      else {
-        ctx.strokeStyle = '#00000055'; ctx.lineWidth = 3;
-        ctx.beginPath();
-        for (let yy = b.y + 22; yy < b.y + b.h - 10; yy += 22) { ctx.moveTo(b.x + 6, yy); ctx.lineTo(b.x + b.w - 6, yy); }
-        ctx.stroke();
-      }
-      // ちょうちん
-      ctx.fillStyle = '#ff6a3d'; ctx.shadowColor = '#ff6a3d'; ctx.shadowBlur = 14;
-      ctx.beginPath(); ctx.arc(b.x + 14, b.y + b.h + 2, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
+      Stages.drawBuilding(ctx, b, stage, now, pattern);
     }
   }
 
@@ -908,8 +919,9 @@
     const sx = mw / map.w;
     ctx.save();
     ctx.globalAlpha = 0.9;
-    ctx.fillStyle = '#1a1020cc'; ctx.fillRect(ox, oy, mw, mh);
-    ctx.fillStyle = '#5a4a66';
+    const th = Stages.theme(stage);
+    ctx.fillStyle = th.miniBg; ctx.fillRect(ox, oy, mw, mh);
+    ctx.fillStyle = th.mini;
     for (const b of map.buildings) ctx.fillRect(ox + b.x * sx, oy + b.y * sx, b.w * sx, b.h * sx);
     ctx.globalAlpha = 1;
     ctx.strokeStyle = '#fff6'; ctx.lineWidth = 1; ctx.strokeRect(ox, oy, mw, mh);
@@ -944,6 +956,7 @@
   }
 
   function drawHUD(me, now) {
+    Stages.drawTint(ctx, W, H, stage);
     drawMinimap(me, now);
 
     // タイマー
@@ -1056,10 +1069,13 @@
       ctx.globalAlpha = Math.min(1, p * 5);
       ctx.font = `bold ${Math.round(H * 0.05)}px sans-serif`; ctx.fillStyle = '#fff';
       ctx.fillText('…ゴゴゴゴゴ', W / 2 + Math.sin(now * 40) * 2, H * 0.3);
+      ctx.font = `bold ${Math.round(H * 0.07)}px sans-serif`; ctx.lineWidth = 6; ctx.strokeStyle = '#000';
+      ctx.strokeText(`ステージ：${S.STAGES[stage].name}`, W / 2, H * 0.44); ctx.fillStyle = Stages.theme(stage).border; ctx.fillText(`ステージ：${S.STAGES[stage].name}`, W / 2, H * 0.44);
     } else if (p < 0.95) {
       ctx.globalAlpha = Math.min(1, (p - 0.4) * 6, (0.95 - p) * 8);
       ctx.font = `bold ${Math.round(Math.min(W, H) * 0.1)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
-      ctx.strokeText(`${kind.name}が街に到着した…！`, W / 2, H * 0.24); ctx.fillStyle = BOSS_UI[bossType]; ctx.fillText(`${kind.name}が街に到着した…！`, W / 2, H * 0.24);
+      const arrive = `${kind.name}が${S.STAGES[stage].name}に到着した…！`;
+      ctx.strokeText(arrive, W / 2, H * 0.24); ctx.fillStyle = BOSS_UI[bossType]; ctx.fillText(arrive, W / 2, H * 0.24);
       ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`; ctx.lineWidth = 5;
       ctx.strokeText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09); ctx.fillStyle = '#fff'; ctx.fillText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09);
     }

@@ -39,7 +39,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const crypto = require('crypto');
 function computeVersion() {
   const h = crypto.createHash('sha1');
-  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'attacks.js', 'shared.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
+  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'attacks.js', 'shared.js', 'stages.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
     try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
   }
   h.update(fs.readFileSync(__filename));
@@ -227,6 +227,7 @@ class Room {
     this.code = code;
     this.players = new Map();
     this.state = 'lobby'; // lobby | battle | result
+    this.bossSel = 'red';  // ホストが選んだボス鬼
   }
 
   broadcast(msg) {
@@ -236,7 +237,7 @@ class Room {
 
   lobbyInfo() {
     return {
-      t: 'lobby', code: this.code, state: this.state,
+      t: 'lobby', code: this.code, state: this.state, boss: this.bossSel,
       players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host })),
     };
   }
@@ -272,6 +273,7 @@ class Room {
     this.bombs = [];
     this.result = null;
     const seed = Math.floor(Math.random() * 1e9);
+    this.stage = process.env.TEST_STAGE || S.pickStage();
     this.map = S.generateCity(seed);
     this.gridS = new Grid(this.map, PATROL_R + 4);
     this.gridB = new Grid(this.map, BOSS_R + 4);
@@ -318,9 +320,9 @@ class Room {
 
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
-    const type = process.env.TEST_BOSS || S.pickBoss();
+    const type = process.env.TEST_BOSS || this.bossSel;
     const kind = S.BOSSES[type];
-    const bossHp = Math.round((1200 + 900 * n) * kind.hp); // 2人なら赤鬼3000・青鬼4500・黒鬼6600
+    const bossHp = Math.round((1500 + 1100 * n) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
     this.boss = {
       x: bp.x, y: bp.y, hp: bossHp, maxHp: bossHp, type, kind, name: kind.name, face: 0,
       state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
@@ -328,7 +330,7 @@ class Room {
     };
 
     this.broadcast({
-      t: 'start', seed, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
+      t: 'start', seed, stage: this.stage, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
     });
   }
@@ -491,6 +493,8 @@ class Room {
     if (!b || b.hp <= 0) return;
     b.hitFlash = Math.max(0, b.hitFlash - DT);
     if (b.stunT > 0) { b.stunT -= DT; return; }
+    // 体力が半分を切ると怒る（攻撃の間隔が短くなる）
+    if (!b.rage && b.hp < b.maxHp / 2) { b.rage = true; this.events.push({ k: 'rage', x: Math.round(b.x), y: Math.round(b.y) }); }
 
     // 自分の目で見つけたら戦闘
     if (b.state !== 'engage' && b.state !== 'charging' && b.state !== 'windup') {
@@ -522,7 +526,7 @@ class Room {
       }
       case 'windup':
         b.stateT -= DT;
-        if (b.stateT <= 0) { b.state = 'engage'; b.atkT = rand(1.2, 2.0) * b.kind.atkGap; }
+        if (b.stateT <= 0) { b.state = 'engage'; b.atkT = rand(1.2, 2.0) * b.kind.atkGap * (b.rage ? 0.75 : 1); }
         break;
       case 'charging': {
         b.stateT -= DT;
@@ -531,7 +535,7 @@ class Room {
         S.collide(this.map, b, BOSS_R);
         for (const p of this.activePlayers()) if (!p.chargeHit && dist(p, b) < BOSS_R + PLAYER_R) { this.damagePlayer(p, 45 * b.kind.dmg); p.chargeHit = true; }
         const blocked = Math.hypot(b.x - px, b.y - py) < 600 * DT * 0.5;
-        if (b.stateT <= 0 || blocked) { b.state = 'engage'; b.atkT = rand(1.2, 1.8) * b.kind.atkGap; if (blocked) this.events.push({ k: 'boom', x: Math.round(b.x), y: Math.round(b.y), r: 60 }); }
+        if (b.stateT <= 0 || blocked) { b.state = 'engage'; b.atkT = rand(1.2, 1.8) * b.kind.atkGap * (b.rage ? 0.75 : 1); if (blocked) this.events.push({ k: 'boom', x: Math.round(b.x), y: Math.round(b.y), r: 60 }); }
         break;
       }
     }
@@ -540,8 +544,18 @@ class Room {
   bossAttack(t) {
     const b = this.boss;
     const roll = Math.random();
-    const warn = 1.0;
+    const warn = b.kind.warn;
     b.face = Math.atan2(t.y - b.y, t.x - b.x);
+    // 怒り状態の青鬼・黒鬼は、まわりにいくつも落とす「乱れ打ち」も使う
+    if (b.rage && b.type !== 'red' && roll < 0.3) {
+      const k = b.type === 'black' ? 5 : 3;
+      for (let i = 0; i < k; i++) {
+        const a = i / k * Math.PI * 2 + Math.random(), r = i === 0 ? 0 : rand(60, 170);
+        this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, r: 95, t: warn + i * 0.12, max: warn + i * 0.12, dmg: 32 * b.kind.dmg });
+      }
+      b.state = 'windup'; b.stateT = warn + 0.5;
+      return;
+    }
     if (roll < 0.4) {
       this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x, y: t.y, r: 110, t: warn, max: warn, dmg: 40 * b.kind.dmg });
       b.state = 'windup'; b.stateT = warn + 0.3;
@@ -763,7 +777,8 @@ class Room {
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt),
       gacha: p.escaped ? rollGacha(judged) : null,
     }));
-    this.broadcast({ t: 'result', players, team });
+    const b = this.boss;
+    this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });
   }
 
   snapshot() {
@@ -778,7 +793,7 @@ class Room {
         skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
-      boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0 } : null,
+      boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage } : null,
       items: this.items.map(it => ({ id: it.id, x: Math.round(it.x), y: Math.round(it.y), type: it.type })),
       traps: this.traps.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y) })),
       bombs: this.bombs.map(bm => ({ id: bm.id, x: Math.round(bm.x), y: Math.round(bm.y), t: +bm.t.toFixed(1) })),
@@ -828,6 +843,9 @@ wss.on('connection', ws => {
       }
       case 'yokai':
         if (room && me && room.state === 'lobby' && S.YOKAI_BY_ID[msg.id]) { me.yokai = msg.id; room.broadcast(room.lobbyInfo()); }
+        break;
+      case 'boss':
+        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type]) { room.bossSel = msg.type; room.broadcast(room.lobbyInfo()); }
         break;
       case 'start':
         if (room && me && me.host && room.state === 'lobby' && !draining) {

@@ -64,17 +64,30 @@
   }
 
   // ---------- ボス鬼 ----------
+  // 赤鬼 → 青鬼 → 黒鬼 の順に、前の鬼を倒すと次の鬼に挑戦できる
   const BOSSES = {
-    red:   { name: '赤鬼', color: '#c8242a', hp: 1.0, dmg: 1.0, atkGap: 1.0,  drop: 50,  weight: 50 },
-    blue:  { name: '青鬼', color: '#2a5ad8', hp: 1.5, dmg: 1.3, atkGap: 0.8,  drop: 100, weight: 35 },
-    black: { name: '黒鬼', color: '#2a2030', hp: 2.2, dmg: 1.6, atkGap: 0.65, drop: 150, weight: 15 },
+    red:   { name: '赤鬼', color: '#c8242a', hp: 1.15, dmg: 1.2, atkGap: 0.85, warn: 1.0,  drop: 50,  need: null },
+    blue:  { name: '青鬼', color: '#2a5ad8', hp: 1.75, dmg: 1.55, atkGap: 0.7, warn: 0.95, drop: 100, need: 'red' },
+    black: { name: '黒鬼', color: '#2a2030', hp: 2.6, dmg: 1.95, atkGap: 0.56, warn: 0.85, drop: 150, need: 'blue' },
   };
-  function pickBoss(rnd = Math.random) {
-    const keys = Object.keys(BOSSES);
-    let x = rnd() * keys.reduce((a, k) => a + BOSSES[k].weight, 0);
-    for (const k of keys) { if (x < BOSSES[k].weight) return k; x -= BOSSES[k].weight; }
-    return 'red';
+  const BOSS_ORDER = ['red', 'blue', 'black'];
+  // cleared: { red: true, ... } 倒したことのある鬼
+  function bossUnlocked(type, cleared) {
+    const b = BOSSES[type];
+    return !!b && (!b.need || !!(cleared && cleared[b.need]));
   }
+
+  // ---------- ステージ（毎回ランダム） ----------
+  const STAGES = {
+    oni:    { name: '鬼の世界' },
+    japan:  { name: '日本の街' },
+    france: { name: 'フランスの街' },
+    brazil: { name: 'ブラジルの街' },
+    china:  { name: '中国の街' },
+    usa:    { name: 'アメリカの街' },
+  };
+  const STAGE_KEYS = Object.keys(STAGES);
+  function pickStage(rnd = Math.random) { return STAGE_KEYS[Math.floor(rnd() * STAGE_KEYS.length)]; }
 
   // ---------- アイテム ----------
   const ITEMS = {
@@ -100,11 +113,11 @@
 
   function generateCity(seed) {
     const rand = rng(seed);
-    const buildings = [];
+    const buildings = [], plazas = [];
     for (let bx = STREET; bx + BLOCK <= MAP_W - STREET / 2; bx += BLOCK + STREET) {
       for (let by = STREET; by + BLOCK <= MAP_H - STREET / 2; by += BLOCK + STREET) {
         const roll = rand();
-        if (roll < 0.15) continue; // 広場
+        if (roll < 0.15) { plazas.push({ x: bx, y: by, w: BLOCK, h: BLOCK }); continue; } // 広場（名所を置く）
         if (roll < 0.55) {
           buildings.push({ x: bx, y: by, w: BLOCK, h: BLOCK });
         } else if (roll < 0.8) {
@@ -120,7 +133,8 @@
       }
     }
     for (const b of buildings) { b.x = Math.round(b.x); b.y = Math.round(b.y); b.w = Math.round(b.w); b.h = Math.round(b.h); b.hue = Math.floor(rand() * 4); }
-    return { w: MAP_W, h: MAP_H, buildings, seed };
+    for (const pl of plazas) pl.v = Math.floor(rand() * 1000);
+    return { w: MAP_W, h: MAP_H, buildings, plazas, seed };
   }
 
   // 円をマップ外と建物から押し出す
@@ -175,5 +189,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, BOSSES, pickBoss, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });
