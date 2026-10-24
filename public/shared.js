@@ -267,7 +267,30 @@
     return { w: MAP_W, h: MAP_H, buildings, plazas, seed };
   }
 
-  // 円をマップ外と建物から押し出す
+  // ---- 建物の場所の索引（近くの建物だけを調べて速くする。結果は全部調べたときと同じ） ----
+  const BCELL = 300;
+  function bIndex(map) {
+    if (map._bi) return map._bi;
+    const cols = Math.ceil(map.w / BCELL) + 1, rows = Math.ceil(map.h / BCELL) + 1;
+    const cells = Array.from({ length: cols * rows }, () => []);
+    map.buildings.forEach((b, i) => {
+      for (let cy = Math.max(0, Math.floor(b.y / BCELL)); cy <= Math.min(rows - 1, Math.floor((b.y + b.h) / BCELL)); cy++)
+        for (let cx = Math.max(0, Math.floor(b.x / BCELL)); cx <= Math.min(cols - 1, Math.floor((b.x + b.w) / BCELL)); cx++) cells[cy * cols + cx].push(i);
+    });
+    return (map._bi = { cols, rows, cells, mark: new Uint32Array(map.buildings.length), stamp: 0, out: [] });
+  }
+  // 四角 (x0,y0)-(x1,y1) にかかるかもしれない建物の番号（小さい順）
+  function nearIdx(map, x0, y0, x1, y1) {
+    const ix = bIndex(map), out = ix.out;
+    out.length = 0;
+    if (++ix.stamp === 0xffffffff) { ix.mark.fill(0); ix.stamp = 1; }
+    const c0 = Math.max(0, Math.floor(Math.min(x0, x1) / BCELL)), c1 = Math.min(ix.cols - 1, Math.floor(Math.max(x0, x1) / BCELL));
+    const r0 = Math.max(0, Math.floor(Math.min(y0, y1) / BCELL)), r1 = Math.min(ix.rows - 1, Math.floor(Math.max(y0, y1) / BCELL));
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) for (const i of ix.cells[r * ix.cols + c]) if (ix.mark[i] !== ix.stamp) { ix.mark[i] = ix.stamp; out.push(i); }
+    return out;
+  }
+
+  // 円をマップ外と建物から押し出す（建物は90くらいなので、全部見るほうが速い）
   function collide(map, e, r) {
     e.x = Math.max(r, Math.min(map.w - r, e.x));
     e.y = Math.max(r, Math.min(map.h - r, e.y));
@@ -291,21 +314,39 @@
   }
 
   // 線分 a-b が建物にさえぎられていないか
+  // 索引のマスを、線が通る行ごとに通る範囲だけ見る（長い線でも斜めの四角全体は見ない。結果は全部調べたときと同じ）
   function lineOfSight(map, a, b) {
-    for (const r of map.buildings) {
-      if (segRect(a.x, a.y, b.x, b.y, r)) return false;
+    const ix = bIndex(map), bs = map.buildings, mark = ix.mark;
+    if (++ix.stamp === 0xffffffff) { mark.fill(0); ix.stamp = 1; }
+    const st = ix.stamp, dx = b.x - a.x, dy = b.y - a.y;
+    const ymin = Math.min(a.y, b.y), ymax = Math.max(a.y, b.y);
+    const r0 = Math.max(0, Math.floor(ymin / BCELL)), r1 = Math.min(ix.rows - 1, Math.floor(ymax / BCELL));
+    for (let r = r0; r <= r1; r++) {
+      let xa = a.x, xb = b.x;
+      if (dy !== 0) {
+        const ya = Math.max(ymin, r * BCELL), yb = Math.min(ymax, (r + 1) * BCELL);
+        xa = a.x + dx * (ya - a.y) / dy; xb = a.x + dx * (yb - a.y) / dy;
+      }
+      // 計算の誤差でマスの境目を取りこぼさないよう、左右に1ずつ広めに見る
+      const c0 = Math.max(0, Math.floor((Math.min(xa, xb) - 1) / BCELL)), c1 = Math.min(ix.cols - 1, Math.floor((Math.max(xa, xb) + 1) / BCELL));
+      for (let c = c0; c <= c1; c++) for (const i of ix.cells[r * ix.cols + c]) {
+        if (mark[i] === st) continue;
+        mark[i] = st;
+        if (segRect(a.x, a.y, b.x, b.y, bs[i])) return false;
+      }
     }
     return true;
   }
   function segRect(x0, y0, x1, y1, r) {
     let t0 = 0, t1 = 1;
     const dx = x1 - x0, dy = y1 - y0;
-    const p = [-dx, dx, -dy, dy];
-    const q = [x0 - r.x, r.x + r.w - x0, y0 - r.y, r.y + r.h - y0];
+    // 4つの辺について順に（配列を作らずに）
     for (let i = 0; i < 4; i++) {
-      if (p[i] === 0) { if (q[i] < 0) return false; continue; }
-      const t = q[i] / p[i];
-      if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+      const p = i === 0 ? -dx : i === 1 ? dx : i === 2 ? -dy : dy;
+      const q = i === 0 ? x0 - r.x : i === 1 ? r.x + r.w - x0 : i === 2 ? y0 - r.y : r.y + r.h - y0;
+      if (p === 0) { if (q < 0) return false; continue; }
+      const t = q / p;
+      if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
       else { if (t < t0) return false; if (t < t1) t1 = t; }
     }
     return true;
@@ -313,7 +354,9 @@
 
   function isFree(map, x, y, r) {
     if (x < r || y < r || x > map.w - r || y > map.h - r) return false;
-    for (const b of map.buildings) {
+    const bs = map.buildings;
+    for (const i of nearIdx(map, x - r, y - r, x + r, y + r)) {
+      const b = bs[i];
       if (x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r) return false;
     }
     return true;

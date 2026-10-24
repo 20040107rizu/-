@@ -136,41 +136,56 @@ class Grid {
       if (this.free[i]) return { x: ((i % this.cols) + 0.5) * S.CELL, y: (Math.floor(i / this.cols) + 0.5) * S.CELL };
     }
   }
+  // A*。作業用の配列は毎回作らずに使い回す（メモリの掃除を減らして軽くするため。結果は同じ）
   path(sx, sy, tx, ty) {
-    const C = this.cols;
+    const C = this.cols, N = this.free.length;
     const [sc, sr] = this.nearestFree(...this.cellOf(sx, sy));
     const [tc, tr] = this.nearestFree(...this.cellOf(tx, ty));
     const start = sr * C + sc, goal = tr * C + tc;
     if (start === goal) return [{ x: tx, y: ty }];
-    const g = new Float32Array(this.free.length).fill(Infinity);
-    const from = new Int32Array(this.free.length).fill(-1);
-    const closed = new Uint8Array(this.free.length);
-    const heap = [];
+    if (!this.g) { this.g = new Float32Array(N); this.from = new Int32Array(N); this.seen = new Uint32Array(N); this.done = new Uint32Array(N); this.stamp = 0; this.hf = new Float64Array(64); this.hi = new Int32Array(64); }
+    if (++this.stamp === 0xffffffff) { this.seen.fill(0); this.done.fill(0); this.stamp = 1; }
+    const g = this.g, from = this.from, seen = this.seen, done = this.done, st = this.stamp;
+    const G = i => (seen[i] === st ? g[i] : Infinity);
+    // 二分ヒープ（f の小さい順）
+    let hf = this.hf, hi = this.hi, hn = 0;
     const push = (i, f) => {
-      heap.push([f, i]);
-      let k = heap.length - 1;
-      while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; }
+      if (hn === hf.length) { const nf = new Float64Array(hn * 2), ni = new Int32Array(hn * 2); nf.set(hf); ni.set(hi); hf = this.hf = nf; hi = this.hi = ni; }
+      let k = hn++;
+      hf[k] = f; hi[k] = i;
+      while (k > 0) {
+        const p = (k - 1) >> 1;
+        if (hf[p] <= hf[k]) break;
+        const tf = hf[p]; hf[p] = hf[k]; hf[k] = tf; const ti = hi[p]; hi[p] = hi[k]; hi[k] = ti;
+        k = p;
+      }
     };
     const pop = () => {
-      const top = heap[0], last = heap.pop();
-      if (heap.length) {
-        heap[0] = last; let k = 0;
+      const top = hi[0];
+      hn--;
+      if (hn > 0) {
+        hf[0] = hf[hn]; hi[0] = hi[hn]; let k = 0;
         for (;;) {
           const l = 2 * k + 1, r = l + 1; let m = k;
-          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
-          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
-          if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m;
+          if (l < hn && hf[l] < hf[m]) m = l;
+          if (r < hn && hf[r] < hf[m]) m = r;
+          if (m === k) break;
+          const tf = hf[m]; hf[m] = hf[k]; hf[k] = tf; const ti = hi[m]; hi[m] = hi[k]; hi[k] = ti;
+          k = m;
         }
       }
       return top;
     };
-    const h = i => Math.hypot((i % C) - tc, Math.floor(i / C) - tr);
-    g[start] = 0; push(start, h(start));
-    while (heap.length) {
-      const [, cur] = pop();
+    // 距離の見積もり。Math.hypot は遅いので、同じ値を表にしておいて引く
+    if (!this.hyp) { this.hyp = new Float64Array(C * this.rows); for (let y = 0; y < this.rows; y++) for (let x = 0; x < C; x++) this.hyp[y * C + x] = Math.hypot(x, y); }
+    const hyp = this.hyp;
+    const h = i => hyp[Math.abs(Math.floor(i / C) - tr) * C + Math.abs((i % C) - tc)];
+    seen[start] = st; g[start] = 0; from[start] = -1; push(start, h(start));
+    while (hn) {
+      const cur = pop();
       if (cur === goal) break;
-      if (closed[cur]) continue;
-      closed[cur] = 1;
+      if (done[cur] === st) continue;
+      done[cur] = st;
       const cc = cur % C, cr = Math.floor(cur / C);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
@@ -179,11 +194,11 @@ class Grid {
         const ni = nr * C + nc;
         if (!this.free[ni]) continue;
         if (dx && dy && (!this.free[cr * C + nc] || !this.free[nr * C + cc])) continue; // 角をすり抜けない
-        const ng = g[cur] + (dx && dy ? 1.414 : 1);
-        if (ng < g[ni]) { g[ni] = ng; from[ni] = cur; push(ni, ng + h(ni)); }
+        const ng = G(cur) + (dx && dy ? 1.414 : 1);
+        if (ng < G(ni)) { seen[ni] = st; g[ni] = ng; from[ni] = cur; push(ni, ng + h(ni)); }
       }
     }
-    if (from[goal] === -1) return [{ x: tx, y: ty }];
+    if (seen[goal] !== st || goal === start) return [{ x: tx, y: ty }];
     const pts = [];
     for (let i = goal; i !== start; i = from[i]) pts.push({ x: ((i % C) + 0.5) * S.CELL, y: (Math.floor(i / C) + 0.5) * S.CELL });
     pts.reverse();
@@ -249,8 +264,8 @@ class Room {
 
   broadcast(msg) {
     const data = JSON.stringify(msg);
-    for (const p of this.players.values()) if (p.ws.readyState === 1) p.ws.send(data);
-    for (const w of this.watchers) if (w.readyState === 1) w.send(data);
+    for (const p of this.players.values()) if (p.ws.readyState === 1) { p.ws.send(data); load.bytes += data.length; }
+    for (const w of this.watchers) if (w.readyState === 1) { w.send(data); load.bytes += data.length; }
   }
 
   // 途中から観戦する人に、今のバトルの様子を送る
@@ -1130,9 +1145,22 @@ function drainStep() {
   }
 }
 
+// ---------- 負荷の記録（LOAD_STATS=1 のとき5秒ごとにログ） ----------
+const load = { ticks: 0, tickMs: 0, maxMs: 0, bytes: 0, cpu: process.cpuUsage(), at: Date.now(), lagMax: 0, last: Date.now() };
+if (process.env.LOAD_STATS) setInterval(() => {
+  const cpu = process.cpuUsage(load.cpu), wall = Date.now() - load.at;
+  const battles = [...rooms.values()].filter(r => r.state === 'battle').length;
+  console.log(`[負荷] 部屋${rooms.size}（バトル中${battles}） 人数${[...rooms.values()].reduce((a, r) => a + r.players.size, 0)} フレンド接続${presence.size}`
+    + ` | 1回の計算 平均${(load.tickMs / Math.max(1, load.ticks)).toFixed(2)}ms 最大${load.maxMs.toFixed(1)}ms 遅れ最大${load.lagMax}ms`
+    + ` | CPU ${(((cpu.user + cpu.system) / 1000 / wall) * 100).toFixed(1)}%（1コア） メモリ${Math.round(process.memoryUsage().rss / 1048576)}MB 送信${Math.round(load.bytes / 1024 / (wall / 1000))}KB/秒`);
+  Object.assign(load, { ticks: 0, tickMs: 0, maxMs: 0, bytes: 0, cpu: process.cpuUsage(), at: Date.now(), lagMax: 0 });
+}, 5000);
+
 // ---------- ゲームループ ----------
 let sendAcc = 0;
 setInterval(() => {
+  const t0 = performance.now();
+  const now = Date.now(); load.lagMax = Math.max(load.lagMax, now - load.last - Math.round(1000 / TICK_RATE)); load.last = now; // 予定より遅れたか
   sendAcc += DT;
   const doSend = sendAcc >= 1 / SEND_RATE;
   if (doSend) sendAcc = 0;
@@ -1141,6 +1169,7 @@ setInterval(() => {
     if (doSend && room.state === 'battle') room.broadcast(room.snapshot());
   }
   if (draining) drainStep();
+  const ms = performance.now() - t0; load.ticks++; load.tickMs += ms; load.maxMs = Math.max(load.maxMs, ms);
 }, 1000 / TICK_RATE);
 
 if (require.main === module) {
