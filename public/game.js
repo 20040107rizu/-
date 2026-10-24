@@ -4,7 +4,7 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -12,7 +12,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -101,6 +101,7 @@
     pws.onopen = () => { pwsWait = 2000; helloAgain(); };
     pws.onmessage = e => {
       const m = JSON.parse(e.data);
+      if (m.t === 'profile') return gotProfile(m);
       if (m.t !== 'friends') return;
       buddyLive = m.list;
       for (const f of m.list) buddies[f.pid] = { name: f.name, yokai: f.yokai, seen: Math.max(f.seen, buddies[f.pid]?.seen || 0) };
@@ -116,8 +117,18 @@
       pwsWait = Math.min(pwsWait * 2, 30000);
     };
   }
+  // フレンドに見せる自分の情報（持っている妖怪の数・記録・称号）
+  const PROF_YOKAI = S.YOKAI.concat(S.LEGENDS);
+  function myProfile() {
+    return {
+      f: PROF_YOKAI.map(y => Math.min(9, friends[y.id] || 0)).join(''),
+      s: [stats.plays, stats.escapes, stats.best, stats.dama],
+      c: S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0),
+      tc: titlesDone().length, wt: weeklyTitles,
+    };
+  }
   function helloAgain() {
-    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle }));
+    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() }));
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) presenceConnect(); });
   const STATUS = { home: 'ホームにいる', lobby: '募集中', battle: '出撃中', result: '結果を見ている', off: 'オフライン' };
@@ -139,11 +150,62 @@
       const st = f.status === 'off' ? `オフライン（${ago(f.seen)}）` : f.status === 'lobby' ? `募集中（${f.n}/4人）` : STATUS[f.status];
       const btn = f.room && f.status === 'lobby' ? `<button class="join" data-code="${f.room}">参加</button>`
         : f.room && f.status === 'battle' ? `<button class="watch" data-code="${f.room}">観戦</button>` : '';
-      return `<li class="${f.status}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)} ${f.title ? titleTag(f.title) : ''}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
+      return `<li class="${f.status}" data-pid="${f.pid}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)} ${f.title ? titleTag(f.title) : ''}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
     }).join('');
+    for (const li of ul.querySelectorAll('li[data-pid]')) li.onclick = e => { if (!e.target.closest('button')) openProfile(li.dataset.pid); };
     for (const b of ul.querySelectorAll('button.join')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'join', code: b.dataset.code }); };
     for (const b of ul.querySelectorAll('button.watch')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'watch', code: b.dataset.code }); };
   }
+  // ---------- フレンドのプロフィール ----------
+  let profPid = null, profTab = 'all';
+  function openProfile(id) {
+    profPid = id; profTab = 'all';
+    show('profileScreen');
+    renderProfile();
+    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'profile', pid: id }));
+  }
+  function gotProfile(m) {
+    if (m.ok && buddies[m.pid]) { buddies[m.pid].prof = m.prof; try { localStorage.setItem('buddies', JSON.stringify(buddies)); } catch {} } // オフラインでも見られるように覚えておく
+    if (m.pid === profPid) renderProfile(m.ok ? null : 'none');
+  }
+  function renderProfile(state) {
+    const b = buddies[profPid] || {}, live = buddyLive.find(f => f.pid === profPid) || { status: 'off', seen: b.seen };
+    const pr = b.prof;
+    const y = S.YOKAI_BY_ID[live.yokai || b.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
+    const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
+    const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
+    const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
+    const bosses = S.BOSS_ORDER.map((k, i) => `<span class="pboss ${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join('');
+    $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
+      <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
+      <div><span class="st ${live.status}">${st}</span></div>
+      <div>いまのお友達：<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</span></div>
+      ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　🌈 レジェンド ${legends.length}体` : ''}</dd>
+        <dt>遊んだ</dt><dd>${pr.s[0] || 0}回（脱出 ${pr.s[1] || 0}回）</dd>
+        <dt>鬼玉</dt><dd>最高 ${pr.s[2] || 0}個・合計 ${(pr.s[3] || 0).toLocaleString('ja-JP')}個</dd>
+        <dt>称号</dt><dd>${pr.tc || 0}個${(pr.wt || []).length ? `（限定 ${pr.wt.map(titleTag).join(' ')}）` : ''}</dd>
+        <dt>ボス鬼</dt><dd>${bosses}</dd></dl>`
+        : `<small>${state === 'none' ? 'まだくわしい情報がありません（この人が新しいバージョンで遊ぶと見られるようになります）' : '読み込み中…'}</small>`}</div>`;
+    const btn = live.room && live.status === 'lobby' ? `<button class="big" id="profJoin">参加</button>` : live.room && live.status === 'battle' ? `<button class="big alt" id="profWatch">観戦</button>` : '';
+    $('profAction').innerHTML = btn;
+    if ($('profJoin')) $('profJoin').onclick = () => connect({ t: 'join', code: live.room });
+    if ($('profWatch')) $('profWatch').onclick = () => connect({ t: 'watch', code: live.room });
+    // 持っている妖怪
+    const tabs = [['all', 'ぜんぶ'], ['L', '🌈'], ['S', 'S'], ['A', 'A'], ['B', 'B'], ['C', 'C']];
+    $('profTabs').innerHTML = pr ? tabs.map(([k, l]) => {
+      const pool = k === 'all' ? S.YOKAI : k === 'L' ? S.LEGENDS : S.YOKAI.filter(q => q.rank === k);
+      return `<button class="tab${profTab === k ? ' on' : ''}" data-k="${k}">${l} <small>${pool.filter(q => counts[q.id]).length}/${pool.length}</small></button>`;
+    }).join('') : '';
+    for (const t of $('profTabs').querySelectorAll('button')) t.onclick = () => { profTab = t.dataset.k; $('profGrid').scrollTop = 0; renderProfile(state); };
+    const pool = profTab === 'all' ? S.LEGENDS.concat(S.YOKAI) : profTab === 'L' ? S.LEGENDS : S.YOKAI.filter(q => q.rank === profTab);
+    const list = pool.filter(q => counts[q.id]);
+    $('profGrid').innerHTML = !pr ? '' : list.length ? list.map(q => {
+      const n = counts[q.id], tt = S.totsuOf(n);
+      return `<div class="yk${q.legend ? ' legend' : ''}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
+    }).join('') : '<p class="sub">このランクのお友達はまだいません</p>';
+  }
+  $('btnProfClose').onclick = () => { show('buddyScreen'); renderBuddies(); };
+
   $('btnBuddies').onclick = () => { $('buddyMsg').textContent = ''; show('buddyScreen'); renderBuddies(); presenceConnect(); };
   $('btnBuddyClose').onclick = () => show('title');
   $('name').addEventListener('change', helloAgain);
@@ -258,7 +320,7 @@
   function unseal(l) {
     if (friends[l.id] || !S.sealProgress(l, friends, stats.seals).ready) return;
     friends[l.id] = 1;
-    saveAll(); updateFriendCount();
+    saveAll(); updateFriendCount(); helloAgain();
     beep(523, 0.2, 'triangle', 0.08); setTimeout(() => beep(784, 0.2, 'triangle', 0.08), 150); setTimeout(() => beep(1046, 0.5, 'triangle', 0.09), 300);
     $('rewardWeek').textContent = '🌈 レジェンド';
     $('rewardTitle').textContent = `${l.name}の封印がとけた！`;
@@ -365,7 +427,7 @@
     const isNew = !friends[y.id];
     friends[y.id] = (friends[y.id] || 0) + 1;
     try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
-    saveAll(); updateFriendCount(); renderTicketButton();
+    saveAll(); updateFriendCount(); renderTicketButton(); helloAgain();
     ticketMode = true;
     const id = ++gachaRun;
     $('btnToResult').hidden = true; $('btnToResult').textContent = 'ホームへ';
@@ -800,7 +862,7 @@
       const l = S.YOKAI_BY_ID[mine.seal.legend];
       result.sealNote = `🔮 封印の欠片をゲット！（${l.name}の封印 ${Math.min(sl.frag, S.SEAL.fragments)}/${S.SEAL.fragments}）`;
     }
-    if (mine) { saveAll(); updateFriendCount(); }
+    if (mine) { saveAll(); updateFriendCount(); helloAgain(); }
     const id = ++gachaRun;
     $('btnToResult').hidden = true;
     $('gachaStage').innerHTML = '';

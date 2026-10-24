@@ -939,8 +939,14 @@ wss.on('connection', ws => {
         pid = cleanPid(msg.pid);
         if (!pid) return;
         touchPlayer(pid, msg.name, msg.yokai, msg.title);
+        if (msg.prof) known.get(pid).prof = cleanProfile(msg.prof);
         presence.set(ws, pid);
         sendFriends(ws);
+        break;
+      }
+      case 'profile': { // フレンドのくわしい情報
+        const id = cleanPid(msg.pid), k = id && known.get(id);
+        send({ t: 'profile', pid: msg.pid, ok: !!(k && k.prof), name: k && k.name, yokai: k && k.yokai, title: k && k.title, prof: k && k.prof });
         break;
       }
       case 'watch': {
@@ -1042,6 +1048,16 @@ const known = new Map();    // pid → { name, yokai, seen }
 const presence = new Map(); // ホーム画面の接続 → pid
 const usableYokai = id => !!S.YOKAI_BY_ID[id];
 const isLegend = id => !!(S.YOKAI_BY_ID[id] && S.YOKAI_BY_ID[id].legend);
+// プロフィール: f=持っている妖怪の数（1けた×176）、s=[遊んだ回数, 脱出, 最高鬼玉, 集めた鬼玉]、c=倒したボス、tc=称号の数、wt=限定称号
+function cleanProfile(p) {
+  if (!p || typeof p !== 'object') return null;
+  const n = v => Math.max(0, Math.min(1e7, Math.floor(+v || 0)));
+  return {
+    f: typeof p.f === 'string' && /^[0-9]{0,400}$/.test(p.f) ? p.f : '',
+    s: Array.isArray(p.s) ? p.s.slice(0, 4).map(n) : [],
+    c: n(p.c) & 7, tc: n(p.tc), wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
+  };
+}
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
 const cleanTitle = v => (S.TITLE_BY_ID[v] || S.weeklyTitle(v) ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);

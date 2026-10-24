@@ -372,3 +372,16 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .legend-face { filter: drop-shadow(0 0 10px #c85aff); }
 .legend-name { background: linear-gradient(90deg, #ff9a2a, #ffe24a, #4ae07a, #3ac8ff, #c85aff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .unseal-img { width: 160px; height: 160px; object-fit: contain; filter: drop-shadow(0 0 18px #c85aff); animation: unlockPop .8s ease-out; }
+
+/* フレンドのプロフィール */
+.buddy-list li[data-pid] { cursor: pointer; }
+#profileScreen.active { flex-direction: row; align-items: stretch; gap: 12px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
+.prof-info { flex-direction: column; align-items: center; text-align: center; overflow-y: auto; }
+.prof-info .big-face { width: min(45%, 110px); }
+.prof-info dl { text-align: left; }
+.prof-btns { justify-content: space-between; flex-wrap: nowrap; }
+.prof-btns button.big { padding: 8px 18px; font-size: 15px; }
+.pboss { display: inline-block; font-size: 10px; padding: 0 5px; margin-right: 3px; border-radius: 6px; background: #333; color: #888; }
+.pboss.on.red { background: #a8222a; color: #fff; }
+.pboss.on.blue { background: #2a56c8; color: #fff; }
+.pboss.on.black { background: #3a2e44; color: #fff; border: 1px solid #c8a0ff; }
