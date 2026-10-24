@@ -63,12 +63,12 @@
   const ELEMENT = {
     fire:    { name: '炎', adj: '紅蓮',   color: '#ff6a2a', effect: '燃えて少しずつダメージ' },
     ice:     { name: '氷', adj: '氷結',   color: '#8ad8ff', effect: '敵が遅くなる' },
-    thunder: { name: '雷', adj: '迅雷',   color: '#ffe14a', effect: '見回り鬼が一瞬しびれる' },
-    wind:    { name: '風', adj: '疾風',   color: '#7af0b0', effect: '見回り鬼を吹き飛ばす' },
+    thunder: { name: '雷', adj: '迅雷',   color: '#ffe14a', effect: '鬼が一瞬しびれる（ボス鬼は2秒に1回まで）' },
+    wind:    { name: '風', adj: '疾風',   color: '#7af0b0', effect: '鬼を吹き飛ばす（ボス鬼は少しだけ）' },
     water:   { name: '水', adj: '激流',   color: '#4a9aff', effect: '敵が少し遅くなる' },
     dark:    { name: '闇', adj: '常闇',   color: '#b06aff', effect: 'ダメージの一部を吸収' },
     light:   { name: '光', adj: '閃光',   color: '#fff6a0', effect: 'ボス鬼に大ダメージ' },
-    earth:   { name: '土', adj: '岩砕',   color: '#c8a060', effect: '見回り鬼に大ダメージ' },
+    earth:   { name: '土', adj: '岩砕',   color: '#c8a060', effect: '鬼に追加ダメージ' },
     flower:  { name: '花', adj: '花吹雪', color: '#ff9ad8', effect: '近くの仲間を少し回復' },
     poison:  { name: '毒', adj: '猛毒',   color: '#9ad04a', effect: '毒で少しずつダメージ' },
   };

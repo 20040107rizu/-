@@ -36,11 +36,15 @@ function applyElement(room, p, e, amount, el) {
     case 'poison': addDot(e, amount * 0.15, 3, p); break;
     case 'ice': slow(e, 0.55, 1.2); break;
     case 'water': slow(e, 0.75, 0.8); break;
-    case 'thunder': if (isPatrol) e.stunT = Math.max(e.stunT || 0, 0.4); break;
-    case 'wind': if (isPatrol) knock(room, e, p, 34); break;
+    case 'thunder':
+      if (isPatrol) e.stunT = Math.max(e.stunT || 0, 0.4);
+      // ボス鬼も一瞬しびれる。ずっと止まらないように、しびれたあと2秒はしびれない
+      else if (e.hp > 0 && room.time >= (e.stunReadyAt || 0)) { e.stunT = Math.max(e.stunT || 0, 0.4); e.stunReadyAt = room.time + 2.4; }
+      break;
+    case 'wind': knock(room, e, p, isPatrol ? 34 : 12); break; // ボス鬼は重いので少しだけ
     case 'dark': room.healPlayer(p, amount * 0.08); break;
     case 'light': if (!isPatrol && e.hp > 0) room.damageOni(p, e, amount * 0.2); break;
-    case 'earth': if (isPatrol && e.hp > 0) room.damageOni(p, e, amount * 0.15); break;
+    case 'earth': if (e.hp > 0) room.damageOni(p, e, amount * 0.15); break;
     case 'flower': {
       const ally = room.activePlayers().filter(q => dist(q, p) < 300).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
       if (ally) room.healPlayer(ally, amount * 0.06);
@@ -53,7 +57,7 @@ function slow(e, mul, t) { if (!(e.slowT > 0) || mul <= (e.slowMul || 1)) { e.sl
 function knock(room, e, from, d) {
   const a = Math.atan2(e.y - from.y, e.x - from.x);
   e.x += Math.cos(a) * d; e.y += Math.sin(a) * d;
-  S.collide(room.map, e, 22);
+  S.collide(room.map, e, room.enemyR(e));
 }
 function stunPatrol(e, t) { if (e.isPatrol) e.stunT = Math.max(e.stunT || 0, t); else slow(e, 0.6, t); }
 
