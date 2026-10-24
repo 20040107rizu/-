@@ -4,7 +4,7 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -12,7 +12,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -35,11 +35,13 @@
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
   // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
   let myTitle = localStorage.getItem('title') || null;
-  const titlesDone = () => S.titleProgress(friends).filter(t => t.done).map(t => t.title.id);
+  let weeklyTitles = loadJSON('wtitles', []).filter(id => S.weeklyTitle(id)); // ランキング1位でもらった称号
+  const titlesDone = () => S.titleProgress(friends).filter(t => t.done).map(t => t.title.id).concat(weeklyTitles);
+  const titleInfo = id => S.TITLE_BY_ID[id] || S.weeklyTitle(id);
   function checkMyTitle() { if (myTitle && !titlesDone().includes(myTitle)) myTitle = null; }
   checkMyTitle();
   const myTotsu = () => S.totsuOf(friends[selYokai] || 0);
-  const titleTag = id => { const t = S.TITLE_BY_ID[id]; return t ? `<span class="ttl${t.color === 'gold' ? ' gold' : ''}" style="${t.color === 'gold' ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
+  const titleTag = id => { const t = titleInfo(id); return t ? `<span class="ttl${t.color === 'gold' ? ' gold' : ''}" style="${t.color === 'gold' ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
   const nameTag = (name, title) => `<span class="${title === 'all' ? 'gold' : ''}">${esc(name)}</span>`;
   const totsuTag = n => (n > 0 ? `<span class="totsu">${n >= S.TOTSU_MAX ? '凸MAX' : `凸${n}`}</span>` : '');
 
@@ -151,7 +153,9 @@
         <div class="tinfo">${done ? titleTag(t.id) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
         <div class="tbar"><i style="width:${Math.round((got / need) * 100)}%"></i></div></div>
         <span class="tnum">${got}/${need}</span>
-        ${done ? `<button class="small" data-id="${t.id}">${myTitle === t.id ? 'はずす' : 'つける'}</button>` : '<span class="tlock">🔒</span>'}</div>`).join('');
+        ${done ? `<button class="small" data-id="${t.id}">${myTitle === t.id ? 'はずす' : 'つける'}</button>` : '<span class="tlock">🔒</span>'}</div>`).join('')
+      + weeklyTitles.map(id => { const t = S.weeklyTitle(id); return `<div class="title-row done${myTitle === id ? ' on' : ''}"><div class="tinfo">${titleTag(id)}<small>🏆 ${t.desc}（限定）</small></div>
+        <button class="small" data-id="${id}">${myTitle === id ? 'はずす' : 'つける'}</button></div>`; }).join('');
     for (const b of $('zukanTitles').querySelectorAll('button')) b.onclick = () => {
       myTitle = myTitle === b.dataset.id ? null : b.dataset.id;
       try { localStorage.setItem('title', myTitle || ''); } catch {}
@@ -211,6 +215,117 @@
   }
   $('btnZukan').onclick = () => { zukanSel = null; show('zukan'); renderZukan(); };
   $('btnZukanClose').onclick = () => show('title');
+
+  // ---------- 週替わりランキング ----------
+  let rankData = null, rankView = 'all';
+  async function loadRanking(week) {
+    const r = await fetch(`ranking?pid=${encodeURIComponent(pid)}${week ? `&week=${week}` : ''}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }
+  function rankButton() {
+    const th = rankData ? rankData.theme : S.themeOf(S.weekIndex());
+    const me = rankData && rankData.me;
+    $('btnRank').innerHTML = `${th.icon} ランキング${me && me.rank ? ` <span class="badge gold-bg">${me.rank}位</span>` : ''}`;
+    $('btnRank').title = th.name;
+  }
+  async function refreshRanking() {
+    try { rankData = await loadRanking(); } catch { return; }
+    rankButton();
+    if ($('rankScreen').classList.contains('active')) renderRanking();
+  }
+  const left = end => { const ms = Math.max(0, end - Date.now()), d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000) % 24, m = Math.floor(ms / 60000) % 60; return d ? `${d}日${h}時間` : h ? `${h}時間${m}分` : `${m}分`; };
+  function rewardText(r) {
+    return { gold: '金玉チケット', red: '赤玉チケット', blue: '青玉チケット', green: '緑玉チケット' }[r.ticket] + (r.title ? '＋限定称号' : '');
+  }
+  function renderRanking() {
+    const now = rankData ? rankData.idx : S.weekIndex();
+    $('rankSched').innerHTML = [-1, 0, 1, 2, 3].map(k => {
+      const t = S.themeOf(now + k);
+      if (now + k < 0) return '';
+      return `<div class="sched${k === 0 ? ' on' : k < 0 ? ' past' : ''}"><span class="ic">${t.icon}</span><div><small>第${t.no}回${k === 0 ? '（開催中）' : k < 0 ? '（終了）' : k === 1 ? '（来週）' : ''}</small><br>${esc(t.name)}</div>${k === 0 ? '<span class="now">いま</span>' : ''}</div>`;
+    }).join('');
+    if (!rankData) { $('rankList').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
+    const d = rankData, th = d.theme;
+    $('rankBanner').innerHTML = `<span class="ic">${th.icon}</span><div class="txt"><b>第${th.no}回：${esc(th.name)}</b><br>${esc(th.desc)}</div><div class="left">のこり<br><b>${left(d.end)}</b></div>`;
+    $('rankTabs').innerHTML = [['all', 'みんな'], ['friends', 'フレンド']].map(([k, l]) => `<button class="tab${rankView === k ? ' on' : ''}" data-k="${k}">${l}</button>`).join('');
+    for (const b of $('rankTabs').querySelectorAll('button')) b.onclick = () => { rankView = b.dataset.k; renderRanking(); };
+    $('rankCount').textContent = `参加 ${d.total}人` + (d.saved ? '' : '（試験運転中：サーバーが更新されると記録が消えます）');
+    let rows = d.rows.map((r, i) => ({ ...r, rank: i + 1 }));
+    if (rankView === 'friends') rows = rows.filter(r => r.pid === pid || buddies[r.pid]);
+    const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
+    $('rankList').innerHTML = rows.length ? rows.map(r => {
+      const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
+      return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}
+        <div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b><small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
+    }).join('') : `<p class="sub empty">${rankView === 'friends' ? 'フレンドの記録はまだありません' : 'まだ記録がありません。一番乗りをめざそう！'}</p>`;
+    const me = d.me;
+    $('rankReward').innerHTML = `🎁 報酬　🥇 限定称号《第${th.no}回 ${esc(th.crown)}》＋金玉チケット　🥈🥉 赤玉チケット　〜10位 青玉チケット　参加賞 緑玉チケット`
+      + `<br>あなた：${me.rank ? `<b>${me.rank}位</b>（${esc(S.fmtScore(th, me.score))}）→ ${rewardText(S.weeklyReward(me.rank))}` : me.joined ? '参加済み（まだ記録なし）→ 緑玉チケット' : 'まだ参加していません'}`;
+  }
+  $('btnRank').onclick = () => { show('rankScreen'); renderRanking(); refreshRanking(); };
+  $('btnRankClose').onclick = () => show('title');
+  setInterval(() => { if ($('title').classList.contains('active') || $('rankScreen').classList.contains('active')) refreshRanking(); }, 60000);
+
+  // 先週の結果と報酬（まだ受け取っていなければ）
+  let tickets = loadJSON('tickets', {});
+  function renderTicketButton() {
+    const n = Object.values(tickets).reduce((a, b) => a + b, 0);
+    $('btnTicket').hidden = !n;
+    $('btnTicket').innerHTML = `🎫 チケットガチャ <span class="badge">${n}</span>`;
+  }
+  async function checkReward() {
+    const prev = (rankData ? rankData.idx : S.weekIndex()) - 1;
+    if (prev < 0 || +(localStorage.getItem('rewardWeek') ?? -1) >= prev) return;
+    let d;
+    try { d = await loadRanking('prev'); } catch { return; }
+    if (!d.me.joined) { try { localStorage.setItem('rewardWeek', prev); } catch {} return; }
+    const r = S.weeklyReward(d.me.rank || 999), th = d.theme;
+    $('rewardWeek').textContent = `第${th.no}回 ${th.name} の結果`;
+    $('rewardTitle').textContent = d.me.rank ? `${d.me.rank <= 3 ? ['🥇', '🥈', '🥉'][d.me.rank - 1] : '🏅'} ${d.me.rank}位！` : '🎉 参加ありがとう！';
+    $('rewardSub').textContent = d.me.rank ? `記録 ${S.fmtScore(th, d.me.score)}（参加 ${d.total}人）` : `参加 ${d.total}人`;
+    const ball = S.BALLS.find(b => b.key === r.ticket);
+    $('rewardPrizes').innerHTML = (r.title ? `<div class="prize"><div class="i">🏅</div>限定称号<br>${titleTag('w' + prev)}</div>` : '')
+      + `<div class="prize"><div class="i" style="color:${ball.color}">●</div>${ball.name}玉チケット<br>×1</div>`;
+    $('btnRewardOk').onclick = () => {
+      tickets[r.ticket] = (tickets[r.ticket] || 0) + 1;
+      if (r.title && !weeklyTitles.includes('w' + prev)) weeklyTitles.push('w' + prev);
+      try { localStorage.setItem('tickets', JSON.stringify(tickets)); localStorage.setItem('wtitles', JSON.stringify(weeklyTitles)); localStorage.setItem('rewardWeek', prev); } catch {}
+      renderTicketButton();
+      show('title');
+    };
+    // 「アップデートしました」のお知らせなどが出ている間は待って、ホーム画面に戻ったら出す
+    const open = () => { if ($('title').classList.contains('active')) show('rewardScreen'); else setTimeout(open, 800); };
+    open();
+  }
+
+  // チケットガチャ: その色のガチャ玉が必ず出る
+  let ticketMode = false;
+  $('btnTicket').onclick = () => {
+    const key = ['gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
+    if (!key) return;
+    tickets[key]--;
+    if (!tickets[key]) delete tickets[key];
+    const ball = S.BALLS.find(b => b.key === key);
+    let x = Math.random(), rank = ball.ranks[0][0];
+    for (const [rk, w] of ball.ranks) { if (x < w) { rank = rk; break; } x -= w; }
+    const pool = S.YOKAI.filter(y => y.rank === rank), y = pool[Math.floor(Math.random() * pool.length)];
+    const isNew = !friends[y.id];
+    friends[y.id] = (friends[y.id] || 0) + 1;
+    try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+    saveAll(); updateFriendCount(); renderTicketButton();
+    ticketMode = true;
+    const id = ++gachaRun;
+    $('btnToResult').hidden = true; $('btnToResult').textContent = 'ホームへ';
+    $('gachaFail').hidden = true;
+    GachaShow.run($('gachaStage'), {
+      team: 0, ticket: `${ball.name}玉チケット`,
+      ball: { key: ball.key, name: ball.name, color: ball.color },
+      yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' },
+      isNew, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
+    }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
+    show('gacha');
+  };
 
   // ---------- 状態 ----------
   let ws = null;
@@ -440,6 +555,7 @@
         break;
       case 'welcome': myId = m.id; offline = false; serverUpdating = false; break;
       case 'serverUpdate': serverUpdating = true; break;
+      case 'lobbyMsg': $('lobbyMsg').hidden = false; $('lobbyMsg').textContent = '⚠️ ' + m.msg; break;
       case 'lobby':
         lobby = m;
         if (m.state === 'lobby') { renderLobby(); show('lobby'); }
@@ -541,7 +657,14 @@
       return `<button class="boss-card ${k}${sel ? ' on' : ''}${lock ? ' lock' : ''}" data-k="${k}" ${isHost && open ? '' : 'disabled'}>
         <span class="bname">${lock ? '？？' : b.name}</span><small>${sub}</small></button>`;
     }).join('');
-    for (const el of $('bossPick').querySelectorAll('button')) el.onclick = () => send({ t: 'boss', type: el.dataset.k });
+    const th = S.themeOf(lobby.week ?? S.weekIndex());
+    if (th.key === 'challenge') {
+      $('bossPick').innerHTML += `<button class="boss-card challenge${lobby.challenge ? ' on' : ''}" data-ch="1" ${isHost ? '' : 'disabled'}><span class="bname">🎯</span><small>今週のチャレンジ</small></button>`;
+      if (lobby.challenge) for (const el of $('bossPick').querySelectorAll('.boss-card:not(.challenge)')) el.classList.remove('on');
+    }
+    for (const el of $('bossPick').querySelectorAll('button')) el.onclick = () => (el.dataset.ch ? send({ t: 'challenge', on: !lobby.challenge }) : send({ t: 'boss', type: el.dataset.k }));
+    $('lobbyMsg').hidden = !lobby.challenge;
+    if (lobby.challenge) $('lobbyMsg').textContent = `🎯 ${th.name}　しばり：${th.ruleName}（記録はランキングに入ります）`;
   }
 
   let friendTab = 'own';
@@ -638,6 +761,7 @@
   }
 
   $('btnToResult').onclick = () => {
+    if (ticketMode) { ticketMode = false; $('btnToResult').textContent = '結果を見る'; show('title'); return; }
     renderResult();
     show('result', true);
     menuMusic();
@@ -1548,5 +1672,6 @@
     }
   }
   requestAnimationFrame(frame);
+  rankButton(); renderTicketButton(); refreshRanking().then(checkReward);
   presenceConnect();
 })();

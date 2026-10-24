@@ -109,6 +109,58 @@
     return BALLS[0];
   }
 
+  // ---------- 週替わりランキング ----------
+  // 毎週月曜0時（日本時間）に1種類ずつ入れ替わる。第1回 = 2026年10月19日（月）からの週
+  const WEEK_MS = 7 * 24 * 3600 * 1000;
+  const WEEK_BASE = Date.UTC(2026, 9, 18, 15, 0, 0); // 2026-10-19 00:00 JST
+  const weekIndex = (now = Date.now()) => Math.floor((now - WEEK_BASE) / WEEK_MS);
+  const weekStart = idx => WEEK_BASE + idx * WEEK_MS;
+  const THEME_ORDER = ['dama', 'bossTime', 'challenge', 'rescue', 'stealth', 'patrol', 'bossDmg', 'meister'];
+  const STARTERS = ['nekomata', 'kasabou', 'chochin', 'hitodama'];
+  function themeOf(idx) {
+    const key = THEME_ORDER[((idx % THEME_ORDER.length) + THEME_ORDER.length) % THEME_ORDER.length];
+    const round = Math.floor(idx / THEME_ORDER.length); // 何周目か（ボスやお題が毎回ちがう）
+    const t = { key, idx, no: idx + 1 };
+    switch (key) {
+      case 'dama': return { ...t, icon: '🟣', name: '鬼玉ランキング', desc: '1週間に集めた鬼玉の合計で勝負！', unit: '個', crown: '鬼玉王' };
+      case 'bossTime': {
+        const boss = ['red', 'blue', 'red', 'black'][round % 4];
+        return { ...t, icon: '⏱️', boss, name: `${BOSSES_N[boss]}討伐タイム`, desc: `${BOSSES_N[boss]}を倒すまでの最速タイムで勝負！（何回挑戦してもOK・一番いい記録が残ります）`, lower: true, crown: `${BOSSES_N[boss]}討伐王` };
+      }
+      case 'challenge': {
+        const stage = ['france', 'usa', 'china', 'brazil', 'japan', 'oni'][round % 6];
+        const boss = ['red', 'blue', 'red', 'black', 'blue', 'red'][round % 6];
+        const rule = ['noHealer', 'short'][round % 2];
+        const ruleName = rule === 'noHealer' ? 'ヒーラー禁止' : '制限時間3分';
+        return { ...t, icon: '🎯', stage, boss, rule, ruleName, name: `チャレンジ「${STAGES_N[stage]}×${BOSSES_N[boss]}」`, desc: `しばり：${ruleName}　1回のバトルで集めた鬼玉の最高記録で勝負！（ロビーで「今週のチャレンジ」を選んで出撃）`, unit: '個', crown: `${STAGES_N[stage]}の覇者` };
+      }
+      case 'rescue': return { ...t, icon: '🤝', name: '救助ランキング', desc: '倒れた仲間を起こした回数で勝負！', unit: '回', crown: '救助王' };
+      case 'stealth': return { ...t, icon: '👻', name: '隠密ランキング', desc: '見回り鬼にもボス鬼にも見つからずに脱出した回数で勝負！', unit: '回', crown: '忍びの王' };
+      case 'patrol': return { ...t, icon: '⚔️', name: '見回り鬼ハンター', desc: '倒した見回り鬼の数で勝負！', unit: '体', crown: '見回り鬼ハンター王' };
+      case 'bossDmg': return { ...t, icon: '💥', name: 'ボスダメージ', desc: 'ボス鬼に与えたダメージの合計で勝負！', unit: '', crown: '破壊王' };
+      default: {
+        const yokai = STARTERS[round % STARTERS.length];
+        const yn = (YOKAI_BY_ID[yokai] || {}).name;
+        return { ...t, icon: '🦊', yokai, name: `妖怪マイスター「${yn}」`, desc: `${yn}をつれて出撃して集めた鬼玉の合計で勝負！`, unit: '個', crown: `${yn}マイスター` };
+      }
+    }
+  }
+  const fmtScore = (theme, v) => theme.lower ? `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}` : `${Math.round(v).toLocaleString('ja-JP')}${theme.unit}`;
+  // 順位ごとの報酬（チケットは、ホームの「チケットガチャ」でその色の玉が必ず出る）
+  function weeklyReward(rank) {
+    if (rank === 1) return { ticket: 'gold', title: true };
+    if (rank <= 3) return { ticket: 'red' };
+    if (rank <= 10) return { ticket: 'blue' };
+    return { ticket: 'green' }; // 参加賞
+  }
+  // その週の1位の称号（id は w + 週の番号）
+  function weeklyTitle(id) {
+    const m = /^w(\d{1,5})$/.exec(id || '');
+    if (!m) return null;
+    const th = themeOf(+m[1]);
+    return { id, name: `第${th.no}回 ${th.crown}`, color: '#ffd23a', weekly: true, desc: `第${th.no}回 ${th.name} 1位` };
+  }
+
   // ---------- ボス鬼 ----------
   // 赤鬼 → 青鬼 → 黒鬼 の順に、前の鬼を倒すと次の鬼に挑戦できる
   const BOSSES = {
@@ -117,6 +169,7 @@
     black: { name: '黒鬼', color: '#2a2030', hp: 2.6, dmg: 1.95, atkGap: 0.56, warn: 0.85, drop: 150, need: 'blue' },
   };
   const BOSS_ORDER = ['red', 'blue', 'black'];
+  const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {
     const b = BOSSES[type];
@@ -133,6 +186,7 @@
     usa:    { name: 'アメリカの街' },
   };
   const STAGE_KEYS = Object.keys(STAGES);
+  const STAGES_N = { oni: '鬼の世界', japan: '日本', france: 'フランス', brazil: 'ブラジル', china: '中国', usa: 'アメリカ' };
   function pickStage(rnd = Math.random) { return STAGE_KEYS[Math.floor(rnd() * STAGE_KEYS.length)]; }
 
   // ---------- アイテム ----------
@@ -235,5 +289,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

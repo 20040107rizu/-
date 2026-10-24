@@ -1,6 +1,6 @@
 // 鬼バスターズ Service Worker
 // 画面ファイルはネット優先で取得し、つながらないときだけ保存版を使う（更新がすぐ反映されるように）。
-const CACHE = 'busters-v13';
+const CACHE = 'busters-v14';
 const ASSETS = ['/', '/index.html', '/style.css', '/music.js', '/yokai.js', '/attacks.js', '/shared.js', '/stages.js', '/title.js', '/gacha.js', '/game.js', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -14,7 +14,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname === '/version') return;
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname === '/version' || url.pathname === '/ranking') return; // 毎回最新が必要なものは保存しない
   e.respondWith(
     fetch(req).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }

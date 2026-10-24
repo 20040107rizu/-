@@ -6,6 +6,9 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const Combat = require('./combat.js');
+const Ranking = require('./ranking.js');
+// テスト用: TEST_WEEK=3 で、今週を第4回（救助ランキング）として動かす
+if (process.env.TEST_WEEK) { const w = +process.env.TEST_WEEK; S.weekIndex = () => w; }
 const A = Combat.A;
 
 const PORT = process.env.PORT || 3000;
@@ -44,7 +47,7 @@ function computeVersion() {
     try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
   }
   h.update(fs.readFileSync(__filename));
-  h.update(fs.readFileSync(path.join(__dirname, 'combat.js'))); // サーバーだけの変更（ボス鬼の強さなど）でも新しい版にする
+  for (const f of ['combat.js', 'ranking.js']) h.update(fs.readFileSync(path.join(__dirname, f))); // サーバーだけの変更（ボス鬼の強さなど）でも新しい版にする
   return h.digest('hex').slice(0, 10);
 }
 const VERSION = computeVersion();
@@ -57,6 +60,16 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/version') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ v: VERSION, ...whatsNew() }));
+  }
+  // 週替わりランキング: /ranking?pid=...&week=prev（先週）
+  if (urlPath === '/ranking') {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const idx = S.weekIndex() - (q.get('week') === 'prev' ? 1 : 0);
+    Ranking.board(idx, cleanPid(q.get('pid'))).then(b => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(b));
+    }, e => { console.error(e); res.writeHead(500); res.end('{}'); });
+    return;
   }
   const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath === '/' ? 'index.html' : urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
@@ -229,6 +242,7 @@ class Room {
     this.players = new Map();
     this.state = 'lobby'; // lobby | battle | result
     this.bossSel = 'red';  // ホストが選んだボス鬼
+    this.challengeOn = false; // 今週のチャレンジで出撃する
     this.watchers = new Set(); // 観戦している人の接続
   }
 
@@ -241,14 +255,14 @@ class Room {
   // 途中から観戦する人に、今のバトルの様子を送る
   watchStart(ws) {
     ws.send(JSON.stringify({
-      t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch: true,
+      t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: this.timeLimit, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch: true,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
     }));
   }
 
   lobbyInfo() {
     return {
-      t: 'lobby', code: this.code, state: this.state, boss: this.bossSel,
+      t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
       players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, title: p.title })),
     };
   }
@@ -273,7 +287,13 @@ class Room {
   start() {
     this.state = 'battle';
     this.time = 0;
-    this.timeLeft = TIME_LIMIT;
+    // 今週のランキングが「チャレンジ」で、ホストが選んでいたら、ステージ・ボス・しばりを固定する
+    this.weekIdx = S.weekIndex();
+    this.theme = S.themeOf(this.weekIdx);
+    this.challenge = this.challengeOn && this.theme.key === 'challenge' ? this.theme : null;
+    this.timeLimit = this.challenge && this.challenge.rule === 'short' ? Math.min(180, TIME_LIMIT) : TIME_LIMIT;
+    this.timeLeft = this.timeLimit;
+    this.bossKillT = null;
     this.introT = INTRO_MOVIE + COUNTDOWN;
     this.events = [];
     this.projectiles = [];
@@ -284,7 +304,7 @@ class Room {
     this.bombs = [];
     this.result = null;
     const seed = Math.floor(Math.random() * 1e9);
-    this.stage = process.env.TEST_STAGE || S.pickStage();
+    this.stage = process.env.TEST_STAGE || (this.challenge ? this.challenge.stage : S.pickStage());
     this.map = S.generateCity(seed);
     this.gridS = new Grid(this.map, PATROL_R + 4);
     this.gridB = new Grid(this.map, BOSS_R + 4);
@@ -302,6 +322,7 @@ class Room {
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
+        spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
       });
       S.collide(this.map, p, PLAYER_R);
     }
@@ -331,7 +352,7 @@ class Room {
 
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
-    const type = process.env.TEST_BOSS || this.bossSel;
+    const type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
     const kind = S.BOSSES[type];
     const bossHp = Math.round((1500 + 1100 * n) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
     this.boss = {
@@ -341,7 +362,7 @@ class Room {
     };
 
     this.broadcast({
-      t: 'start', seed, stage: this.stage, timeLimit: TIME_LIMIT, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
+      t: 'start', seed, stage: this.stage, timeLimit: this.timeLimit, challenge: !!this.challenge, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
     });
   }
@@ -379,7 +400,7 @@ class Room {
     if (e.hp <= 0) return;
     e.hp = Math.max(0, e.hp - amount);
     e.hitFlash = 0.1;
-    if (src) src.dmgDealt += amount;
+    if (src) { src.dmgDealt += amount; if (!e.isPatrol) src.bossDmg += amount; }
     this.events.push({ k: 'dmg', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 30), v: Math.round(amount) });
     // 攻撃された見回り鬼は、攻撃した人が近くに見えているときだけ気づく
     // （竜巻・追尾弾・砲台・燃焼などで遠くや壁の向こうから当てたときは、攻撃が来た方を振り向くだけ）
@@ -388,6 +409,7 @@ class Room {
       else e.face = Math.atan2(src.y - e.y, src.x - e.x);
     }
     if (e.hp <= 0) {
+      if (e.isPatrol && src) src.kills++;
       if (e.isPatrol) this.killPatrol(e);
       else this.killBoss();
     }
@@ -432,6 +454,7 @@ class Room {
   // ---- 見回り鬼 ----
   alertPatrol(e, target) {
     e.state = 'alert'; e.target = target.id; e.lostT = 0; e.path = null;
+    target.spotted = true;
     this.events.push({ k: 'whistle', id: e.id, target: target.id });
     // ボス鬼に報告
     const b = this.boss;
@@ -499,6 +522,7 @@ class Room {
   killBoss() {
     const b = this.boss;
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
+    if (this.bossKillT == null) this.bossKillT = this.time;
     this.dropDama(b.x, b.y, 1, b.kind.drop);
     this.telegraphs = [];
   }
@@ -514,7 +538,7 @@ class Room {
     // 自分の目で見つけたら戦闘
     if (b.state !== 'engage' && b.state !== 'charging' && b.state !== 'windup') {
       for (const p of this.activePlayers()) {
-        if (this.canSee(b, p, 380, Math.PI)) { b.state = 'engage'; b.target = p.id; b.lostT = 0; b.path = null; break; }
+        if (this.canSee(b, p, 380, Math.PI)) { b.state = 'engage'; b.target = p.id; b.lostT = 0; b.path = null; p.spotted = true; break; }
       }
     }
 
@@ -759,6 +783,7 @@ class Room {
       if (helper) p.reviveProg += DT; else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
       if (p.reviveProg >= REVIVE_TIME) {
         p.down = false; p.hp = p.maxHp * 0.4; p.reviveProg = 0; p.invulT = 2;
+        for (const q of this.activePlayers()) if (q !== p && dist(p, q) < REVIVE_RANGE) q.revives++; // 起こした人に記録
         this.events.push({ k: 'revive', id: p.id });
       }
     }
@@ -797,6 +822,32 @@ class Room {
     const b = this.boss;
     this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
+    this.recordRanking(players);
+  }
+
+  // 週替わりランキングに、このバトルの記録を足す
+  recordRanking(results) {
+    const th = this.theme, n = this.players.size;
+    const entries = [...this.players.values()].filter(p => p.pid).map(p => {
+      const r = results.find(x => x.id === p.id);
+      let value = null, detail = null;
+      switch (th.key) {
+        case 'dama': value = p.dama; break;
+        case 'bossTime':
+          if (this.boss.type === th.boss && this.bossKillT != null) { value = this.bossKillT; detail = `${n}人`; }
+          break;
+        case 'challenge':
+          if (this.challenge) { value = r.count; detail = `${p.escaped ? '脱出' : '鬼玉半分'}・${n}人`; }
+          break;
+        case 'rescue': value = p.revives; break;
+        case 'stealth': value = p.escaped && !p.spotted ? 1 : 0; break;
+        case 'patrol': value = p.kills; break;
+        case 'bossDmg': value = Math.round(p.bossDmg); break;
+        case 'meister': value = p.yokai === th.yokai ? p.dama : 0; break;
+      }
+      return { pid: p.pid, name: p.name, yokai: p.yokai, title: p.title, value: value || null, detail };
+    });
+    Ranking.record(this.weekIdx, entries).catch(e => console.error(e));
   }
 
   snapshot() {
@@ -887,10 +938,19 @@ wss.on('connection', ws => {
         if (room && me && room.state === 'lobby' && S.YOKAI_BY_ID[msg.id]) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
-        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type]) { room.bossSel = msg.type; room.broadcast(room.lobbyInfo()); }
+        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type]) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
+        break;
+      case 'challenge':
+        if (room && me && me.host && room.state === 'lobby') { room.challengeOn = !!msg.on && S.themeOf(S.weekIndex()).key === 'challenge'; room.broadcast(room.lobbyInfo()); }
         break;
       case 'start':
         if (room && me && me.host && room.state === 'lobby' && !draining) {
+          // チャレンジのしばり（ヒーラー禁止）を守っているか
+          const th = S.themeOf(S.weekIndex());
+          if (room.challengeOn && th.key === 'challenge' && th.rule === 'noHealer' && [...room.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].role === 'healer')) {
+            room.broadcast({ t: 'lobbyMsg', msg: '今週のチャレンジは「ヒーラー禁止」！ ヒーラーの妖怪を連れている人がいます' });
+            break;
+          }
           room.start();
           room.broadcast(room.lobbyInfo());
         }
@@ -929,7 +989,7 @@ const MAX_WATCHERS = 8;
 const known = new Map();    // pid → { name, yokai, seen }
 const presence = new Map(); // ホーム画面の接続 → pid
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
-const cleanTitle = v => (S.TITLE_BY_ID[v] ? v : null);
+const cleanTitle = v => (S.TITLE_BY_ID[v] || S.weeklyTitle(v) ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);
 function touchPlayer(pid, name, yokai, title) {
   const k = known.get(pid) || {};

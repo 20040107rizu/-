@@ -39,6 +39,8 @@
     <div class="row">
       <button id="btnBuddies" class="mid">👥 フレンド <span id="buddyBadge" class="badge" hidden></span></button>
       <button id="btnZukan" class="mid">📖 妖怪図鑑</button>
+      <button id="btnRank" class="mid rank-btn">🏆 今週のランキング</button>
+      <button id="btnTicket" class="mid ticket-btn" hidden>🎫 チケットガチャ</button>
     </div>
     <div class="row">
       <p id="friendCount" class="sub"></p>
@@ -54,6 +56,33 @@
     <div class="ov-head"><h2>👥 フレンド</h2><span class="sub">このゲームで遊んだ人は、みんな自動でフレンドになります</span><button id="btnBuddyClose" class="small">✕ とじる</button></div>
     <ul id="buddyList" class="buddy-list"></ul>
     <p id="buddyMsg" class="sub"></p>
+  </section>
+
+  <!-- 週替わりランキング -->
+  <section id="rankScreen" class="screen overlay">
+    <div class="lb-left">
+      <div class="ov-head"><h2>🏆 今週のランキング</h2></div>
+      <span class="sub">毎週月曜0時に内容が変わります</span>
+      <div id="rankSched" class="rank-sched"></div>
+      <button id="btnRankClose" class="big">とじる</button>
+    </div>
+    <div class="lb-right">
+      <div id="rankBanner" class="rank-banner"></div>
+      <div class="rank-head"><div id="rankTabs" class="tabs"></div><span id="rankCount" class="sub"></span></div>
+      <div id="rankList" class="rank-list"></div>
+      <div id="rankReward" class="rank-reward"></div>
+    </div>
+  </section>
+
+  <!-- 先週のランキングの結果と報酬 -->
+  <section id="rewardScreen" class="screen overlay">
+    <div class="reward-box">
+      <div id="rewardWeek" class="sub"></div>
+      <h2 id="rewardTitle"></h2>
+      <div id="rewardSub" class="sub"></div>
+      <div id="rewardPrizes" class="prizes"></div>
+      <button id="btnRewardOk" class="big">うけとる</button>
+    </div>
   </section>
 
   <!-- 妖怪図鑑 -->
@@ -118,6 +147,7 @@
       <div id="bossPick" class="boss-pick"></div>
       <button id="btnStart" class="big">鬼の世界へ！</button>
       <span id="waitMsg" class="sub wait">ホストの開始を待っています…</span>
+      <p id="lobbyMsg" class="lobby-msg" hidden></p>
     </div>
     <div class="lb-right">
       <div id="friendTabs" class="tabs"></div>
