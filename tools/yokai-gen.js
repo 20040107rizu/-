@@ -137,6 +137,7 @@ function hat(kit, kind, h, c) {
     case 'tokin': return kit.cel(`M${x - 14} ${t + 6} L${x + 14} ${t + 6} L${x + 10} ${t - 16} L${x - 10} ${t - 16}Z`, '#1a1a24', { dx: 3, dy: 2, thin: true });
     case 'top': return kit.cel(`M${x - r * 1.05} ${t + 12} Q${x} ${t} ${x + r * 1.05} ${t + 12} Q${x} ${t + 22} ${x - r * 1.05} ${t + 12}Z`, '#1a1a24') + kit.cel(`M${x - r * 0.6} ${t + 10} L${x - r * 0.65} ${t - 44} L${x + r * 0.65} ${t - 44} L${x + r * 0.6} ${t + 10}Z`, '#1a1a24') + `<path d="M${x - r * 0.62} ${t} L${x + r * 0.62} ${t}" stroke="#c8242a" stroke-width="8"/>`;
     case 'catears': return both(`M${x - 18} ${t + 10} L${x - 30} ${t - 26} L${x - 42} ${t + 22}Z`, d => kit.cel(d, c, { dx: 3, dy: 2, thin: true }));
+    case 'circlet': return `<path d="M${x - r * 1.02} ${h.y - r * 0.5} Q${x} ${h.y - r * 0.95} ${x + r * 1.02} ${h.y - r * 0.5}" stroke="${INK}" stroke-width="9" fill="none"/><path d="M${x - r * 1.02} ${h.y - r * 0.5} Q${x} ${h.y - r * 0.95} ${x + r * 1.02} ${h.y - r * 0.5}" stroke="#ffcc33" stroke-width="5" fill="none"/>` + `<circle cx="${x}" cy="${h.y - r * 0.73}" r="6" fill="#ff3a3a" ${THIN}/>`;
     case 'dish': return kit.cel(ell(x, t + 6, r * 0.75, 9), '#d8f4ff', { dx: 3, dy: 2, thin: true }) + `<path d="${ell(x, t + 5, r * 0.5, 4.5)}" fill="#6ac8ff"/>`;
     default: return '';
   }
@@ -228,6 +229,13 @@ function aura(kit, rank, glowC) {
     const p = (ang, r) => `${(128 + Math.cos(ang) * r).toFixed(1)} ${(134 + Math.sin(ang) * r * 1.05).toFixed(1)}`;
     return `<path d="M${p(a - w, r0)} Q${p(a - w * 0.3, r1 * 0.85)} ${p(a + w * 0.4, r1)} Q${p(a + w * 0.2, r1 * 0.8)} ${p(a + w, r0)}Z" fill="${col}" opacity="${op}"/>`;
   }).join('');
+  if (rank === 'L') {
+    const rainbow = ['#ff4a4a', '#ff9a2a', '#ffe24a', '#4ae07a', '#3ac8ff', '#6a6aff', '#c85aff'];
+    const multi = (n, r0, r1, op) => Array.from({ length: n }, (_, i) => flames(n, r0, r1, rainbow[i % rainbow.length], op).split('/>')[i] + '/>').join('');
+    return `<circle cx="128" cy="130" r="127" fill="${kit.grad([[0.25, '#ffffff', 0.95], [0.55, '#ffe680', 0.6], [0.85, '#c85aff', 0.35], [1, '#3ac8ff', 0]])}"/>`
+      + multi(21, 70, 128, 0.55) + flames(21, 62, 100, '#fff6c0', 0.35)
+      + `<circle cx="128" cy="128" r="112" fill="none" stroke="#ffd23a" stroke-width="3" stroke-dasharray="2 9" opacity="0.9"/>`;
+  }
   if (rank === 'B') return `<circle cx="128" cy="134" r="112" fill="${kit.grad([[0.45, glowC, 0.32], [1, glowC, 0]])}"/>`;
   if (rank === 'A') return `<circle cx="128" cy="134" r="122" fill="${kit.grad([[0.35, glowC, 0.55], [1, glowC, 0]])}"/>` + flames(14, 70, 122, glowC, 0.35);
   return `<circle cx="128" cy="130" r="126" fill="${kit.grad([[0.3, '#ffe680', 0.9], [0.75, '#ffa000', 0.45], [1, '#ff6a00', 0]])}"/>` + flames(18, 72, 126, '#ffcc33', 0.42) + flames(18, 60, 102, '#fff2a0', 0.28);
@@ -289,7 +297,11 @@ function roleGear(kit, role, robe, trim, rnd) {
 
 // 人の頭（とがったあご）。髪型つき
 function humanHead(kit, L, c, rnd, skin, hc) {
-  const head = `M94 82 C94 50 110 40 128 40 C146 40 162 50 162 82 C162 104 150 120 128 130 C106 120 94 104 94 82Z`;
+  if (L.hc) hc = L.hc;
+  // head=long: ぬらりひょんのような後ろに長い頭
+  const head = L.head === 'long'
+    ? `M94 82 C92 52 100 20 132 8 C168 0 176 40 162 82 C162 104 150 120 128 130 C106 120 94 104 94 82Z`
+    : `M94 82 C94 50 110 40 128 40 C146 40 162 50 162 82 C162 104 150 120 128 130 C106 120 94 104 94 82Z`;
   const hairs = {
     short: `M90 88 Q86 36 128 32 Q170 36 166 88 L160 70 L152 80 L148 62 L138 74 L132 56 L122 72 L114 58 L108 76 L100 64 L96 82Z`,
     spiky: `M92 92 L70 70 L92 64 L78 36 L104 46 L106 14 L126 38 L144 8 L150 40 L176 24 L168 54 L192 58 L170 76 L164 92 L156 66 L148 80 L142 58 L132 74 L124 54 L116 74 L108 58 L102 80Z`,
@@ -561,15 +573,16 @@ function drawYokai(y) {
   const rnd = seeded(y.id);
   const c = y.color;
   const kit = makeKit();
-  const el = Attacks.ELEMENT[Attacks.of(y.id).el];
+  const el = Attacks.ELEMENT[y.el || Attacks.of(y.id).el];
   const glowC = el ? el.color : '#ffcc33';
   const b = (BODY[L.t] || BODY.blob)(kit, L, c, rnd, glowC);
   const h = b.head;
   const top = horns(kit, L.horns, h) + hat(kit, L.hat, h, c);
   let faceSvg = b.noFace || h.noFace ? '' : face(L, h, glowC, rnd);
   if (b.glowEyes) faceSvg = b.glowEyes.map(([x, yy]) => `<circle cx="${x}" cy="${yy}" r="9" fill="${kit.grad([[0, '#fff', 1], [0.35, glowC, 1], [1, glowC, 0]])}"/>`).join('');
+  const cloud = L.cloud ? kit.cel('M60 236 Q50 214 74 214 Q78 198 100 206 Q116 192 136 204 Q158 194 170 210 Q196 206 194 226 Q206 240 186 244 L74 244 Q52 246 60 236Z', '#fff6d8', { dx: 6, dy: 4 }) : '';
   const body = `${aura(kit, y.rank, glowC)}${ring(kit, L.ring, glowC)}
-    <ellipse cx="128" cy="238" rx="62" ry="9" fill="#000" opacity="0.35"/>
+    ${cloud || '<ellipse cx="128" cy="238" rx="62" ry="9" fill="#000" opacity="0.35"/>'}
     ${wings(kit, L.wings, b.wing.x, b.wing.y, c)}${b.back}${b.body}${faceSvg}${b.front || ''}${b.after || ''}${top}
     ${weapon(kit, L.acc, b.hand.x, b.hand.y, c, glowC)}${effects(L.fx, rnd, glowC)}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><defs>${kit.defs.join('')}</defs>${body}</svg>`;
