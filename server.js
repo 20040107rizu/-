@@ -860,6 +860,7 @@ class Room {
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
       gacha: rollGacha(p.escaped ? judged : judged / 2),
+      seal: S.sealDrop(this.stage, this.boss.type, this.boss.hp <= 0), // レジェンドの封印の欠片（封印の地でボスを倒したとき）
     }));
     const b = this.boss;
     this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });
@@ -977,6 +978,11 @@ wss.on('connection', ws => {
         break;
       }
       case 'yokai':
+        // レジェンドはチームで1体まで
+        if (room && me && room.state === 'lobby' && isLegend(msg.id) && [...room.players.values()].some(q => q !== me && isLegend(q.yokai))) {
+          send({ t: 'lobbyMsg', msg: 'レジェンドはチームで1体までです。ほかの人がもう連れています' });
+          break;
+        }
         if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
@@ -987,6 +993,10 @@ wss.on('connection', ws => {
         break;
       case 'start':
         if (room && me && me.host && room.state === 'lobby' && !draining) {
+          if ([...room.players.values()].filter(p => isLegend(p.yokai)).length > 1) {
+            room.broadcast({ t: 'lobbyMsg', msg: 'レジェンドはチームで1体までです。だれか1人がほかのお友達に変えてね' });
+            break;
+          }
           // チャレンジのしばり（ヒーラー禁止）を守っているか
           const th = S.themeOf(S.weekIndex());
           if (room.challengeOn && th.key === 'challenge' && th.rule === 'noHealer' && [...room.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].role === 'healer')) {
@@ -1030,8 +1040,8 @@ wss.on('connection', ws => {
 const MAX_WATCHERS = 8;
 const known = new Map();    // pid → { name, yokai, seen }
 const presence = new Map(); // ホーム画面の接続 → pid
-// レジェンドはまだ手に入らない（デモ撮影のときだけ使える）
-const usableYokai = id => !!S.YOKAI_BY_ID[id] && (!S.YOKAI_BY_ID[id].legend || DEMO_AI);
+const usableYokai = id => !!S.YOKAI_BY_ID[id];
+const isLegend = id => !!(S.YOKAI_BY_ID[id] && S.YOKAI_BY_ID[id].legend);
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
 const cleanTitle = v => (S.TITLE_BY_ID[v] || S.weeklyTitle(v) ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);

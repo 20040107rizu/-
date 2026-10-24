@@ -352,3 +352,23 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .prizes { display: flex; gap: 10px; justify-content: center; margin: 8px 0; }
 .prize { background: #0006; border-radius: 12px; padding: 8px 14px; font-size: 12px; }
 .prize .i { font-size: 28px; }
+
+/* レジェンド */
+.yk.legend { background: linear-gradient(#3a2456, #1a1030); border-color: #c85aff66; }
+.yk.legend.sel { border-color: #ffe36b; }
+.yk.blocked { opacity: .45; }
+.yk .block-tag { position: absolute; left: 2px; right: 2px; bottom: 30%; font-size: 9px; background: #000c; border-radius: 6px; color: #ffb0b0; }
+.legend-tab { border-color: #c85aff !important; }
+.seal-box { grid-column: 1 / -1; background: #ffffff10; border: 1px solid #c85aff88; border-radius: 12px; padding: 6px 10px; font-size: 11px; line-height: 1.45; display: flex; flex-direction: column; gap: 2px; }
+.seal-box .cond { display: flex; align-items: center; gap: 6px; }
+.seal-box .cl { flex: 1; min-width: 0; }
+.seal-box .ck { width: 15px; height: 15px; border-radius: 4px; border: 2px solid #fff6; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex: none; }
+.seal-box .cond.ok .ck { background: #2fbf6a; border-color: #2fbf6a; }
+.seal-box .pg { font-size: 10px; opacity: .85; white-space: nowrap; }
+.seal-box .mem { display: flex; gap: 3px; flex-wrap: wrap; margin: 3px 0; }
+.seal-box .mem span { font-size: 9px; padding: 1px 5px; border-radius: 6px; background: #0006; }
+.seal-box .mem span.got { background: #2fbf6a55; }
+.seal-box button.big { align-self: flex-start; font-size: 14px; padding: 7px 16px; margin-top: 2px; }
+.legend-face { filter: drop-shadow(0 0 10px #c85aff); }
+.legend-name { background: linear-gradient(90deg, #ff9a2a, #ffe24a, #4ae07a, #3ac8ff, #c85aff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.unseal-img { width: 160px; height: 160px; object-fit: contain; filter: drop-shadow(0 0 18px #c85aff); animation: unlockPop .8s ease-out; }

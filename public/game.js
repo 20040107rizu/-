@@ -33,6 +33,7 @@
   let friends = loadFriends();
   let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
+  stats.seals = stats.seals || {};     // レジェンドの封印 { legendId: { frag: 欠片, black: 封印の地で黒鬼を倒した } }
   // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
   let myTitle = localStorage.getItem('title') || null;
   let weeklyTitles = loadJSON('wtitles', []).filter(id => S.weeklyTitle(id)); // ランキング1位でもらった称号
@@ -51,9 +52,6 @@
   if (!/^[A-Za-z0-9_-]{8,40}$/.test(pid || '')) { pid = newPid(); try { localStorage.setItem('pid', pid); } catch {} }
   let selYokai = localStorage.getItem('yokai');
   if (!friends[selYokai]) selYokai = 'nekomata';
-  // デモ撮影用: ?demo=ura のように、まだ手に入らないレジェンドを使ってみる（セーブはしない）
-  const demoYokai = new URLSearchParams(location.search).get('demo');
-  if (S.YOKAI_BY_ID[demoYokai]?.legend) selYokai = demoYokai;
   function saveAll() {
     try {
       localStorage.setItem('friends', JSON.stringify(friends));
@@ -75,7 +73,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, stats.seals[l.id]?.black ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -86,8 +84,11 @@
     if (d.v !== 1 || !Array.isArray(d.f)) throw new Error('このコードは読み込めません');
     const f = {};
     S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
+    S.LEGENDS.forEach((l, i) => { if ((d.l || [])[i] > 0) f[l.id] = 1; });
+    const seals = {};
+    S.LEGENDS.forEach((l, i) => { const g = (d.g || [])[i]; if (Array.isArray(g) && (g[0] || g[1])) seals[l.id] = { frag: Math.min(99, Math.floor(+g[0] || 0)), black: !!g[1] }; });
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
-    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] ? d.t : null, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
+    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
   }
 
   // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
@@ -175,18 +176,20 @@
   function renderZukan() {
     $('zukanTitles').hidden = zukanRank !== 'title';
     $('zukanGrid').hidden = zukanRank === 'title';
-    $('zukanRoles').hidden = zukanRank === 'title';
+    $('zukanRoles').hidden = zukanRank === 'title' || zukanRank === 'legend';
     const got = S.YOKAI.filter(y => friends[y.id]).length;
     $('zukanCount').textContent = `${got} / ${S.YOKAI.length} 体`;
     $('zukanTabs').innerHTML = [['all', 'ぜんぶ'], ['C', 'C'], ['B', 'B'], ['A', 'A'], ['S', 'S']].map(([k, label]) => {
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
-    }).join('') + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${S.TITLES.length}</small></button>`;
+    }).join('') + `<button class="tab legend-tab${zukanRank === 'legend' ? ' on' : ''}" data-k="legend">🌈 レジェンド <small>${S.LEGENDS.filter(l => friends[l.id]).length}/${S.LEGENDS.length}</small></button>`
+      + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${S.TITLES.length}</small></button>`;
     $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
       `<button class="tab${zukanRole === k ? ' on' : ''}" data-k="${k}">${label}</button>`).join('');
     for (const b of $('zukanTabs').querySelectorAll('button')) b.onclick = () => { zukanRank = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
     for (const b of $('zukanRoles').querySelectorAll('button')) b.onclick = () => { zukanRole = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
     if (zukanRank === 'title') { renderTitles(); return; }
+    if (zukanRank === 'legend') { renderLegends(); return; }
     const list = S.YOKAI.filter(y => (zukanRank === 'all' || y.rank === zukanRank) && (zukanRole === 'all' || y.role === zukanRole));
     const grid = $('zukanGrid'), keep = grid.scrollTop;
     grid.innerHTML = '';
@@ -216,6 +219,55 @@
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>・${y.origin}</div>
       <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd><dt>仲間</dt><dd>${owned}体${owned > 1 ? `（${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}・HP/攻撃 +${Math.round(S.totsuOf(owned) * S.TOTSU_STEP * 100)}%）` : ''}</dd></dl></div>`;
   }
+  // ---------- レジェンド（封印をとく） ----------
+  function renderLegends() {
+    if (!S.YOKAI_BY_ID[zukanSel]?.legend) zukanSel = S.LEGENDS[0].id;
+    const grid = $('zukanGrid');
+    grid.innerHTML = '';
+    for (const l of S.LEGENDS) {
+      const owned = friends[l.id], ready = !owned && S.sealProgress(l, friends, stats.seals).ready;
+      const d = document.createElement('div');
+      d.className = 'yk legend' + (l.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
+      d.onclick = () => { zukanSel = l.id; renderZukan(); };
+      grid.appendChild(d);
+    }
+    const l = S.YOKAI_BY_ID[zukanSel], owned = friends[l.id];
+    const prog = S.sealProgress(l, friends, stats.seals);
+    const box = document.createElement('div');
+    box.className = 'seal-box';
+    box.innerHTML = owned
+      ? `<b>🌈 封印はとけています</b><br><small>ロビーで連れていけます（チームで1体まで）</small>`
+      : `<b>🔒 封印をとく条件（ぜんぶ必要）</b>
+        ${prog.conds.map(c => `<div class="cond${c.got >= c.need ? ' ok' : ''}"><span class="ck">${c.got >= c.need ? '✓' : ''}</span><span class="cl">${esc(c.label)}</span><span class="pg">${c.got}/${c.need}</span></div><div class="tbar"><i style="width:${Math.round((c.got / c.need) * 100)}%"></i></div>`).join('')}
+        <div class="mem">${l.seal.map(id => { const y = S.YOKAI_BY_ID[id], n = friends[id]; return `<span class="${n ? 'got' : ''}">${n ? `${y.name}${S.totsuOf(n) ? ` 凸${S.totsuOf(n)}` : ''}` : '？'.repeat([...y.name].length)}</span>`; }).join('')}</div>
+        <button id="btnUnseal" class="big"${prog.ready ? '' : ' disabled'}>${prog.ready ? '🔓 封印をとく！' : '🔒 封印をとく（条件がそろうと押せる）'}</button>`;
+    grid.appendChild(box);
+    if ($('btnUnseal')) $('btnUnseal').onclick = () => unseal(l);
+    renderLegendInfo(l);
+  }
+  function renderLegendInfo(l) {
+    const owned = friends[l.id], url = artUrl('yokai/' + l.id);
+    const at = Attacks.of(l.id), el = Attacks.ELEMENT[at.el];
+    $('zukanInfo').innerHTML = `${url ? `<img class="big-face legend-face${owned ? '' : ' sil'}" src="${url}" alt="">` : ''}
+      <div class="pv"><b class="legend-name">L ${esc(l.name)}</b>
+      <div>${S.ROLES[l.role].name}・<span style="color:${el.color}">${el.name}属性</span>・封印の地：${S.STAGES[l.stage].name}</div>
+      <dl><dt>必殺技</dt><dd>${esc(l.ultName)}：${esc(l.ultDesc)}</dd><dt>特性</dt><dd>${esc(l.passiveDesc)}</dd></dl>
+      <small>${esc(l.story)}</small></div>`;
+  }
+  function unseal(l) {
+    if (friends[l.id] || !S.sealProgress(l, friends, stats.seals).ready) return;
+    friends[l.id] = 1;
+    saveAll(); updateFriendCount();
+    beep(523, 0.2, 'triangle', 0.08); setTimeout(() => beep(784, 0.2, 'triangle', 0.08), 150); setTimeout(() => beep(1046, 0.5, 'triangle', 0.09), 300);
+    $('rewardWeek').textContent = '🌈 レジェンド';
+    $('rewardTitle').textContent = `${l.name}の封印がとけた！`;
+    $('rewardSub').textContent = `${l.name}がお友達になった！ ロビーで連れていけます（チームで1体まで）`;
+    $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + l.id) || ''}" alt="">`;
+    $('btnRewardOk').onclick = () => { show('zukan'); renderZukan(); };
+    show('rewardScreen');
+  }
+
   $('btnZukan').onclick = () => { zukanSel = null; show('zukan'); renderZukan(); };
   $('btnZukanClose').onclick = () => show('title');
 
@@ -356,13 +408,13 @@
   const urlRoom = new URLSearchParams(location.search).get('room');
   if (urlRoom) $('code').value = urlRoom.toUpperCase();
   function updateFriendCount() {
-    $('friendCount').textContent = `お友達 ${Object.keys(friends).length} / ${S.YOKAI.length}`;
+    $('friendCount').textContent = `お友達 ${S.YOKAI.filter(y => friends[y.id]).length} / ${S.YOKAI.length}` + (S.LEGENDS.some(l => friends[l.id]) ? `　🌈 ${S.LEGENDS.filter(l => friends[l.id]).length}` : '');
   }
   updateFriendCount();
 
   // ---------- セーブ画面 ----------
   function openSave() {
-    $('saveStats').textContent = `お友達 ${Object.keys(friends).length}/${S.YOKAI.length}　遊んだ回数 ${stats.plays}　脱出 ${stats.escapes}回　集めた鬼玉 ${stats.dama}個（最高 ${stats.best}個）`;
+    $('saveStats').textContent = `お友達 ${S.YOKAI.filter(y => friends[y.id]).length}/${S.YOKAI.length}　遊んだ回数 ${stats.plays}　脱出 ${stats.escapes}回　集めた鬼玉 ${stats.dama}個（最高 ${stats.best}個）`;
     $('saveCode').value = makeSaveCode();
     $('loadCode').value = '';
     $('saveMsg').textContent = '';
@@ -384,7 +436,7 @@
     catch (e) { $('saveMsg').style.color = '#ff8080'; $('saveMsg').textContent = e.message; return; }
     const n = Object.keys(data.friends).length;
     if (!confirm(`お友達${n}体のデータを読み込みます。\nこの端末の今のデータは上書きされます。よろしいですか？`)) return;
-    friends = data.friends; stats = data.stats;
+    friends = data.friends; stats = data.stats; stats.seals = data.seals;
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
     myTitle = data.title; checkMyTitle(); try { localStorage.setItem('title', myTitle || ''); } catch {}
@@ -695,15 +747,19 @@
     const el = $('friends');
     const keep = el.scrollTop; // 選び直してもスクロール位置はそのまま
     el.innerHTML = '';
-    const list = friendTab === 'own' ? S.YOKAI.filter(y => friends[y.id]) : S.YOKAI.filter(y => y.rank === friendTab);
+    const list = friendTab === 'own' ? S.LEGENDS.filter(y => friends[y.id]).concat(S.YOKAI.filter(y => friends[y.id])) : S.YOKAI.filter(y => y.rank === friendTab);
+    const legendTaken = lobby && lobby.players.some(p => p.id !== myId && S.YOKAI_BY_ID[p.yokai]?.legend);
     for (const y of list) {
       const owned = friends[y.id];
+      const blocked = y.legend && legendTaken; // レジェンドはチームで1体まで
       const d = document.createElement('div');
-      d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked');
+      d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '') + (blocked ? ' blocked' : '');
       d.innerHTML = owned
         ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
+      if (blocked) d.innerHTML += '<span class="block-tag">チームに1体まで</span>';
       if (owned) d.onclick = () => {
+        if (blocked) { $('lobbyMsg').hidden = false; $('lobbyMsg').textContent = '⚠️ レジェンドはチームで1体まで。ほかの人がもう連れています'; return; }
         selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id, totsu: myTotsu(), title: myTitle });
         helloAgain();
@@ -735,6 +791,15 @@
     result.newClear = false;
     if (mine && result.bossDown && !stats.cleared[result.boss]) { stats.cleared[result.boss] = true; result.newClear = true; }
     result.newTitles = mine ? titlesDone().filter(id => !titlesBefore.includes(id)) : [];
+    // レジェンドの封印の欠片
+    result.sealNote = null;
+    if (mine && mine.seal) {
+      const sl = (stats.seals[mine.seal.legend] = stats.seals[mine.seal.legend] || { frag: 0, black: false });
+      sl.frag += mine.seal.frag;
+      if (mine.seal.black) sl.black = true;
+      const l = S.YOKAI_BY_ID[mine.seal.legend];
+      result.sealNote = `🔮 封印の欠片をゲット！（${l.name}の封印 ${Math.min(sl.frag, S.SEAL.fragments)}/${S.SEAL.fragments}）`;
+    }
     if (mine) { saveAll(); updateFriendCount(); }
     const id = ++gachaRun;
     $('btnToResult').hidden = true;
@@ -777,6 +842,7 @@
       notes.push(esc(next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
         : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`));
     }
+    if (result.sealNote) notes.push(esc(result.sealNote));
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
     $('resUnlock').hidden = !notes.length;
     $('resUnlock').innerHTML = notes.join('<br>');

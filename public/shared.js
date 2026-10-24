@@ -112,6 +112,33 @@
     return BALLS[0];
   }
 
+  // ---------- レジェンドの封印 ----------
+  // 全部そろうと図鑑で「封印をとく」が押せる
+  const SEAL = { totsuNeed: 3, totsuCount: 3, fragments: 5 };
+  // friends: { id: 数 }、seals: { legendId: { frag: 欠片の数, black: 封印の地で黒鬼を倒したか } }
+  function sealProgress(legend, friends, seals) {
+    const st = (seals && seals[legend.id]) || {};
+    const got = legend.seal.filter(id => friends[id]).length;
+    const totsu = legend.seal.filter(id => totsuOf(friends[id] || 0) >= SEAL.totsuNeed).length;
+    const frag = Math.min(SEAL.fragments, st.frag || 0);
+    const conds = [
+      { label: '決められた妖怪8体をお友達にする', got, need: legend.seal.length },
+      { label: `そのうち${SEAL.totsuCount}体を凸${SEAL.totsuNeed}以上にする`, got: Math.min(totsu, SEAL.totsuCount), need: SEAL.totsuCount },
+      { label: `「${STAGES_N[legend.stage]}」ステージで黒鬼を倒す`, got: st.black ? 1 : 0, need: 1 },
+      { label: `封印の欠片を${SEAL.fragments}個集める（「${STAGES_N[legend.stage]}」で黒鬼：必ず1個／青鬼：3回に1個）`, got: frag, need: SEAL.fragments },
+    ];
+    return { conds, ready: conds.every(c => c.got >= c.need) };
+  }
+  // バトルの結果から、もらえる欠片を決める（サーバーで使う）
+  function sealDrop(stage, boss, bossDown, rnd = Math.random) {
+    if (!bossDown) return null;
+    const l = LEGENDS.find(x => x.stage === stage);
+    if (!l) return null;
+    if (boss === 'black') return { legend: l.id, frag: 1, black: true };
+    if (boss === 'blue' && rnd() < 1 / 3) return { legend: l.id, frag: 1 };
+    return null;
+  }
+
   // ---------- 週替わりランキング ----------
   // 毎週月曜0時（日本時間）に1種類ずつ入れ替わる。第1回 = 2026年10月19日（月）からの週
   const WEEK_MS = 7 * 24 * 3600 * 1000;
@@ -292,5 +319,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });
