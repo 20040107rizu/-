@@ -1014,10 +1014,10 @@
         break;
       case 'gust': fx.push({ k: 'gust', x: ev.x, y: ev.y, a: ev.a || 0, t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) beep(200, 0.4, 'triangle', 0.05, 400); break;
       case 'phase':
-        banner = ev.n === 2 ? { text: '鬼神が変身した！', sub: '仲間の見回り鬼を呼んでくるぞ', t: 2.6, c: '#ff3a6a' } : { text: '鬼神 最後の姿！', sub: '町がせまくなっていく…赤い輪の中にいろ！', t: 3, c: '#ff3a6a' };
+        banner = ev.n === 2 ? { text: '鬼神が変身した！', sub: '金の鎧・吹雪・大なぎ払いを使ってくるぞ', t: 2.8, c: '#ff3a6a' } : { text: '鬼神 最後の姿！', sub: '町がせまくなっていく…赤い輪の中にいろ！', t: 3, c: '#ff3a6a' };
         fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 420, c: '#ff3a6a', t: 0.9, max: 0.9 }); shake = 0.8; beep(60, 0.9, 'sawtooth', 0.12, -20);
         break;
-      case 'summon': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 200, c: '#b08cff', t: 0.6, max: 0.6 }); break;
+      case 'sweep': banner = { text: '⚠ 地獄の大なぎ払い！', sub: '建物のうしろにかくれろ！（回避でもよけられる）', t: 2.2, c: '#ff3a6a' }; beep(120, 1.2, 'sawtooth', 0.08, 300); break;
       case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: bossType === 'gold' ? '金の鎧！正面からの攻撃はほとんど効かない。うしろに回りこめ！' : '攻撃がはげしくなるぞ', t: bossType === 'gold' ? 3 : 2.2, c: bossType === 'gold' ? '#ffd23a' : '#ff4a3a' }; shake = 0.5; break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
@@ -1330,6 +1330,7 @@
   }
 
   function drawBoss(b, pos, now) {
+    if (b.sweep) drawSweep(b.sweep, pos, now); // 吹雪の中でも見える
     if (b.bliz) { ctx.save(); ctx.globalAlpha = 0.07 + 0.05 * Math.sin(now * 7); } // 吹雪の中ではほとんど見えない
     else bossAura(b, pos, now);
     const wob = Math.sin(now * 5) * 3;
@@ -1352,7 +1353,7 @@
   // 金鬼から先のボスのまわりの光
   function bossAura(b, pos, now) {
     const cy = pos.y - 30;
-    if (b.type === 'gold' && b.rage) { // 金の鎧: 正面に盾
+    if (b.armor) { // 金の鎧: 正面に盾
       ctx.save(); ctx.translate(pos.x, cy);
       ctx.strokeStyle = `rgba(255,215,60,${0.7 + 0.3 * Math.sin(now * 9)})`; ctx.lineWidth = 10; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(0, 0, 105, b.face - 1.1, b.face + 1.1); ctx.stroke();
@@ -1379,6 +1380,24 @@
       for (let k = 0; k < b.phase; k++) { ctx.strokeStyle = `rgba(255,${40 + k * 30},80,${0.35 + 0.2 * Math.sin(now * 6 + k)})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, 95 + k * 16 + Math.sin(now * 5 + k) * 4, 0, Math.PI * 2); ctx.stroke(); }
       ctx.restore();
     }
+  }
+  // 地獄の大なぎ払い（予告の間は細い線と回る向きの矢印、そのあとは太い光線）
+  function drawSweep(sw, pos, now) {
+    const cy = pos.y - 30;
+    ctx.save(); ctx.translate(pos.x, cy); ctx.rotate(sw.a); ctx.lineCap = 'round';
+    if (sw.w >= 0) {
+      ctx.strokeStyle = `rgba(255,60,100,${0.5 + 0.5 * Math.sin(now * 20)})`; ctx.lineWidth = 6; ctx.setLineDash([26, 16]);
+      ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(sw.len, 0); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 8; // 回る向き
+      ctx.beginPath(); ctx.arc(0, 0, 150, 0, sw.dir * (0.4 + sw.w * 1.2), sw.dir < 0); ctx.stroke();
+    } else {
+      for (const [w, c] of [[110, 'rgba(255,40,80,0.25)'], [64, 'rgba(255,90,60,0.7)'], [22, '#fff4c0']]) {
+        ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(sw.len, 0); ctx.stroke();
+      }
+      ctx.rotate(-sw.dir * 0.25); ctx.strokeStyle = 'rgba(255,60,90,0.25)'; ctx.lineWidth = 40; // 通ったあとの残像
+      ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(sw.len * 0.95, 0); ctx.stroke();
+    }
+    ctx.restore();
   }
   // 鬼神の最後の形態: 輪の外を赤くする（町の座標で描く）
   function drawRing(g, now) {
