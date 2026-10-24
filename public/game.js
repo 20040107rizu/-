@@ -250,7 +250,7 @@
     $('rankBanner').innerHTML = `<span class="ic">${th.icon}</span><div class="txt"><b>第${th.no}回：${esc(th.name)}</b><br>${esc(th.desc)}</div><div class="left">のこり<br><b>${left(d.end)}</b></div>`;
     $('rankTabs').innerHTML = [['all', 'みんな'], ['friends', 'フレンド']].map(([k, l]) => `<button class="tab${rankView === k ? ' on' : ''}" data-k="${k}">${l}</button>`).join('');
     for (const b of $('rankTabs').querySelectorAll('button')) b.onclick = () => { rankView = b.dataset.k; renderRanking(); };
-    $('rankCount').textContent = `参加 ${d.total}人` + (d.saved ? '' : '（試験運転中：サーバーが更新されると記録が消えます）');
+    $('rankCount').textContent = `参加 ${d.total}人` + (d.dbError ? '（⚠️ 記録の保存に失敗しています）' : d.saved ? '（記録は保存されています）' : '（試験運転中：サーバーが更新されると記録が消えます）');
     let rows = d.rows.map((r, i) => ({ ...r, rank: i + 1 }));
     if (rankView === 'friends') rows = rows.filter(r => r.pid === pid || buddies[r.pid]);
     const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);

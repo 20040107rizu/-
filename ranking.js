@@ -7,6 +7,7 @@ const BASE = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const enabled = !!(BASE && KEY);
 
+let dbError = null; // 最後に Supabase とのやりとりで起きた問題（画面に出して気づけるように）
 const weeks = new Map(); // 週の番号 → { rows: Map(pid → row), loading: Promise }
 
 function headers(extra) {
@@ -24,8 +25,8 @@ function week(idx) {
     if (enabled) {
       w.loading = fetch(`${BASE}/rest/v1/weekly_scores?week=eq.${idx}&select=pid,name,yokai,title,score,detail&limit=5000`, { headers: headers() })
         .then(r => (r.ok ? r.json() : r.text().then(t => { throw new Error(`${r.status} ${t}`); })))
-        .then(list => { for (const row of list) if (!w.rows.has(row.pid)) w.rows.set(row.pid, row); })
-        .catch(e => { console.error('ランキングの読み込みに失敗:', e.message); weeks.delete(idx); });
+        .then(list => { dbError = null; for (const row of list) if (!w.rows.has(row.pid)) w.rows.set(row.pid, row); })
+        .catch(e => { console.error('ランキングの読み込みに失敗:', e.message); dbError = e.message.slice(0, 200); }); // 読み込めなくても、メモリの記録はそのまま使う
     }
     // 古い週はメモリから外す（今週と先週だけ持っておく）
     for (const k of weeks.keys()) if (k < idx - 1) weeks.delete(k);
@@ -41,8 +42,9 @@ async function save(idx, row) {
       headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify([{ week: String(idx), ...row, updated_at: new Date().toISOString() }]),
     });
-    if (!r.ok) console.error('ランキングの保存に失敗:', r.status, await r.text());
-  } catch (e) { console.error('ランキングの保存に失敗:', e.message); }
+    if (!r.ok) { const t = await r.text(); console.error('ランキングの保存に失敗:', r.status, t); dbError = `${r.status} ${t}`.slice(0, 200); }
+    else dbError = null;
+  } catch (e) { console.error('ランキングの保存に失敗:', e.message); dbError = e.message.slice(0, 200); }
 }
 
 // 1回のバトルの結果を記録する。entries: [{ pid, name, yokai, title, value, detail }]
@@ -76,7 +78,7 @@ async function board(idx, pid) {
   const meRow = pid && w.rows.get(pid);
   const myRank = meRow && meRow.score > 0 ? ranked.indexOf(meRow) + 1 : null;
   return {
-    idx, theme, start: S.weekStart(idx), end: S.weekStart(idx + 1), saved: enabled,
+    idx, theme, start: S.weekStart(idx), end: S.weekStart(idx + 1), saved: enabled && !dbError, dbError: enabled ? dbError : null,
     total: all.length, rows: ranked.slice(0, 300),
     me: meRow ? { rank: myRank, score: meRow.score, joined: true } : { rank: null, score: 0, joined: false },
   };
