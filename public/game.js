@@ -342,7 +342,6 @@
   const fx = [];
   const bubbles = new Map(); // 見回り鬼の笛表示 id -> 残り時間
   let shake = 0;
-  let cutin = null; // 必殺技のカットイン
   let banner = null;
   let myPred = null;
   let bossType = 'red';
@@ -812,11 +811,11 @@
   // ---------- 演出イベント ----------
   function nameOf(id) { const p = snap && snap.players.find(q => q.id === id); return p ? p.name : ''; }
   // キャラの頭の上に文字を出す（強攻撃の名前など）
-  function floatOn(id, text, c) {
+  function floatOn(id, text, c, big) {
     const p = snap && snap.players.find(q => q.id === id);
     if (!p) return;
     const pos = id === myId && myPred ? myPred : p;
-    floats.push({ x: pos.x, y: pos.y - 70, text, c: c || '#fff', t: 1.1, small: true });
+    floats.push({ x: pos.x, y: pos.y - 70, text, c: c || '#fff', t: big ? 1.6 : 1.1, small: !big });
   }
   function handleEvent(ev) {
     const near = (x, y) => myPred && Math.hypot(x - myPred.x, y - myPred.y) < 700;
@@ -836,9 +835,10 @@
       case 'dodge': fx.push({ k: 'after', id: ev.id, t: 0.3, max: 0.3 }); break;
       case 'strong': floatOn(ev.id, ev.name, ev.c); break;
       case 'ult': {
-        const who = snap && snap.players.find(q => q.id === ev.id);
-        cutin = { yokai: who ? who.yokai : null, name: ev.name, t: 1.4, max: 1.4, me: ev.id === myId };
-        shake = Math.max(shake, 0.6);
+        // 技の名前をキャラの上に出す（大きなカットインはなし）
+        floatOn(ev.id, `必殺！${ev.name}`, ev.c, true);
+        fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#fff', t: 0.4, max: 0.4 });
+        shake = Math.max(shake, 0.3);
         beep(220, 0.5, 'sawtooth', 0.08, 600); setTimeout(() => beep(660, 0.4, 'triangle', 0.07, 900), 120);
         if (ev.kind === 'roar') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 480 * (0.5 + k * 0.25), c: ['#ff4a4a', '#ffb83a', '#fff'][k], t: 0.7 + k * 0.15, max: 0.7 + k * 0.15 });
         if (ev.kind === 'dragon') fx.push({ k: 'dragon', x: ev.x, y: ev.y, a: ev.a, t: 1.0, max: 1.0 });
@@ -1327,36 +1327,6 @@
     ctx.textBaseline = 'alphabetic';
   }
 
-  // 必殺技のカットイン: 画面を横切る帯にレジェンドの絵と技の名前
-  function drawCutin(dt) {
-    if (!cutin) return;
-    cutin.t -= dt;
-    if (cutin.t <= 0) { cutin = null; return; }
-    const p = 1 - cutin.t / cutin.max;
-    const slide = p < 0.15 ? 1 - p / 0.15 : p > 0.85 ? -(p - 0.85) / 0.15 : 0; // 入ってきて止まって出ていく
-    const bh = H * 0.34, y = H * 0.33 - bh / 2;
-    ctx.save();
-    ctx.translate(slide * W, 0);
-    const g = ctx.createLinearGradient(0, y, W, y + bh);
-    ['#ff4a4a', '#ff9a2a', '#ffe24a', '#4ae07a', '#3ac8ff', '#6a6aff', '#c85aff'].forEach((c, i) => g.addColorStop(i / 6, c));
-    ctx.globalAlpha = 0.9; ctx.fillStyle = '#0a0612'; ctx.fillRect(0, y, W, bh);
-    ctx.fillStyle = g; ctx.fillRect(0, y, W, 5); ctx.fillRect(0, y + bh - 5, W, 5);
-    ctx.globalAlpha = 0.25; ctx.fillRect(0, y, W, bh); ctx.globalAlpha = 1;
-    // 集中線
-    ctx.strokeStyle = '#ffffff30'; ctx.lineWidth = 2;
-    for (let k = 0; k < 24; k++) { const yy = y + ((k * 37 + performance.now() / 3) % bh); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
-    const img = cutin.yokai && art('yokai/' + cutin.yokai);
-    if (img) ctx.drawImage(img, W * 0.08, y - bh * 0.35, bh * 1.6, bh * 1.6);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.font = `900 ${Math.round(bh * 0.32)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
-    const tx = W * 0.08 + bh * 1.55;
-    ctx.strokeText(cutin.name, tx, y + bh * 0.52); ctx.fillStyle = g; ctx.fillText(cutin.name, tx, y + bh * 0.52);
-    ctx.font = `bold ${Math.round(bh * 0.12)}px sans-serif`; ctx.fillStyle = '#ffe36b';
-    ctx.fillText(cutin.me ? '必殺技！' : `${S.YOKAI_BY_ID[cutin.yokai]?.name || ''}の必殺技！`, tx, y + bh * 0.2);
-    ctx.textBaseline = 'alphabetic';
-    ctx.restore();
-  }
-
   function drawHUD(me, now) {
     Stages.drawTint(ctx, W, H, stage);
     drawMinimap(me, now);
@@ -1776,7 +1746,6 @@
     if (movieLeft > 0) drawMovie(movieP, now);
     else {
       drawHUD(me, now);
-      drawCutin(dt);
       if (intro > 0) drawCountdown(intro);
     }
   }
