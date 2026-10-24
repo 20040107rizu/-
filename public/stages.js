@@ -143,19 +143,26 @@
   }
 
   // ---------- 建物 ----------
-  function drawBuilding(ctx, b, stage, now, pattern) {
+  // layer: 'static' = 動かない部分だけ（一度描いて使い回す）、'anim' = 動く部分だけ（毎コマ）、なし = 全部
+  function drawBuilding(ctx, b, stage, now, pattern, layer) {
     const th = theme(stage);
     const R = hashRand(b.x * 7 + b.y * 13 + b.w);
+    if (layer === 'anim') { // 動くのは中国のちょうちんと、アメリカのヘリポートの灯りだけ
+      if (stage === 'china') chinaLanterns(ctx, b, now);
+      else if (stage === 'usa') usaBlink(ctx, b, R, now);
+      return;
+    }
     rect(ctx, b.x, b.y + 14, b.w, b.h, th.wall); // 壁（手前に見える面）
     switch (stage) {
       case 'japan': return japanRoof(ctx, b, R, now);
       case 'france': return franceRoof(ctx, b, R, now);
       case 'brazil': return brazilRoof(ctx, b, R, now);
-      case 'china': return chinaRoof(ctx, b, R, now);
-      case 'usa': return usaRoof(ctx, b, R, now);
+      case 'china': chinaRoof(ctx, b, R, now); if (layer !== 'static') chinaLanterns(ctx, b, now); return;
+      case 'usa': usaRoof(ctx, b, R, now); if (layer !== 'static') usaBlink(ctx, b, hashRand(b.x * 7 + b.y * 13 + b.w), now); return;
       default: return oniRoof(ctx, b, now, pattern);
     }
   }
+  const STAGE_HAS_ANIM = { china: true, usa: true };
 
   const ONI_ROOF = ['#5a3a5a', '#4a3a60', '#603a3a', '#3a4a5a'];
   function oniRoof(ctx, b, now, pattern) {
@@ -284,9 +291,23 @@
     rect(ctx, b.x + 10, b.y + H / 2 - 7, b.w - 20, 4, '#e8c03a');
     for (const x of [b.x + 14, b.x + b.w - 14]) { circle(ctx, x, b.y + H / 2, 10, '#e8c03a'); circle(ctx, x, b.y + H / 2, 5, '#8a1a14'); }
     ctx.strokeStyle = '#8a1a14'; ctx.lineWidth = 5; ctx.strokeRect(b.x + 2.5, b.y + 2.5, b.w - 5, H - 5);
-    // 赤ちょうちんの列
-    const sway = Math.sin(now * 2 + b.x) * 2;
+  }
+  // 赤ちょうちんの列（ゆれるので毎コマ描く。光るちょうちんは一度描いた絵を使い回す）
+  let lanternImg = null;
+  function lanternSprite() {
+    if (lanternImg || typeof document === 'undefined') return lanternImg;
+    const k = 3, c = document.createElement('canvas'); c.width = c.height = 48 * k;
+    const g = c.getContext('2d'); g.scale(k, k); g.translate(24, 24);
+    g.shadowColor = '#ff3a2a'; g.shadowBlur = 14 * k;
+    g.fillStyle = '#e8241a'; g.beginPath(); g.ellipse(0, 0, 7, 9, 0, 0, TAU); g.fill();
+    g.shadowBlur = 0;
+    g.fillStyle = '#e8c03a'; g.fillRect(-4, -10, 8, 3);
+    return (lanternImg = c);
+  }
+  function chinaLanterns(ctx, b, now) {
+    const sway = Math.sin(now * 2 + b.x) * 2, img = lanternSprite();
     for (let xx = b.x + 18; xx < b.x + b.w - 10; xx += 40) {
+      if (img) { ctx.drawImage(img, xx + sway - 24, b.y + b.h + 6 - 24, 48, 48); continue; }
       ctx.shadowColor = '#ff3a2a'; ctx.shadowBlur = 14;
       ctx.fillStyle = '#e8241a'; ctx.beginPath(); ctx.ellipse(xx + sway, b.y + b.h + 6, 7, 9, 0, 0, TAU); ctx.fill();
       ctx.shadowBlur = 0;
@@ -308,7 +329,6 @@
       ctx.strokeStyle = '#f0c020'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, 52, 0, TAU); ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.font = 'bold 54px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('H', cx, cy + 2); ctx.textBaseline = 'alphabetic';
-      if (Math.sin(now * 3 + b.x) > 0) glow(ctx, cx + 60, cy - 60, 4, '#ff3a3a', 10);
     } else {
       for (let k = 0; k < 3 + Math.floor(R() * 3); k++) {
         const x = b.x + 18 + R() * (b.w - 64), y = b.y + 18 + R() * (H - 60);
@@ -497,6 +517,14 @@
     rect(ctx, pl.x + pl.w - 90, pl.y + 14, 70, 30, '#e8e8e8'); for (let s = 0; s < 7; s++) rect(ctx, pl.x + pl.w - 90 + s * 10, pl.y + 10, 10, 10, s % 2 ? '#fff' : '#e8241a');
   }
 
+  // ヘリポートの赤い灯り（点滅）。usaRoof と同じ乱数の1回目でヘリポートかどうかが決まる
+  function usaBlink(ctx, b, R, now) {
+    const H = b.h - 6;
+    if (!(b.w > 200 && H > 200 && R() < 0.5)) return;
+    const cx = b.x + b.w / 2, cy = b.y + H / 2;
+    if (Math.sin(now * 3 + b.x) > 0) glow(ctx, cx + 60, cy - 60, 4, '#ff3a3a', 10);
+  }
+
   // 画面全体の色味
   function drawTint(ctx, W, H, stage) {
     const t = theme(stage).tint;
@@ -504,7 +532,7 @@
     ctx.fillStyle = t; ctx.fillRect(0, 0, W, H);
   }
 
-  const api = { THEME, theme, drawGround, drawBuilding, drawPlaza, drawTint };
+  const api = { THEME, theme, drawGround, drawBuilding, drawPlaza, drawTint, STAGE_HAS_ANIM };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Stages = api;
 })(typeof self !== 'undefined' ? self : this);

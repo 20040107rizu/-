@@ -1172,9 +1172,79 @@
     ctx.fillStyle = c; ctx.fillRect(x, y, w * Math.max(0, Math.min(1, v)), h);
   }
 
+  // ---- 光る丸の絵の使い回し ----
+  // shadowBlur（ぼかしの光）は毎コマ計算すると重いので、同じ見た目の小さな絵を一度作って貼る
+  const glowCache = new Map();
+  function glowDot(x, y, r, color, glowColor, blur) {
+    const pxs = (H / 640) * DPR, key = `${color}|${glowColor}|${r}|${blur}|${pxs.toFixed(3)}`;
+    let sp = glowCache.get(key);
+    if (!sp) {
+      const half = r + (blur * 1.6) / pxs, px = Math.ceil(half * 2 * pxs);
+      const c = document.createElement('canvas'); c.width = c.height = px;
+      const g = c.getContext('2d');
+      g.shadowColor = glowColor; g.shadowBlur = blur; // ぼかしは画面の点の単位（元の描き方と同じ）
+      g.fillStyle = color; g.beginPath(); g.arc(px / 2, px / 2, r * pxs, 0, Math.PI * 2); g.fill();
+      sp = { c, half };
+      if (glowCache.size > 200) glowCache.clear();
+      glowCache.set(key, sp);
+    }
+    ctx.drawImage(sp.c, x - sp.half, y - sp.half, sp.half * 2, sp.half * 2);
+  }
+
+  // ---- 街の絵の使い回し ----
+  // 地面と建物（動かない部分）は、600×600 の区画ごとに一度だけ別のキャンバスに描いておき、毎コマはそれを貼るだけにする（軽くするため）
+  const CHUNK = 600, CPAD = 2, CHUNK_KEEP = 24;
+  const town = { key: '', chunks: new Map() };
+  function buildChunk(cx, cy, pxs) {
+    const size = CHUNK + CPAD * 2, px = Math.ceil(size * pxs);
+    const cv2 = document.createElement('canvas'); cv2.width = cv2.height = px;
+    const g = cv2.getContext('2d');
+    const x0 = cx * CHUNK - CPAD, y0 = cy * CHUNK - CPAD;
+    g.scale(px / size, px / size); g.translate(-x0, -y0);
+    let incomplete = false;
+    const pats = {};
+    const pat = key => {
+      if (key in pats) return pats[key];
+      const img = art(key);
+      if (!img && MANIFEST[key]) incomplete = true; // 絵がまだ読み込み中なら、あとで描き直す
+      return (pats[key] = img ? g.createPattern(img, 'repeat') : null);
+    };
+    const m = 60; // 壁・灯りが区画の外にはみ出す分
+    Stages.drawGround(g, map, { l: x0 - m, r: x0 + size + m, t: y0 - m, b: y0 + size + m }, stage, pat);
+    for (const b of map.buildings) {
+      if (b.x > x0 + size + m || b.x + b.w < x0 - m || b.y > y0 + size + m || b.y + b.h < y0 - m) continue;
+      Stages.drawBuilding(g, b, stage, 0, pat, 'static');
+    }
+    return { cv: cv2, incomplete, used: 0, built: performance.now() };
+  }
+  function drawTown(cam) {
+    const pxs = (H / 640) * DPR;
+    const key = `${map.seed}|${stage}|${pxs.toFixed(4)}`;
+    if (town.key !== key) { town.key = key; town.chunks.clear(); }
+    const now = performance.now();
+    const cx0 = Math.max(0, Math.floor((cam.x - cam.vw / 2) / CHUNK)), cx1 = Math.min(Math.ceil(map.w / CHUNK) - 1, Math.floor((cam.x + cam.vw / 2) / CHUNK));
+    const cy0 = Math.max(0, Math.floor((cam.y - cam.vh / 2) / CHUNK)), cy1 = Math.min(Math.ceil(map.h / CHUNK) - 1, Math.floor((cam.y + cam.vh / 2) / CHUNK));
+    for (let cx = cx0; cx <= cx1; cx++) for (let cy = cy0; cy <= cy1; cy++) {
+      const k = cx + ',' + cy;
+      let c = town.chunks.get(k);
+      if (!c || c.incomplete && c.built < now - 300) { c = buildChunk(cx, cy, pxs); town.chunks.set(k, c); } // 絵が読み込めたら描き直す
+      c.used = now;
+      ctx.drawImage(c.cv, cx * CHUNK - CPAD, cy * CHUNK - CPAD, CHUNK + CPAD * 2, CHUNK + CPAD * 2);
+    }
+    // 見えるところのまわりを、1コマに1区画ずつ先に描いておく（歩いたときにかくっとしないように）
+    outer: for (let cx = cx0 - 1; cx <= cx1 + 1; cx++) for (let cy = cy0 - 1; cy <= cy1 + 1; cy++) {
+      if (cx < 0 || cy < 0 || cx * CHUNK >= map.w || cy * CHUNK >= map.h || town.chunks.has(cx + ',' + cy)) continue;
+      const c = buildChunk(cx, cy, pxs); c.used = now - 1; town.chunks.set(cx + ',' + cy, c);
+      break outer;
+    }
+    if (town.chunks.size > CHUNK_KEEP) { // 古い区画から捨てる
+      const old = [...town.chunks.entries()].sort((a, b) => a[1].used - b[1].used).slice(0, town.chunks.size - CHUNK_KEEP);
+      for (const [k] of old) town.chunks.delete(k);
+    }
+  }
   function drawCity(cam) {
     const v = { l: cam.x - cam.vw / 2 - 50, r: cam.x + cam.vw / 2 + 50, t: cam.y - cam.vh / 2 - 50, b: cam.y + cam.vh / 2 + 50 };
-    Stages.drawGround(ctx, map, v, stage, pattern);
+    drawTown(cam);
     for (const pl of map.plazas || []) {
       if (pl.x > v.r + 150 || pl.x + pl.w < v.l - 150 || pl.y > v.b + 300 || pl.y + pl.h < v.t - 150) continue;
       Stages.drawPlaza(ctx, pl, stage, performance.now() / 1000);
@@ -1183,9 +1253,10 @@
   function drawBuildings(cam) {
     const l = cam.x - cam.vw / 2 - 50, r = cam.x + cam.vw / 2 + 50, t = cam.y - cam.vh / 2 - 50, bt = cam.y + cam.vh / 2 + 50;
     const now = performance.now() / 1000;
+    if (!Stages.STAGE_HAS_ANIM[stage]) return; // 動く部分がある街だけ毎コマ描く（ほかは drawTown の絵に入っている）
     for (const b of map.buildings) {
       if (b.x > r || b.x + b.w < l || b.y > bt || b.y + b.h < t) continue;
-      Stages.drawBuilding(ctx, b, stage, now, pattern);
+      Stages.drawBuilding(ctx, b, stage, now, pattern, 'anim');
     }
   }
 
@@ -1714,7 +1785,10 @@
     const sx = shake > 0 ? (Math.random() - 0.5) * 60 * shake : 0;
     const sy = shake > 0 ? (Math.random() - 0.5) * 60 * shake : 0;
     ctx.save();
-    ctx.translate(W / 2 + sx, H / 2 + sy);
+    // 画面の点にぴったり合わせる（使い回している街の絵がにじまないように）
+    const px = scale * DPR;
+    cam.x = Math.round(cam.x * px) / px; cam.y = Math.round(cam.y * px) / px;
+    ctx.translate(Math.round((W / 2 + sx) * DPR) / DPR, Math.round((H / 2 + sy) * DPR) / DPR);
     ctx.scale(scale, scale);
     ctx.translate(-cam.x, -cam.y);
 
@@ -1748,9 +1822,8 @@
       if (Math.abs(d.x - cam.x) > cam.vw / 2 + 30 || Math.abs(d.y - cam.y) > cam.vh / 2 + 30) continue;
       const bob = Math.sin(now * 4 + d.id) * 3;
       const r = d.v > 1 ? 30 + Math.sin(now * 6) * 2 : 9;
-      ctx.fillStyle = '#ff3da8'; ctx.shadowColor = d.v > 1 ? '#ffe14a' : '#ff3da8'; ctx.shadowBlur = d.v > 1 ? 40 : 12;
-      ctx.beginPath(); ctx.arc(d.x, d.y + bob, r, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
+      if (d.v > 1) { const k = r / 30; ctx.save(); ctx.translate(d.x, d.y + bob); ctx.scale(k, k); glowDot(0, 0, 30, '#ff3da8', '#ffe14a', 40); ctx.restore(); }
+      else glowDot(d.x, d.y + bob, 9, '#ff3da8', '#ff3da8', 12);
       ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(d.x - r / 3, d.y + bob - r / 3, r / 3, 0, Math.PI * 2); ctx.fill();
       if (d.v > 1) {
         ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(d.x, d.y + bob, r + 4, 0, Math.PI * 2); ctx.stroke();
@@ -1796,6 +1869,7 @@
       const pos = lerpEnt('j' + pr.id, pr.x, pr.y, 0.5);
       if (pr.punch) { ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👊', pos.x, pos.y); ctx.textBaseline = 'alphabetic'; continue; }
       if (pr.bomb) { ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💣', pos.x, pos.y - 16); ctx.textBaseline = 'alphabetic'; continue; }
+      if (!pr.spin) { glowDot(pos.x, pos.y - (pr.lob ? 18 : 0), pr.r, pr.c, pr.c, 12); continue; }
       ctx.fillStyle = pr.c; ctx.shadowColor = pr.c; ctx.shadowBlur = 12;
       if (pr.spin) {
         // ブーメラン: くるくる回る
