@@ -303,6 +303,8 @@ class Room {
   start() {
     this.state = 'battle';
     this.time = 0;
+    // 1回でもバトルに行った人はフレンド一覧に出す
+    for (const p of this.players.values()) if (p.pid) { touchPlayer(p.pid, p.name, p.yokai, p.title); known.get(p.pid).played = true; }
     // 今週のランキングが「チャレンジ」で、ホストが選んでいたら、ステージ・ボス・しばりを固定する
     this.weekIdx = S.weekIndex();
     this.theme = S.themeOf(this.weekIdx);
@@ -1059,7 +1061,7 @@ wss.on('connection', ws => {
 
 // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
 const MAX_WATCHERS = 8;
-const known = new Map();    // pid → { name, yokai, seen }
+const known = new Map();    // pid → { name, yokai, title, seen, played, prof }
 const presence = new Map(); // ホーム画面の接続 → pid
 const usableYokai = id => !!S.YOKAI_BY_ID[id];
 const isLegend = id => !!(S.YOKAI_BY_ID[id] && S.YOKAI_BY_ID[id].legend);
@@ -1079,6 +1081,7 @@ const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) 
 function touchPlayer(pid, name, yokai, title) {
   const k = known.get(pid) || {};
   known.set(pid, {
+    ...k, // バトルに行ったか・プロフィールはそのまま残す
     name: String(name || k.name || 'プレイヤー').slice(0, 10),
     yokai: S.YOKAI_BY_ID[yokai] ? yokai : k.yokai || 'nekomata',
     title: title === undefined ? k.title || null : cleanTitle(title),
@@ -1098,7 +1101,9 @@ function friendList() {
     touchPlayer(p.pid, p.name, p.yokai, p.title);
   }
   const online = new Set(presence.values());
-  return [...known.entries()].sort((a, b) => b[1].seen - a[1].seen).slice(0, 100).map(([id, k]) => {
+  // 1回もバトルに行っていない人（開いただけの人）は出さない。サーバーが再起動しても、プロフィールの遊んだ回数でわかる
+  const played = k => k.played || (k.prof && k.prof.s[0] > 0);
+  return [...known.entries()].filter(([, k]) => played(k)).sort((a, b) => b[1].seen - a[1].seen).slice(0, 100).map(([id, k]) => {
     const w = where.get(id);
     const status = w ? w.state : online.has(id) ? 'home' : 'off';
     return {
