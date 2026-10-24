@@ -94,7 +94,8 @@
   // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
   // ホーム画面にいる間はサーバーとつないで、みんなが今どうしているかを受け取る
   let pws = null, pwsWait = 2000, buddyLive = [];
-  let buddies = loadJSON('buddies', {}); // 一度会った人（サーバーが再起動しても一覧に残す） pid → { name, yokai, seen }
+  let buddies = loadJSON('buddies', {}); // 一度会った人（サーバーが再起動しても一覧に残す） pid → { name, yokai, seen, ok, prof }
+  // ok: サーバーが「バトルに行ったことがある人」として送ってきた印。印のない古い記録（開いただけの人）は出さない
   function presenceConnect() {
     if (pws && pws.readyState <= 1) return;
     pws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
@@ -104,7 +105,7 @@
       if (m.t === 'profile') return gotProfile(m);
       if (m.t !== 'friends') return;
       buddyLive = m.list;
-      for (const f of m.list) buddies[f.pid] = { name: f.name, yokai: f.yokai, seen: Math.max(f.seen, buddies[f.pid]?.seen || 0) };
+      for (const f of m.list) buddies[f.pid] = { ...buddies[f.pid], name: f.name, yokai: f.yokai, seen: Math.max(f.seen, buddies[f.pid]?.seen || 0), ok: 1 }; // プロフィールは消さずに残す
       const keep = Object.entries(buddies).sort((a, b) => b[1].seen - a[1].seen).slice(0, 200);
       buddies = Object.fromEntries(keep);
       try { localStorage.setItem('buddies', JSON.stringify(buddies)); } catch {}
@@ -135,7 +136,7 @@
   const ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 60 ? `${Math.max(1, m)}分前` : m < 1440 ? `${Math.floor(m / 60)}時間前` : `${Math.floor(m / 1440)}日前`; };
   function renderBuddies() {
     const live = new Map(buddyLive.map(f => [f.pid, f]));
-    const list = Object.entries(buddies).filter(([id]) => id !== pid).map(([id, b]) => live.get(id) || { pid: id, ...b, status: 'off' });
+    const list = Object.entries(buddies).filter(([id, b]) => id !== pid && (b.ok || live.has(id))).map(([id, b]) => live.get(id) || { pid: id, ...b, status: 'off' });
     const order = { lobby: 0, battle: 1, result: 2, home: 3, off: 4 };
     list.sort((a, b) => order[a.status] - order[b.status] || b.seen - a.seen);
     const online = list.filter(f => f.status !== 'off').length;
