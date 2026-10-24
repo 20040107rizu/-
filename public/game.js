@@ -217,7 +217,7 @@
   $('btnZukanClose').onclick = () => show('title');
 
   // ---------- 週替わりランキング ----------
-  let rankData = null, rankView = 'all';
+  let rankData = null;
   async function loadRanking(week) {
     const r = await fetch(`ranking?pid=${encodeURIComponent(pid)}${week ? `&week=${week}` : ''}`, { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
@@ -248,17 +248,14 @@
     if (!rankData) { $('rankList').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
     const d = rankData, th = d.theme;
     $('rankBanner').innerHTML = `<span class="ic">${th.icon}</span><div class="txt"><b>第${th.no}回：${esc(th.name)}</b><br>${esc(th.desc)}</div><div class="left">のこり<br><b>${left(d.end)}</b></div>`;
-    $('rankTabs').innerHTML = [['all', 'みんな'], ['friends', 'フレンド']].map(([k, l]) => `<button class="tab${rankView === k ? ' on' : ''}" data-k="${k}">${l}</button>`).join('');
-    for (const b of $('rankTabs').querySelectorAll('button')) b.onclick = () => { rankView = b.dataset.k; renderRanking(); };
     $('rankCount').textContent = `参加 ${d.total}人` + (d.dbError ? '（⚠️ 記録の保存に失敗しています）' : d.saved ? '（記録は保存されています）' : '（試験運転中：サーバーが更新されると記録が消えます）');
-    let rows = d.rows.map((r, i) => ({ ...r, rank: i + 1 }));
-    if (rankView === 'friends') rows = rows.filter(r => r.pid === pid || buddies[r.pid]);
+    const rows = d.rows.map((r, i) => ({ ...r, rank: i + 1 }));
     const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
     $('rankList').innerHTML = rows.length ? rows.map(r => {
       const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
       return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}
         <div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b><small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
-    }).join('') : `<p class="sub empty">${rankView === 'friends' ? 'フレンドの記録はまだありません' : 'まだ記録がありません。一番乗りをめざそう！'}</p>`;
+    }).join('') : `<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>`;
     const me = d.me;
     $('rankReward').innerHTML = `🎁 報酬　🥇 限定称号《第${th.no}回 ${esc(th.crown)}》＋金玉チケット　🥈🥉 赤玉チケット　〜10位 青玉チケット　参加賞 緑玉チケット`
       + `<br>あなた：${me.rank ? `<b>${me.rank}位</b>（${esc(S.fmtScore(th, me.score))}）→ ${rewardText(S.weeklyReward(me.rank))}` : me.joined ? '参加済み（まだ記録なし）→ 緑玉チケット' : 'まだ参加していません'}`;
