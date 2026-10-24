@@ -249,13 +249,13 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel,
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host })),
+      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, title: p.title })),
     };
   }
 
-  addPlayer(ws, name, yokai, pid) {
+  addPlayer(ws, name, yokai, pid, totsu, title) {
     const p = {
-      id: genId(), ws, pid, name: (name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yokai] ? yokai : 'nekomata',
+      id: genId(), ws, pid, totsu: cleanTotsu(totsu), title: cleanTitle(title), name: (name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yokai] ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
       input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false }, prevItem: false,
     };
@@ -295,7 +295,7 @@ class Room {
     for (const p of this.players.values()) {
       const sp = this.farFromAll(this.gridS, spawns, 1400);
       spawns.push(sp);
-      const st = S.yokaiStats(p.yokai);
+      const st = S.yokaiStats(p.yokai, p.totsu);
       Object.assign(p, {
         stats: st, x: sp.x, y: sp.y, face: 0,
         hp: st.hp, maxHp: st.hp, atkT: 0, strongT: 0, down: false, reviveProg: 0, escaped: false,
@@ -844,7 +844,7 @@ wss.on('connection', ws => {
       case 'hello': { // ホーム画面にいる間つないでおく接続（フレンドの一覧用）
         pid = cleanPid(msg.pid);
         if (!pid) return;
-        touchPlayer(pid, msg.name, msg.yokai);
+        touchPlayer(pid, msg.name, msg.yokai, msg.title);
         presence.set(ws, pid);
         sendFriends(ws);
         break;
@@ -878,13 +878,13 @@ wss.on('connection', ws => {
         room = target;
         pid = cleanPid(msg.pid);
         if (pid) touchPlayer(pid, msg.name, msg.yokai);
-        me = room.addPlayer(ws, msg.name, msg.yokai, pid);
+        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title);
         send({ t: 'welcome', id: me.id });
         room.broadcast(room.lobbyInfo());
         break;
       }
       case 'yokai':
-        if (room && me && room.state === 'lobby' && S.YOKAI_BY_ID[msg.id]) { me.yokai = msg.id; room.broadcast(room.lobbyInfo()); }
+        if (room && me && room.state === 'lobby' && S.YOKAI_BY_ID[msg.id]) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
         if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type]) { room.bossSel = msg.type; room.broadcast(room.lobbyInfo()); }
@@ -928,12 +928,15 @@ wss.on('connection', ws => {
 const MAX_WATCHERS = 8;
 const known = new Map();    // pid → { name, yokai, seen }
 const presence = new Map(); // ホーム画面の接続 → pid
+const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
+const cleanTitle = v => (S.TITLE_BY_ID[v] ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);
-function touchPlayer(pid, name, yokai) {
+function touchPlayer(pid, name, yokai, title) {
   const k = known.get(pid) || {};
   known.set(pid, {
     name: String(name || k.name || 'プレイヤー').slice(0, 10),
     yokai: S.YOKAI_BY_ID[yokai] ? yokai : k.yokai || 'nekomata',
+    title: title === undefined ? k.title || null : cleanTitle(title),
     seen: Date.now(),
   });
   if (known.size > 500) { // 古い人から忘れる
@@ -947,14 +950,14 @@ function friendList() {
   for (const room of rooms.values()) for (const p of room.players.values()) {
     if (!p.pid) continue;
     where.set(p.pid, { room: room.code, state: room.state, n: room.players.size, yokai: p.yokai, name: p.name });
-    touchPlayer(p.pid, p.name, p.yokai);
+    touchPlayer(p.pid, p.name, p.yokai, p.title);
   }
   const online = new Set(presence.values());
   return [...known.entries()].sort((a, b) => b[1].seen - a[1].seen).slice(0, 100).map(([id, k]) => {
     const w = where.get(id);
     const status = w ? w.state : online.has(id) ? 'home' : 'off';
     return {
-      pid: id, name: w ? w.name : k.name, yokai: w ? w.yokai : k.yokai, status, seen: k.seen,
+      pid: id, name: w ? w.name : k.name, yokai: w ? w.yokai : k.yokai, title: k.title, status, seen: k.seen,
       room: w && (w.state === 'battle' || (w.state === 'lobby' && w.n < MAX_PLAYERS)) ? w.room : null,
       n: w ? w.n : 0,
     };

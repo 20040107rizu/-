@@ -33,6 +33,16 @@
   let friends = loadFriends();
   let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
+  // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
+  let myTitle = localStorage.getItem('title') || null;
+  const titlesDone = () => S.titleProgress(friends).filter(t => t.done).map(t => t.title.id);
+  function checkMyTitle() { if (myTitle && !titlesDone().includes(myTitle)) myTitle = null; }
+  checkMyTitle();
+  const myTotsu = () => S.totsuOf(friends[selYokai] || 0);
+  const titleTag = id => { const t = S.TITLE_BY_ID[id]; return t ? `<span class="ttl${t.color === 'gold' ? ' gold' : ''}" style="${t.color === 'gold' ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
+  const nameTag = (name, title) => `<span class="${title === 'all' ? 'gold' : ''}">${esc(name)}</span>`;
+  const totsuTag = n => (n > 0 ? `<span class="totsu">${n >= S.TOTSU_MAX ? '凸MAX' : `凸${n}`}</span>` : '');
+
   // フレンド機能用の、この人のID（引き継ぎコードにも入る）
   const newPid = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'[b & 63]).join('');
   let pid = localStorage.getItem('pid');
@@ -60,7 +70,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -72,7 +82,7 @@
     const f = {};
     S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
-    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
+    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] ? d.t : null, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
   }
 
   // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
@@ -101,7 +111,7 @@
     };
   }
   function helloAgain() {
-    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai }));
+    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle }));
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) presenceConnect(); });
   const STATUS = { home: 'ホームにいる', lobby: '募集中', battle: '出撃中', result: '結果を見ている', off: 'オフライン' };
@@ -123,7 +133,7 @@
       const st = f.status === 'off' ? `オフライン（${ago(f.seen)}）` : f.status === 'lobby' ? `募集中（${f.n}/4人）` : STATUS[f.status];
       const btn = f.room && f.status === 'lobby' ? `<button class="join" data-code="${f.room}">参加</button>`
         : f.room && f.status === 'battle' ? `<button class="watch" data-code="${f.room}">観戦</button>` : '';
-      return `<li class="${f.status}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${esc(f.name)}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
+      return `<li class="${f.status}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)} ${f.title ? titleTag(f.title) : ''}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
     }).join('');
     for (const b of ul.querySelectorAll('button.join')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'join', code: b.dataset.code }); };
     for (const b of ul.querySelectorAll('button.watch')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'watch', code: b.dataset.code }); };
@@ -134,17 +144,42 @@
 
   // ---------- 妖怪図鑑 ----------
   let zukanRank = 'all', zukanRole = 'all', zukanSel = null;
+  function renderTitles() {
+    const prog = S.titleProgress(friends);
+    $('zukanGrid').innerHTML = '';
+    $('zukanTitles').innerHTML = prog.map(({ title: t, got, need, done }) => `<div class="title-row${done ? ' done' : ''}${myTitle === t.id ? ' on' : ''}">
+        <div class="tinfo">${done ? titleTag(t.id) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
+        <div class="tbar"><i style="width:${Math.round((got / need) * 100)}%"></i></div></div>
+        <span class="tnum">${got}/${need}</span>
+        ${done ? `<button class="small" data-id="${t.id}">${myTitle === t.id ? 'はずす' : 'つける'}</button>` : '<span class="tlock">🔒</span>'}</div>`).join('');
+    for (const b of $('zukanTitles').querySelectorAll('button')) b.onclick = () => {
+      myTitle = myTitle === b.dataset.id ? null : b.dataset.id;
+      try { localStorage.setItem('title', myTitle || ''); } catch {}
+      helloAgain(); renderTitles(); renderMyTitle();
+    };
+    renderMyTitle();
+  }
+  function renderMyTitle() {
+    const done = titlesDone().length;
+    $('zukanInfo').innerHTML = `<div class="pv"><b>🏅 称号</b><div>${done} / ${S.TITLES.length} 個ゲット</div>
+      <div style="margin:6px 0">いまの称号：${myTitle ? titleTag(myTitle) : 'なし'}</div>
+      <small>図鑑をコンプリートすると称号がもらえます。つけた称号は、ロビーやフレンド一覧で名前といっしょに表示されます。「妖怪マスター」をつけると名前が金色に！</small></div>`;
+  }
   function renderZukan() {
+    $('zukanTitles').hidden = zukanRank !== 'title';
+    $('zukanGrid').hidden = zukanRank === 'title';
+    $('zukanRoles').hidden = zukanRank === 'title';
     const got = S.YOKAI.filter(y => friends[y.id]).length;
     $('zukanCount').textContent = `${got} / ${S.YOKAI.length} 体`;
     $('zukanTabs').innerHTML = [['all', 'ぜんぶ'], ['C', 'C'], ['B', 'B'], ['A', 'A'], ['S', 'S']].map(([k, label]) => {
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
-    }).join('');
+    }).join('') + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${S.TITLES.length}</small></button>`;
     $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
       `<button class="tab${zukanRole === k ? ' on' : ''}" data-k="${k}">${label}</button>`).join('');
     for (const b of $('zukanTabs').querySelectorAll('button')) b.onclick = () => { zukanRank = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
     for (const b of $('zukanRoles').querySelectorAll('button')) b.onclick = () => { zukanRole = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
+    if (zukanRank === 'title') { renderTitles(); return; }
     const list = S.YOKAI.filter(y => (zukanRank === 'all' || y.rank === zukanRank) && (zukanRole === 'all' || y.role === zukanRole));
     const grid = $('zukanGrid'), keep = grid.scrollTop;
     grid.innerHTML = '';
@@ -152,7 +187,7 @@
       const owned = friends[y.id];
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
-      d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y, !owned)}`
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${faceImg(y, !owned)}`
         + (owned ? `<span class="nm">${y.name}</span>` : `<span class="unk nm">${'？'.repeat([...y.name].length)}</span>`) + `<small class="nm">${y.origin}</small>`;
       d.onclick = () => { zukanSel = y.id; renderZukan(); };
       grid.appendChild(d);
@@ -172,9 +207,9 @@
     const at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
     $('zukanInfo').innerHTML = `${img}<div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>・${y.origin}</div>
-      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd><dt>仲間</dt><dd>${owned}体</dd></dl></div>`;
+      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd><dt>仲間</dt><dd>${owned}体${owned > 1 ? `（${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}・HP/攻撃 +${Math.round(S.totsuOf(owned) * S.TOTSU_STEP * 100)}%）` : ''}</dd></dl></div>`;
   }
-  $('btnZukan').onclick = () => { show('zukan'); renderZukan(); };
+  $('btnZukan').onclick = () => { zukanSel = null; show('zukan'); renderZukan(); };
   $('btnZukanClose').onclick = () => show('title');
 
   // ---------- 状態 ----------
@@ -237,6 +272,7 @@
     friends = data.friends; stats = data.stats;
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
+    myTitle = data.title; checkMyTitle(); try { localStorage.setItem('title', myTitle || ''); } catch {}
     if (data.pid) { pid = data.pid; try { localStorage.setItem('pid', pid); } catch {} helloAgain(); }
     saveAll(); updateFriendCount();
     openSave();
@@ -377,7 +413,7 @@
     Music.unlock();
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     watcher = first.t === 'watch';
-    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid });
+    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), title: myTitle });
     ws.onmessage = e => onMessage(JSON.parse(e.data));
     ws.onclose = () => {
       ws = null;
@@ -480,7 +516,7 @@
         // みんなが連れていく妖怪が絵でわかるように
         const y = S.YOKAI_BY_ID[p.yokai];
         if (p.id === myId) li.className = 'me';
-        li.innerHTML = `${faceImg(y)}<div class="pinfo"><b>${esc(p.name)}${p.host ? '👑' : ''}</b><span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span><small>${S.ROLES[y.role].name}</small></div>`;
+        li.innerHTML = `${faceImg(y)}${totsuTag(p.totsu)}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>${p.title ? titleTag(p.title) : ''}<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span></div>`;
       } else { li.className = 'empty'; li.textContent = 'あき'; }
       ul.appendChild(li);
     }
@@ -525,8 +561,8 @@
     const y = S.YOKAI_BY_ID[selYokai], at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
     const url = artUrl('yokai/' + y.id);
     $('yokaiInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : `<div class="big-face" style="background:${y.color}"></div>`}
-      <div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>
-      <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span></div>
+      <div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b> ${totsuTag(myTotsu())}
+      <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>${myTotsu() ? `・<span class="totsu-up">HP・攻撃 +${Math.round(myTotsu() * S.TOTSU_STEP * 100)}%</span>` : ''}</div>
       <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd></dl>
       <small>${el.name}属性：${el.effect}</small></div>`;
   }
@@ -542,11 +578,11 @@
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = owned
-        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">×${owned}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
+        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
-        send({ t: 'yokai', id: y.id });
+        send({ t: 'yokai', id: y.id, totsu: myTotsu(), title: myTitle });
         helloAgain();
         renderFriends();
       };
@@ -560,6 +596,7 @@
   function startGacha() {
     const mine = result.players.find(p => p.id === myId);
     let isNew = false;
+    const titlesBefore = titlesDone();
     // ガチャ結果はこの時点で保存する（玉を開ける前にアプリを閉じても消えない）
     if (mine) {
       stats.plays++;
@@ -574,6 +611,7 @@
     // ボス鬼を倒したら次の鬼が解放される（その回に参加していた全員）
     result.newClear = false;
     if (mine && result.bossDown && !stats.cleared[result.boss]) { stats.cleared[result.boss] = true; result.newClear = true; }
+    result.newTitles = mine ? titlesDone().filter(id => !titlesBefore.includes(id)) : [];
     if (mine) { saveAll(); updateFriendCount(); }
     const id = ++gachaRun;
     $('btnToResult').hidden = true;
@@ -589,7 +627,7 @@
         failed: mine.escaped ? null : { from: result.team ?? 0 },
         ball: { key: ball.key, name: ball.name, color: ball.color },
         yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img },
-        isNew, dupCount: friends[y.id],
+        isNew, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
       }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
     } else {
       $('gachaTitle').textContent = mine && !mine.escaped ? '脱出失敗…' : '鬼ガチャ';
@@ -609,12 +647,15 @@
     const anyEsc = result.players.some(p => p.escaped);
     $('resTitle').textContent = anyEsc ? '鬼の世界から脱出！' : '全員脱出できなかった…';
     $('resTitle').textContent += `（みんなの鬼玉 ${result.team ?? 0}個）`;
-    $('resUnlock').hidden = !result.newClear;
+    const notes = [];
     if (result.newClear) {
       const next = S.BOSS_ORDER.find(k => S.BOSSES[k].need === result.boss);
-      $('resUnlock').textContent = next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
-        : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`;
+      notes.push(esc(next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
+        : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`));
     }
+    for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
+    $('resUnlock').hidden = !notes.length;
+    $('resUnlock').innerHTML = notes.join('<br>');
     $('resTable').innerHTML = '<tr><th>なまえ</th><th>お友達</th><th>脱出</th><th>集めた鬼玉</th><th>ガチャ</th></tr>' +
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];

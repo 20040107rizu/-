@@ -27,12 +27,58 @@
   const YOKAI_BY_ID = Object.fromEntries(YOKAI.map(y => [y.id, y]));
 
   // 妖怪の実ステータス（ロール基本値 × ランク倍率）
-  function yokaiStats(id) {
+  // 凸: 同じ妖怪がガチャでかぶるたびに1つ上がり、HPと攻撃が少しだけ上がる
+  const TOTSU_MAX = 5, TOTSU_STEP = 0.03;
+  const totsuOf = count => Math.max(0, Math.min(TOTSU_MAX, (count | 0) - 1));
+  function yokaiStats(id, totsu = 0) {
     const y = YOKAI_BY_ID[id] || YOKAI[0];
     const r = ROLES[y.role];
     const m = RANKS[y.rank].mul;
-    return { ...r, hp: Math.round(r.hp * m), atkDmg: r.atkDmg * m, strongMul: m, speed: r.speed + (m - 1) * 20 };
+    const k = 1 + TOTSU_STEP * Math.max(0, Math.min(TOTSU_MAX, totsu | 0));
+    return { ...r, hp: Math.round(r.hp * m * k), atkDmg: r.atkDmg * m * k, strongMul: m * k, speed: r.speed + (m - 1) * 20 };
   }
+
+  // ---------- 称号（図鑑のコンプリート報酬） ----------
+  const REGION = {
+    japan: ['日本', '沖縄'],
+    asia: ['中国', '韓国', 'インド', 'フィリピン', 'ヒマラヤ'],
+    europe: ['イギリス', 'ヨーロッパ', 'スコットランド', 'アイルランド', 'ドイツ', 'スペイン', 'ルーマニア', 'ギリシャ', 'ノルウェー', '北欧', 'フランス', '中欧', 'ロシア'],
+  };
+  const regionOf = y => Object.keys(REGION).find(k => REGION[k].includes(y.origin)) || 'world';
+  // need(list) → その妖怪たちを全部集めたら。count → 種類数
+  const TITLES = [
+    { id: 'n10',    name: '妖怪となかよし',     color: '#9ae0ff', count: 10,  desc: 'お友達を10体集める' },
+    { id: 'n30',    name: '妖怪ハンター',       color: '#7be07b', count: 30,  desc: 'お友達を30体集める' },
+    { id: 'n50',    name: '妖怪博士',           color: '#5aa7ff', count: 50,  desc: 'お友達を50体集める' },
+    { id: 'n100',   name: '妖怪大将',           color: '#ff8a5a', count: 100, desc: 'お友達を100体集める' },
+    { id: 'rC',     name: 'Cランク制覇',        color: '#7be07b', of: y => y.rank === 'C', desc: 'Cランクを全部集める' },
+    { id: 'rB',     name: 'Bランク制覇',        color: '#5aa7ff', of: y => y.rank === 'B', desc: 'Bランクを全部集める' },
+    { id: 'rA',     name: 'Aランク制覇',        color: '#ff6a6a', of: y => y.rank === 'A', desc: 'Aランクを全部集める' },
+    { id: 'rS',     name: 'Sランク制覇',        color: '#ffd23a', of: y => y.rank === 'S', desc: 'Sランクを全部集める' },
+    { id: 's10',    name: '伝説を従えし者',     color: '#ffd23a', of: y => y.rank === 'S', count: 10, desc: 'Sランクを10体集める' },
+    { id: 'fighter', name: '百戦錬磨',          color: '#ff8a5a', of: y => y.role === 'fighter', desc: 'ファイターを全部集める' },
+    { id: 'tank',   name: '鉄壁の守り手',       color: '#9ab0c8', of: y => y.role === 'tank', desc: 'タンクを全部集める' },
+    { id: 'healer', name: '癒しの使い手',       color: '#7af0b0', of: y => y.role === 'healer', desc: 'ヒーラーを全部集める' },
+    { id: 'ranger', name: '百発百中',           color: '#c8a0ff', of: y => y.role === 'ranger', desc: 'レンジャーを全部集める' },
+    { id: 'japan',  name: '日本妖怪コンプ',     color: '#ff6a8a', of: y => regionOf(y) === 'japan', desc: '日本（沖縄も）の妖怪を全部集める' },
+    { id: 'asia',   name: 'アジア妖怪コンプ',   color: '#ffb84a', of: y => regionOf(y) === 'asia', desc: '中国・韓国・インドなどの妖怪を全部集める' },
+    { id: 'europe', name: 'ヨーロッパ妖怪コンプ', color: '#8ab8ff', of: y => regionOf(y) === 'europe', desc: 'ヨーロッパの妖怪を全部集める' },
+    { id: 'world',  name: '世界の妖怪コンプ',   color: '#5ad8c8', of: y => regionOf(y) === 'world', desc: 'アフリカ・アメリカ・中東などの妖怪を全部集める' },
+    { id: 'totsu',  name: '限界突破',           color: '#ff5ad8', totsu: true, desc: 'どれか1体を凸5（凸MAX）にする' },
+    { id: 'all',    name: '妖怪マスター',       color: 'gold', count: 'all', desc: '170体ぜんぶ集める（名前が金色になる）' },
+  ];
+  const TITLE_BY_ID = Object.fromEntries(TITLES.map(t => [t.id, t]));
+  // friends: { id: 持っている数 } → [{ title, got, need, done }]
+  function titleProgress(friends) {
+    return TITLES.map(t => {
+      if (t.totsu) { const best = Math.max(0, ...YOKAI.map(y => totsuOf(friends[y.id] || 0))); return { title: t, got: best, need: TOTSU_MAX, done: best >= TOTSU_MAX }; }
+      const pool = t.of ? YOKAI.filter(t.of) : YOKAI;
+      const got = pool.filter(y => friends[y.id]).length;
+      const need = t.count === 'all' ? YOKAI.length : t.count || pool.length;
+      return { title: t, got: Math.min(got, need), need, done: got >= need };
+    });
+  }
+
 
   // ---------- ガチャ玉 ----------
   // 集めた鬼玉が多いほど良い色が出やすくなる（必ず出るわけではない）
@@ -189,5 +235,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

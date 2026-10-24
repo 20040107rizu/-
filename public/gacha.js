@@ -1,5 +1,5 @@
 // 鬼ガチャの演出。GachaShow.run(root, opts) で root の中に演出を作り、終わったら resolve する。
-// opts: { team, failed: {from} | null（脱出失敗で半分になったとき）, ball: {key, name, color}, yokai: {name, rank, rankColor, role, img}, isNew, dupCount }
+// opts: { team, failed: {from} | null（脱出失敗で半分になったとき）, ball: {key, name, color}, yokai: {name, rank, rankColor, role, img}, isNew, dupCount, totsu, totsuMax, totsuStep }
 (function () {
   'use strict';
   const TIER = { green: 0, blue: 1, red: 2, gold: 3, black: 4 };
@@ -214,7 +214,7 @@
     stamp.textContent = o.yokai.rank; stamp.classList.add('on'); SFX.stamp(); shakeScreen('gs-quake');
     await wait(350);
     $('.gs-name').textContent = o.yokai.name; $('.gs-name').classList.add('on');
-    $('.gs-msg').textContent = o.isNew ? `${o.yokai.role}の${o.yokai.name}がお友達になった！` : `${o.yokai.name}とさらに仲良くなった！（×${o.dupCount}）`;
+    $('.gs-msg').textContent = o.isNew ? `${o.yokai.role}の${o.yokai.name}がお友達になった！` : o.totsu != null ? (o.dupCount - 1 > o.totsuMax ? `${o.yokai.name}は凸MAX！ これ以上は強くならないけど仲良し（×${o.dupCount}）` : `${o.yokai.name}が凸${o.totsu}になった！ HP・攻撃 +${Math.round(o.totsu * o.totsuStep * 100)}%`) : `${o.yokai.name}とさらに仲良くなった！（×${o.dupCount}）`;
     $('.gs-msg').classList.add('on');
     SFX.fanfare(tier);
     confetti($('.gs-cfl'), tier >= 3 ? ['#ffe14a', '#fff6c0', '#ffb000', '#ffffff'] : [o.yokai.rankColor, '#ffffff', '#ff8ad8', '#7ad8ff'], tier >= 3 ? 90 : 50);

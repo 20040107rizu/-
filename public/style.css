@@ -232,9 +232,9 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .lb-preview dd { margin: 0; }
 .lb-preview small { opacity: .7; font-size: 10px; }
 .plist { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-.plist li { height: 80px; border-radius: 10px; background: #2a1840; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; line-height: 1.2; overflow: hidden; position: relative; }
+.plist li { height: 92px; border-radius: 10px; background: #2a1840; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; line-height: 1.2; overflow: hidden; position: relative; }
 .plist li.me { border-color: #ffe36b88; }
-.plist li .face { width: 50px; height: 50px; object-fit: contain; border-radius: 50%; flex: none; }
+.plist li .face { width: 46px; height: 46px; object-fit: contain; border-radius: 50%; flex: none; }
 .plist li .pinfo { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 0 2px; }
 .plist li .pinfo > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plist li b { font-size: 11px; }
@@ -288,3 +288,26 @@ button.mid { font-size: 15px; font-weight: bold; padding: 8px 16px; background: 
 #zukan .tabs .tab { cursor: pointer; }
 .gs-failed { color: #ff7070; font-weight: bold; margin-right: 6px; }
 .gs-info s { opacity: .6; }
+
+/* 凸と称号 */
+.totsu { display: inline-block; font-size: 10px; font-weight: bold; color: #fff; background: linear-gradient(#ff5ad8, #a02ab8); border-radius: 6px; padding: 0 5px; line-height: 15px; vertical-align: middle; }
+.totsu-up { color: #ff9ae8; }
+.yk .cnt { color: #ff9ae8; font-weight: bold; opacity: 1; }
+.plist li .totsu { position: absolute; top: 3px; right: 3px; }
+.plist li .ttl { font-size: 9px; }
+.ttl { font-size: 11px; font-weight: bold; white-space: nowrap; }
+.ttl.locked { color: #888; }
+.gold, .ttl.gold { background: linear-gradient(#fff3a0, #ffb000 60%, #ff8a00); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: bold; }
+.title-list { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 5px; padding: 2px; }
+.title-row { display: flex; align-items: center; gap: 8px; background: #2a1840; border-radius: 10px; padding: 5px 8px; border: 2px solid transparent; }
+.title-row.done { background: #3a2456; }
+.title-row.on { border-color: #ffe36b; }
+.title-row .tinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.title-row .ttl { font-size: 13px; }
+.title-row small { font-size: 10px; opacity: .75; }
+.tbar { height: 5px; border-radius: 3px; background: #0006; overflow: hidden; }
+.tbar i { display: block; height: 100%; background: linear-gradient(90deg, #ff9b3d, #ffe36b); }
+.title-row .tnum { font-size: 11px; opacity: .8; white-space: nowrap; }
+.title-row button.small { flex: none; }
+.tlock { opacity: .5; }
+.title-tab { border-color: #c8a030 !important; }
