@@ -327,7 +327,7 @@ class Room {
         legend: !!S.YOKAI_BY_ID[p.yokai].legend, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, nyoi: null, diveLeft: 0, // レジェンド
       });
       S.collide(this.map, p, PLAYER_R);
-      if (DEMO_AI) { p.maxHp *= 5; p.hp = p.maxHp; p.ultBoost = 2.5; }
+      if (DEMO_AI) { p.maxHp *= 5; p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
     }
     const spawn = spawns[0];
 
@@ -724,7 +724,7 @@ class Room {
     if (inp.strong && p.strongT <= 0 && !busy) Combat.strong(this, p, aim, target);
     if (inp.skill && p.skillT <= 0 && !p.leap) Combat.skill(this, p, aim);
     if (p.legend) {
-      p.ult = Math.min(Combat.ULT_MAX, p.ult + 1.5 * DT * (p.ultBoost || 1)); // 時間でも少しずつたまる
+      if (!(this.time < p.ultBusyUntil)) p.ult = Math.min(Combat.ULT_MAX, p.ult + (st.name === 'ヒーラー' ? 2.4 : 1.0) * DT * (p.ultBoost || 1)); // 時間でも少しずつたまる（ヒーラーは多め）
       if (inp.ult && p.ult >= Combat.ULT_MAX && !busy) Combat.ultimate(this, p, aim);
     }
 

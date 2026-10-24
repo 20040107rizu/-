@@ -23,11 +23,11 @@ function rayLen(map, x, y, a, max) {
 // ---------- 当てる ----------
 function dmgMul(p) { return p.atkUpT > 0 ? 1.3 : 1; }
 
-const ULT_MAX = 100, ULT_GAIN = 0.12; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
+const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
   if (!e || e.hp <= 0) return 0;
   room.damageOni(p, e, amount);
-  if (p && p.legend) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1));
+  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1)); // 必殺技の効果中はたまらない
   if (el) applyElement(room, p, e, amount, el);
   return amount;
 }
@@ -232,6 +232,7 @@ function ultimate(room, p, aim) {
   const L = S.YOKAI_BY_ID[p.yokai], el = L.el, c = color(el);
   const P = 30 * p.stats.strongMul * dmgMul(p);
   p.ult = 0;
+  p.ultBusyUntil = room.time + ({ parade: 4, nyoi: 10, dragon: 6, forest: 8, dive: 3 }[L.ult] || 0);
   room.events.push({ k: 'ult', id: p.id, kind: L.ult, name: L.ultName, x: R(p.x), y: R(p.y), a: +aim.toFixed(2), c });
   switch (L.ult) {
     case 'roar': // 鬼王の咆哮: まわりの鬼をしびれさせて大ダメージ
