@@ -84,4 +84,14 @@ async function board(idx, pid) {
   };
 }
 
-module.exports = { enabled, record, board };
+// 最近バトルに行った人（今週と先週の記録がある人）。サーバーが再起動してもフレンド一覧を戻すために使う
+async function recentPlayers(idx) {
+  if (!enabled) return [];
+  try {
+    const r = await fetch(`${BASE}/rest/v1/weekly_scores?week=in.(${idx - 1},${idx})&select=pid,name,yokai,title,updated_at&order=updated_at.desc&limit=1000`, { headers: headers() });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return await r.json();
+  } catch (e) { console.error('フレンドの読み込みに失敗:', e.message); return []; }
+}
+
+module.exports = { enabled, record, board, recentPlayers };

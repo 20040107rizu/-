@@ -1179,6 +1179,16 @@ setInterval(() => {
 
 if (require.main === module) {
   server.listen(PORT, () => console.log(`鬼バスターズ server: http://localhost:${PORT}`));
+  // ランキングに記録がある人（最近バトルに行った人）をフレンドとして思い出す
+  Ranking.recentPlayers(S.weekIndex()).then(list => {
+    let n = 0;
+    for (const r of list) {
+      if (!r.pid || known.has(r.pid)) continue; // 新しい記録が先に来るので、同じ人の古い週の記録は飛ばす
+      n++;
+      known.set(r.pid, { name: String(r.name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[r.yokai] ? r.yokai : 'nekomata', title: cleanTitle(r.title), seen: Date.parse(r.updated_at) || 0, played: true });
+    }
+    if (n) console.log(`フレンドを ${n} 人読み込みました`);
+  });
   process.on('SIGTERM', startDrain);
   process.on('SIGINT', startDrain);
 }
