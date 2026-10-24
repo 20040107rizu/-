@@ -11,6 +11,7 @@
     B: { mul: 1.25, color: '#4a8bff' },
     A: { mul: 1.55, color: '#ff4a4a' },
     S: { mul: 2.0,  color: '#ffd84a' },
+    L: { mul: 2.4,  color: '#ff7ae8' }, // レジェンド
   };
 
   // ---------- ロール（タイプ） ----------
@@ -24,7 +25,9 @@
 
   // ---------- 妖怪（お友達）: public/yokai.js ----------
   const YOKAI = typeof module === 'object' && module.exports ? require('./yokai.js') : self.YokaiList;
-  const YOKAI_BY_ID = Object.fromEntries(YOKAI.map(y => [y.id, y]));
+  const LEGENDS = YOKAI.LEGENDS || [];
+  // 名前や強さを引くときはレジェンドも含める（一覧・ガチャ・図鑑の数は YOKAI だけ）
+  const YOKAI_BY_ID = Object.fromEntries(YOKAI.concat(LEGENDS).map(y => [y.id, y]));
 
   // 妖怪の実ステータス（ロール基本値 × ランク倍率）
   // 凸: 同じ妖怪がガチャでかぶるたびに1つ上がり、HPと攻撃が少しだけ上がる
@@ -289,5 +292,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

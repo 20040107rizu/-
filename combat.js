@@ -23,9 +23,11 @@ function rayLen(map, x, y, a, max) {
 // ---------- 当てる ----------
 function dmgMul(p) { return p.atkUpT > 0 ? 1.3 : 1; }
 
+const ULT_MAX = 100, ULT_GAIN = 0.12; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
   if (!e || e.hp <= 0) return 0;
   room.damageOni(p, e, amount);
+  if (p && p.legend) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1));
   if (el) applyElement(room, p, e, amount, el);
   return amount;
 }
@@ -225,6 +227,51 @@ function skill(room, p, aim) {
   }
 }
 
+// ---------- レジェンドの必殺技 ----------
+function ultimate(room, p, aim) {
+  const L = S.YOKAI_BY_ID[p.yokai], el = L.el, c = color(el);
+  const P = 30 * p.stats.strongMul * dmgMul(p);
+  p.ult = 0;
+  room.events.push({ k: 'ult', id: p.id, kind: L.ult, name: L.ultName, x: R(p.x), y: R(p.y), a: +aim.toFixed(2), c });
+  switch (L.ult) {
+    case 'roar': // 鬼王の咆哮: まわりの鬼をしびれさせて大ダメージ
+      for (const e of enemiesInCircle(room, p.x, p.y, 480)) {
+        hit(room, p, e, P * 3, el);
+        e.stunT = Math.max(e.stunT || 0, 3);
+        if (!e.isPatrol) e.stunReadyAt = room.time + 5;
+      }
+      break;
+    case 'parade': // 百鬼夜行: 幻の妖怪たちがまわりを攻撃＋みんな大回復
+      zone(room, p, p.x, p.y, 380, 4, { kind: 'dmg', follow: p.id, tickDmg: P * 0.6, every: 0.4, el, c, shape: 'parade' });
+      for (const q of room.activePlayers()) room.healPlayer(q, q.maxHp * 0.5);
+      break;
+    case 'nyoi': // 如意棒: ぐるりとなぎはらう＋分身2体
+      p.nyoi = { t: 0, dur: 0.8, a0: aim, len: 520, dmg: P * 3, hits: new Set() };
+      for (const side of [-1, 1]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 10, t: 0.3, dmg: P * 0.5, el, c, clone: p.yokai, follow: side });
+      break;
+    case 'dragon': // 竜の泉: 水の竜がまっすぐのみこむ＋回復の泉
+      beam(room, p, aim, 760, 110, P * 4, el, { big: true });
+      zone(room, p, p.x, p.y, 170, 6, { amt: 7, every: 0.5, c: '#7dd8ff', shape: 'spring' });
+      break;
+    case 'forest': // 森のまどわし: 8秒だれも見つからない＋花の矢の雨
+      for (const q of room.activePlayers()) q.invisT = Math.max(q.invisT, 8);
+      for (const e of room.patrols) if (e.state === 'alert') room.calmPatrol(e);
+      if (room.boss && room.boss.hp > 0) { room.boss.state = 'wander'; room.boss.target = null; room.boss.huntBy = null; room.boss.path = null; }
+      zone(room, p, p.x, p.y, 320, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.4, every: 0.3, el, c, shape: 'petals' });
+      break;
+    case 'dive': // 夜空の急降下: ボス（いなければ近くの鬼）に5回
+      p.diveLeft = 5; p.diveDmg = P * 1.6;
+      nextDive(room, p);
+      break;
+  }
+}
+function nextDive(room, p) {
+  const t = room.boss && room.boss.hp > 0 && dist(room.boss, p) < 900 ? room.boss : nearest(room, p, 700);
+  p.diveLeft--;
+  const tx = t ? t.x : p.x + Math.cos(p.face) * 120, ty = t ? t.y : p.y + Math.sin(p.face) * 120;
+  p.leap = { sx: p.x, sy: p.y, tx, ty, t: 0, dur: 0.42, dmg: p.diveDmg, el: S.YOKAI_BY_ID[p.yokai].el, dive: true };
+}
+
 // ---------- 毎フレーム ----------
 // 移動の前に呼ぶ。true を返したら通常の移動をしない（ジャンプ中など）
 function preMove(room, p) {
@@ -239,7 +286,17 @@ function preMove(room, p) {
       p.leap = null; p.jump = 0;
       hitCircle(room, p, p.x, p.y, 150, L.dmg, L.el);
       room.events.push({ k: 'boom', x: R(p.x), y: R(p.y), r: 150, c: color(L.el), big: true });
+      if (L.dive && p.diveLeft > 0) nextDive(room, p);
     }
+    return true;
+  }
+  if (p.nyoi) { // 如意棒のなぎはらい（そのあいだ動かない）
+    const N = p.nyoi;
+    N.t += DT;
+    const a = N.a0 + (N.t / N.dur) * Math.PI * 2;
+    p.nyoiA = a;
+    for (const e of room.enemies()) if (!N.hits.has(e) && inBand(e, p, a, N.len, 60 + room.enemyR(e))) { N.hits.add(e); hit(room, p, e, N.dmg, S.YOKAI_BY_ID[p.yokai].el); }
+    if (N.t >= N.dur) { p.nyoi = null; p.nyoiA = null; }
     return true;
   }
   if (p.flurry) {
@@ -375,6 +432,7 @@ function updateEffects(room) {
   for (const t of room.turrets) {
     t.life -= DT; t.t -= DT;
     const owner = room.players.get(t.owner);
+    if (t.follow && owner) { const a = owner.face + t.follow * 2.2; t.x = owner.x + Math.cos(a) * 55; t.y = owner.y + Math.sin(a) * 55; }
     if (t.t <= 0 && owner) {
       const e = nearest(room, t, 450);
       if (e) { t.t = 0.5; shoot(room, { id: t.owner, x: t.x, y: t.y }, Math.atan2(e.y - t.y, e.x - t.x), 700, t.dmg, 0.7, 8, t.el); }
@@ -383,4 +441,4 @@ function updateEffects(room) {
   room.turrets = room.turrets.filter(t => t.life > 0);
 }
 
-module.exports = { normal, strong, skill, preMove, dashHit, updateProjectiles, updateEffects, A };
+module.exports = { normal, strong, skill, ultimate, ULT_MAX, preMove, dashHit, updateProjectiles, updateEffects, A };

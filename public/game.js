@@ -51,6 +51,9 @@
   if (!/^[A-Za-z0-9_-]{8,40}$/.test(pid || '')) { pid = newPid(); try { localStorage.setItem('pid', pid); } catch {} }
   let selYokai = localStorage.getItem('yokai');
   if (!friends[selYokai]) selYokai = 'nekomata';
+  // デモ撮影用: ?demo=ura のように、まだ手に入らないレジェンドを使ってみる（セーブはしない）
+  const demoYokai = new URLSearchParams(location.search).get('demo');
+  if (S.YOKAI_BY_ID[demoYokai]?.legend) selYokai = demoYokai;
   function saveAll() {
     try {
       localStorage.setItem('friends', JSON.stringify(friends));
@@ -339,6 +342,7 @@
   const fx = [];
   const bubbles = new Map(); // 見回り鬼の笛表示 id -> 残り時間
   let shake = 0;
+  let cutin = null; // 必殺技のカットイン
   let banner = null;
   let myPred = null;
   let bossType = 'red';
@@ -831,6 +835,15 @@
       case 'buff': fx.push({ k: 'buff', id: ev.id, t: 0.8, max: 0.8 }); if (ev.id === myId) floatOn(ev.id, '攻撃・速さアップ！', '#ffd84a'); break;
       case 'dodge': fx.push({ k: 'after', id: ev.id, t: 0.3, max: 0.3 }); break;
       case 'strong': floatOn(ev.id, ev.name, ev.c); break;
+      case 'ult': {
+        const who = snap && snap.players.find(q => q.id === ev.id);
+        cutin = { yokai: who ? who.yokai : null, name: ev.name, t: 1.4, max: 1.4, me: ev.id === myId };
+        shake = Math.max(shake, 0.6);
+        beep(220, 0.5, 'sawtooth', 0.08, 600); setTimeout(() => beep(660, 0.4, 'triangle', 0.07, 900), 120);
+        if (ev.kind === 'roar') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 480 * (0.5 + k * 0.25), c: ['#ff4a4a', '#ffb83a', '#fff'][k], t: 0.7 + k * 0.15, max: 0.7 + k * 0.15 });
+        if (ev.kind === 'dragon') fx.push({ k: 'dragon', x: ev.x, y: ev.y, a: ev.a, t: 1.0, max: 1.0 });
+        break;
+      }
       case 'ring': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: ev.r, c: ev.c, t: 0.4, max: 0.4 }); break;
       case 'boom':
         fx.push({ k: 'boom', x: ev.x, y: ev.y, r: ev.r || 80, c: ev.c, t: ev.big ? 0.5 : 0.35, max: ev.big ? 0.5 : 0.35 });
@@ -923,7 +936,7 @@
 
   const input = { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false };
   const stick = { active: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
-  const btnHold = { atk: null, strong: null, item: null, dash: null, skill: null };
+  const btnHold = { atk: null, strong: null, item: null, dash: null, skill: null, ult: null };
   const keys = new Set();
 
   // 右側のボタン配置
@@ -938,6 +951,7 @@
       skill:  { x: bx - big * 1.95, y: by + big * 0.25, r: mid },
       dash:   { x: bx - big * 1.75, y: by - big * 1.35, r: mid },
       item:   { x: W - 20 - s * 0.075, y: 66 + s * 0.075, r: s * 0.072 },
+      ult:    { x: bx - big * 1.15, y: by - big * 2.75, r: mid * 1.05 }, // レジェンドの必殺技
     };
   }
 
@@ -1008,6 +1022,7 @@
     input.item = btnHold.item !== null || keys.has('KeyL');
     input.dash = btnHold.dash !== null || keys.has('ShiftLeft') || keys.has('ShiftRight');
     input.skill = btnHold.skill !== null || keys.has('KeyU') || keys.has('KeyI');
+    input.ult = btnHold.ult !== null || keys.has('KeyO');
   }
 
   let lastSent = '', sendT = 0;
@@ -1125,6 +1140,18 @@
     if (p.jump) ctx.translate(0, -p.jump * 70); // 大ジャンプ中は浮く
     if (p.au || p.su) { ctx.fillStyle = 'rgba(255,200,60,0.22)'; ctx.beginPath(); ctx.arc(0, -10, 38 + Math.sin(performance.now() / 120) * 3, 0, Math.PI * 2); ctx.fill(); }
     if (me) { ctx.strokeStyle = '#ffe36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 27, 0, Math.PI * 2); ctx.stroke(); }
+    if (y.legend) { // レジェンドは虹色に光る
+      ctx.save(); ctx.globalAlpha *= 0.35;
+      ctx.fillStyle = `hsl(${(performance.now() / 8) % 360},90%,60%)`;
+      ctx.beginPath(); ctx.arc(0, -14, 44 + Math.sin(performance.now() / 150) * 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    if (p.nyoi != null) { // 如意棒のなぎはらい
+      ctx.save(); ctx.rotate(p.nyoi); ctx.lineCap = 'round';
+      ctx.strokeStyle = '#3a0a0a'; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(520, -10); ctx.stroke();
+      ctx.strokeStyle = '#d8241a'; ctx.lineWidth = 18; ctx.stroke();
+      ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(470, -10); ctx.lineTo(520, -10); ctx.moveTo(0, -10); ctx.lineTo(40, -10); ctx.stroke();
+      ctx.restore();
+    }
     if (p.sh) { ctx.fillStyle = 'rgba(100,160,255,0.3)'; ctx.beginPath(); ctx.arc(0, 0, 31, 0, Math.PI * 2); ctx.fill(); }
     if (p.run || p.dash) {
       ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 3;
@@ -1134,7 +1161,7 @@
     if (img) {
       ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(0, 16, 20, 7, 0, 0, Math.PI * 2); ctx.stroke();
-      drawSprite(img, 0, 16, 80, Math.cos(p.face) < 0);
+      drawSprite(img, 0, 16, y.legend ? 96 : 80, Math.cos(p.face) < 0);
     } else {
       ctx.fillStyle = y.color;
       ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
@@ -1165,8 +1192,38 @@
   }
 
   // 回復・ダメージのエリアや隕石の目印
+  const PARADE = ['kasabou', 'chochin', 'hitodama', 'gashadoku', 'nekomata', 'kitsunebi', 'tenguri', 'yukinko'];
   function drawZone(z, now) {
     ctx.save();
+    if (z.shape === 'parade') { // 百鬼夜行: 妖怪たちがぐるぐる回る
+      ctx.fillStyle = 'rgba(120,60,200,0.15)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill();
+      PARADE.forEach((id, i) => {
+        const a = now * 2.2 + (i / PARADE.length) * Math.PI * 2, rr = z.r * (0.55 + 0.2 * Math.sin(now * 3 + i));
+        const img = art('yokai/' + id);
+        ctx.globalAlpha = 0.75;
+        if (img) drawSprite(img, z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr * 0.7 + 20, 64, Math.sin(a) > 0);
+      });
+      ctx.restore(); return;
+    }
+    if (z.shape === 'petals') { // 森のまどわし: 花びらと矢が降る
+      ctx.fillStyle = 'rgba(60,180,80,0.12)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill();
+      for (let k = 0; k < 28; k++) {
+        const ph = (now * 0.8 + k * 0.137) % 1, a = k * 2.4, rr = (k % 7) / 7 * z.r;
+        const px = z.x + Math.cos(a) * rr, py = z.y + Math.sin(a) * rr * 0.8 - 200 * (1 - ph);
+        ctx.globalAlpha = Math.min(1, ph * 3) * 0.9;
+        ctx.fillStyle = k % 3 ? '#ff9ad8' : '#7af07a';
+        ctx.beginPath(); ctx.ellipse(px, py, 6, 3, now * 3 + k, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore(); return;
+    }
+    if (z.shape === 'spring') { // 竜の泉: 回復の泉
+      const g = ctx.createRadialGradient(z.x, z.y, 10, z.x, z.y, z.r);
+      g.addColorStop(0, 'rgba(180,240,255,0.55)'); g.addColorStop(1, 'rgba(60,140,255,0.1)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(z.x, z.y, z.r, z.r * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,250,255,0.8)'; ctx.lineWidth = 2;
+      for (let k = 0; k < 3; k++) { const rr = ((now * 50 + k * 50) % z.r); ctx.globalAlpha = 1 - rr / z.r; ctx.beginPath(); ctx.ellipse(z.x, z.y, rr, rr * 0.75, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore(); return;
+    }
     if (z.kind === 'heal') {
       ctx.fillStyle = 'rgba(91,224,122,0.18)'; ctx.strokeStyle = 'rgba(125,255,154,0.8)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (0.95 + Math.sin(now * 5) * 0.05), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -1270,6 +1327,36 @@
     ctx.textBaseline = 'alphabetic';
   }
 
+  // 必殺技のカットイン: 画面を横切る帯にレジェンドの絵と技の名前
+  function drawCutin(dt) {
+    if (!cutin) return;
+    cutin.t -= dt;
+    if (cutin.t <= 0) { cutin = null; return; }
+    const p = 1 - cutin.t / cutin.max;
+    const slide = p < 0.15 ? 1 - p / 0.15 : p > 0.85 ? -(p - 0.85) / 0.15 : 0; // 入ってきて止まって出ていく
+    const bh = H * 0.34, y = H * 0.33 - bh / 2;
+    ctx.save();
+    ctx.translate(slide * W, 0);
+    const g = ctx.createLinearGradient(0, y, W, y + bh);
+    ['#ff4a4a', '#ff9a2a', '#ffe24a', '#4ae07a', '#3ac8ff', '#6a6aff', '#c85aff'].forEach((c, i) => g.addColorStop(i / 6, c));
+    ctx.globalAlpha = 0.9; ctx.fillStyle = '#0a0612'; ctx.fillRect(0, y, W, bh);
+    ctx.fillStyle = g; ctx.fillRect(0, y, W, 5); ctx.fillRect(0, y + bh - 5, W, 5);
+    ctx.globalAlpha = 0.25; ctx.fillRect(0, y, W, bh); ctx.globalAlpha = 1;
+    // 集中線
+    ctx.strokeStyle = '#ffffff30'; ctx.lineWidth = 2;
+    for (let k = 0; k < 24; k++) { const yy = y + ((k * 37 + performance.now() / 3) % bh); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
+    const img = cutin.yokai && art('yokai/' + cutin.yokai);
+    if (img) ctx.drawImage(img, W * 0.08, y - bh * 0.35, bh * 1.6, bh * 1.6);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.round(bh * 0.32)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
+    const tx = W * 0.08 + bh * 1.55;
+    ctx.strokeText(cutin.name, tx, y + bh * 0.52); ctx.fillStyle = g; ctx.fillText(cutin.name, tx, y + bh * 0.52);
+    ctx.font = `bold ${Math.round(bh * 0.12)}px sans-serif`; ctx.fillStyle = '#ffe36b';
+    ctx.fillText(cutin.me ? '必殺技！' : `${S.YOKAI_BY_ID[cutin.yokai]?.name || ''}の必殺技！`, tx, y + bh * 0.2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
   function drawHUD(me, now) {
     Stages.drawTint(ctx, W, H, stage);
     drawMinimap(me, now);
@@ -1328,6 +1415,12 @@
       if (itImg) ctx.drawImage(itImg, bs.item.x - bs.item.r * 0.6, bs.item.y - bs.item.r * 0.6, bs.item.r * 1.2, bs.item.r * 1.2);
       ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fffc'; ctx.fillText(it ? it.name : 'アイテム', bs.item.x, bs.item.y + bs.item.r + 12);
       drawButton(bs.dash, input.dash, 0, me.exh ? '#552222' : '#2f62d9', 'ダッシュ', me.inf ? '∞' : null);
+      if (me.ult >= 0) { // レジェンドの必殺技（ゲージは虹色）
+        const ub = bs.ult, full = me.ult >= 100;
+        drawButton(ub, input.ult, 0, full ? `hsl(${(now * 200) % 360},70%,45%)` : '#3a2a4a', '必殺', at.ultName, full);
+        ctx.lineWidth = 6; ctx.strokeStyle = full ? '#fff' : `hsl(${(now * 120) % 360},90%,62%)`;
+        ctx.beginPath(); ctx.arc(ub.x, ub.y, ub.r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * me.ult / 100); ctx.stroke();
+      }
       // スタミナ
       const db = bs.dash;
       ctx.strokeStyle = me.inf ? `hsl(${(now * 300) % 360},100%,65%)` : me.exh ? '#ff5050' : '#5be0ff'; ctx.lineWidth = 5;
@@ -1533,6 +1626,8 @@
 
     for (const z of snap.zones) drawZone(z, now);
     for (const t of snap.turrets || []) {
+      const cimg = t.clone && art('yokai/' + t.clone);
+      if (cimg) { ctx.globalAlpha = 0.6 + Math.sin(now * 12) * 0.15; drawSprite(cimg, t.x, t.y + 16, 70, false); ctx.globalAlpha = 1; continue; } // ソンゴクウの分身
       ctx.fillStyle = '#3a2a4a'; ctx.strokeStyle = t.c; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(t.x, t.y, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = t.c; ctx.beginPath(); ctx.arc(t.x, t.y - 4, 7 + Math.sin(now * 10) * 2, 0, Math.PI * 2); ctx.fill();
@@ -1624,6 +1719,22 @@
         ctx.strokeStyle = e.c || '#fff'; ctx.lineWidth = e.big ? 14 : 8; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 1.1, e.a + 1.1); ctx.stroke();
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 0.9, e.a + 0.9); ctx.stroke();
       }
+      else if (e.k === 'dragon') { // 竜の泉: 水の竜がうねりながら進む
+        const L = 760 * Math.min(1, (1 - a) * 2.2);
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.a);
+        ctx.lineCap = 'round';
+        for (const [w, c] of [[120, 'rgba(40,120,255,0.55)'], [70, 'rgba(120,210,255,0.8)'], [24, 'rgba(255,255,255,0.9)']]) {
+          ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
+          for (let x = 0; x <= L; x += 20) { const yy = Math.sin(x / 70 - performance.now() / 90) * 26; if (!x) ctx.moveTo(x, yy); else ctx.lineTo(x, yy); }
+          ctx.stroke();
+        }
+        // 竜の頭
+        const hy = Math.sin(L / 70 - performance.now() / 90) * 26;
+        ctx.fillStyle = '#2a6ad8'; ctx.beginPath(); ctx.moveTo(L + 70, hy); ctx.lineTo(L - 10, hy - 50); ctx.lineTo(L - 30, hy); ctx.lineTo(L - 10, hy + 50); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(L + 10, hy - 16, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffd23a'; ctx.beginPath(); ctx.arc(L + 10, hy - 16, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
       else if (e.k === 'boom') { ctx.fillStyle = e.c || '#ff6a3d'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1.1 - a * 0.3), 0, Math.PI * 2); ctx.fill(); }
       else if (e.k === 'beam') {
         ctx.lineCap = 'round';
@@ -1665,6 +1776,7 @@
     if (movieLeft > 0) drawMovie(movieP, now);
     else {
       drawHUD(me, now);
+      drawCutin(dt);
       if (intro > 0) drawCountdown(intro);
     }
   }

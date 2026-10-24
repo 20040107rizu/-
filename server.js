@@ -25,6 +25,7 @@ const REVIVE_TIME = 3;
 const REVIVE_RANGE = 70;
 const DASH_MUL = 1.4;               // ダッシュでボス鬼をギリギリ振り切れる速さ
 const BOSS_CHASE = 255;            // ボス鬼の追いかける速さ（どの妖怪の歩きより速い）
+const DEMO_AI = !!process.env.DEMO_AI; // デモ撮影用（自動で戦う・ボスと見回り鬼が近くに出る）
 const NOTICE_RANGE = 300;        // 攻撃してきた相手に見回り鬼が気づける距離（見張りの視界と同じ）
 const ESCAPE_TIME = 1.5;           // 襖の前で攻撃ボタンを長押しする時間
 const ESCAPE_RANGE = 80;
@@ -269,9 +270,9 @@ class Room {
 
   addPlayer(ws, name, yokai, pid, totsu, title) {
     const p = {
-      id: genId(), ws, pid, totsu: cleanTotsu(totsu), title: cleanTitle(title), name: (name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yokai] ? yokai : 'nekomata',
+      id: genId(), ws, pid, totsu: cleanTotsu(totsu), title: cleanTitle(title), name: (name || 'プレイヤー').slice(0, 10), yokai: usableYokai(yokai) ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
-      input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false }, prevItem: false,
+      input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false, ult: false }, prevItem: false,
     };
     this.players.set(p.id, p);
     return p;
@@ -323,8 +324,10 @@ class Room {
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
+        legend: !!S.YOKAI_BY_ID[p.yokai].legend, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, nyoi: null, diveLeft: 0, // レジェンド
       });
       S.collide(this.map, p, PLAYER_R);
+      if (DEMO_AI) { p.maxHp *= 5; p.hp = p.maxHp; p.ultBoost = 2.5; }
     }
     const spawn = spawns[0];
 
@@ -360,6 +363,7 @@ class Room {
       state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
       stunT: 0, chargeDir: 0, hitFlash: 0, atkT: 2,
     };
+    if (DEMO_AI) this.demoPlace(spawns[0]);
 
     this.broadcast({
       t: 'start', seed, stage: this.stage, timeLimit: this.timeLimit, challenge: !!this.challenge, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
@@ -429,6 +433,7 @@ class Room {
   damagePlayer(p, amount) {
     if (p.down || p.escaped || p.dashT > 0 || p.invulT > 0) return;
     if (p.shieldT > 0) amount *= 0.3;
+    if (p.passive === 'bossGuard') amount *= 0.7; // ウラ: ボス鬼からのダメージ -30%
     p.hp -= amount;
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.reviveProg = 0; this.events.push({ k: 'down', id: p.id }); }
@@ -449,6 +454,34 @@ class Room {
       this.dama.push(d);
       this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v });
     }
+  }
+
+  // デモ撮影用: ボス鬼と見回り鬼3体を、出発地点の近くの見えるところに置く
+  demoPlace(sp) {
+    const near = (lo, hi, grid) => {
+      for (let k = 0; k < 3000; k++) { const q = grid.randomFreePoint(); const d = dist(q, sp); if (d > lo && d < hi && S.lineOfSight(this.map, q, sp)) return q; }
+      return grid.randomFreePoint();
+    };
+    Object.assign(this.boss, near(380, 560, this.gridB), { state: 'engage', target: [...this.players.values()][0].id });
+    this.boss.maxHp = this.boss.hp = this.boss.maxHp * 5; // 撮影中にすぐ倒れないように
+    for (const e of this.patrols.slice(0, 3)) Object.assign(e, near(220, 480, this.gridS));
+  }
+
+  // ---- デモ撮影用の自動操作（DEMO_AI=1）: いちばん近い鬼に向かって攻撃し、必殺技がたまったら使う ----
+  demoInput(p) {
+    if (p.down || p.escaped) return;
+    const b = this.boss && this.boss.hp > 0 ? this.boss : null;
+    const t = b && dist(b, p) < 1200 ? b : this.nearestEnemy(p, 1500) || b;
+    const role = S.YOKAI_BY_ID[p.yokai].role;
+    const want = role === 'fighter' || role === 'tank' ? 85 : 260;
+    let mx = 0, my = 0;
+    if (t) {
+      const d = dist(t, p), a = Math.atan2(t.y - p.y, t.x - p.x);
+      if (d > want + 40) { mx = Math.cos(a); my = Math.sin(a); }
+      else if (d < want - 60) { mx = -Math.cos(a); my = -Math.sin(a); }
+      else { mx = Math.cos(a + Math.PI / 2) * 0.6; my = Math.sin(a + Math.PI / 2) * 0.6; } // まわりこむ
+    }
+    p.input = { mx, my, atk: !!t, strong: !!t && this.time > 1.5, item: false, dash: false, skill: this.time % 6 < 0.1, ult: this.time > 3 };
   }
 
   // ---- 見回り鬼 ----
@@ -476,6 +509,8 @@ class Room {
 
   canSee(e, p, range, halfAngle) {
     if (!this.visibleTo(p)) return false;
+    if (p.passive === 'nightDash' && p.dashing) return false; // ジャージーデビル: ダッシュ中は見つからない
+    if (p.passive === 'sneak' && e.isPatrol) range *= 0.5;    // ヌラリヒョン: 見回り鬼の見える距離が半分
     const d = dist(e, p);
     if (d > range) return false;
     if (d > 70 && angleDiff(Math.atan2(p.y - e.y, p.x - e.x), e.face) > halfAngle) return false;
@@ -653,7 +688,7 @@ class Room {
     if (inp.dash && moving && p.staminaT > 0) dashing = true;
     else if (inp.dash && moving && !p.exhausted && p.stamina > 0) {
       dashing = true;
-      p.stamina = Math.max(0, p.stamina - 35 * DT);
+      p.stamina = Math.max(0, p.stamina - (p.passive === 'stamina' ? 21 : 35) * DT); // ソンゴクウ: 減りにくい
       if (p.stamina <= 0) p.exhausted = true;
     }
     if (!dashing) {
@@ -688,6 +723,10 @@ class Room {
     if (inp.atk && p.atkT <= 0 && !busy) Combat.normal(this, p, aim, target);
     if (inp.strong && p.strongT <= 0 && !busy) Combat.strong(this, p, aim, target);
     if (inp.skill && p.skillT <= 0 && !p.leap) Combat.skill(this, p, aim);
+    if (p.legend) {
+      p.ult = Math.min(Combat.ULT_MAX, p.ult + 1.5 * DT * (p.ultBoost || 1)); // 時間でも少しずつたまる
+      if (inp.ult && p.ult >= Combat.ULT_MAX && !busy) Combat.ultimate(this, p, aim);
+    }
 
     // アイテム（押した瞬間に使う）
     if (inp.item && !p.prevItem && p.item) this.useItem(p, aim);
@@ -697,6 +736,7 @@ class Room {
     for (const d of this.dama) {
       if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < 32) {
         d.taken = true; p.dama += d.v;
+        if (p.passive === 'orbHeal') this.healPlayer(p, 5 * Math.min(d.v, 8)); // クルピラ: 鬼玉で少し回復
         this.events.push({ k: 'dg', id: d.id, by: p.id, v: d.v });
       }
     }
@@ -779,8 +819,9 @@ class Room {
   updateRevive() {
     for (const p of this.players.values()) {
       if (!p.down || p.escaped) continue;
-      const helper = this.activePlayers().some(q => q !== p && dist(p, q) < REVIVE_RANGE);
-      if (helper) p.reviveProg += DT; else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
+      const helpers = this.activePlayers().filter(q => q !== p && dist(p, q) < REVIVE_RANGE);
+      const helper = helpers.length > 0;
+      if (helper) p.reviveProg += DT * (helpers.some(q => q.passive === 'reviver') ? 2 : 1); // メリュジーヌ: 起こす速さ2倍 else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
       if (p.reviveProg >= REVIVE_TIME) {
         p.down = false; p.hp = p.maxHp * 0.4; p.reviveProg = 0; p.invulT = 2;
         for (const q of this.activePlayers()) if (q !== p && dist(p, q) < REVIVE_RANGE) q.revives++; // 起こした人に記録
@@ -794,6 +835,7 @@ class Room {
     if (this.introT > 0) { this.introT -= DT; return; }
     this.time += DT;
     this.timeLeft -= DT;
+    if (DEMO_AI) for (const p of this.players.values()) this.demoInput(p);
     for (const p of this.players.values()) this.updatePlayer(p);
     this.updateRevive();
     this.updatePatrols();
@@ -859,7 +901,7 @@ class Room {
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
-        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage } : null,
@@ -867,7 +909,7 @@ class Room {
       traps: this.traps.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y) })),
       bombs: this.bombs.map(bm => ({ id: bm.id, x: Math.round(bm.x), y: Math.round(bm.y), t: +bm.t.toFixed(1) })),
       proj: this.projectiles.map(pr => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), r: pr.r, c: pr.c, punch: pr.punch, spin: pr.spin, lob: pr.lob, bomb: pr.bomb, a: +Math.atan2(pr.vy, pr.vx).toFixed(2) })),
-      turrets: this.turrets.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), c: t.c })),
+      turrets: this.turrets.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), c: t.c, clone: t.clone })),
       tele: this.telegraphs.map(tg => ({ id: tg.id, shape: tg.shape, x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r, a: tg.a, len: tg.len, w: tg.w, p: +(1 - tg.t / tg.max).toFixed(2) })),
       zones: this.zones.map(z => ({ id: z.id, x: Math.round(z.x), y: Math.round(z.y), r: z.r, kind: z.kind || 'heal', c: z.c, shape: z.shape, life: +z.life.toFixed(1) })),
       ev: this.events,
@@ -935,7 +977,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'yokai':
-        if (room && me && room.state === 'lobby' && S.YOKAI_BY_ID[msg.id]) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
+        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
         if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type]) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
@@ -963,7 +1005,7 @@ wss.on('connection', ws => {
           const i = me.input;
           i.mx = clamp(+msg.mx || 0, -1, 1);
           i.my = clamp(+msg.my || 0, -1, 1);
-          i.atk = !!msg.atk; i.strong = !!msg.strong; i.item = !!msg.item; i.dash = !!msg.dash; i.skill = !!msg.skill;
+          i.atk = !!msg.atk; i.strong = !!msg.strong; i.item = !!msg.item; i.dash = !!msg.dash; i.skill = !!msg.skill; i.ult = !!msg.ult;
         }
         break;
     }
@@ -988,6 +1030,8 @@ wss.on('connection', ws => {
 const MAX_WATCHERS = 8;
 const known = new Map();    // pid → { name, yokai, seen }
 const presence = new Map(); // ホーム画面の接続 → pid
+// レジェンドはまだ手に入らない（デモ撮影のときだけ使える）
+const usableYokai = id => !!S.YOKAI_BY_ID[id] && (!S.YOKAI_BY_ID[id].legend || DEMO_AI);
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
 const cleanTitle = v => (S.TITLE_BY_ID[v] || S.weeklyTitle(v) ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);
