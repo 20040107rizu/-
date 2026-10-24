@@ -951,7 +951,7 @@
       skill:  { x: bx - big * 1.95, y: by + big * 0.25, r: mid },
       dash:   { x: bx - big * 1.75, y: by - big * 1.35, r: mid },
       item:   { x: W - 20 - s * 0.075, y: 66 + s * 0.075, r: s * 0.072 },
-      ult:    { x: bx - big * 1.15, y: by - big * 2.75, r: mid * 1.05 }, // レジェンドの必殺技
+      ult:    { x: bx - big * 1.3, y: by - big * 3.0, r: mid * 1.05 }, // レジェンドの必殺技
     };
   }
 
