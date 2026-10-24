@@ -144,14 +144,16 @@
     $('buddyBadge').textContent = open ? `募集中 ${open}` : `${online}人`;
     if (!$('buddyScreen').classList.contains('active')) return;
     const ul = $('buddyList');
-    if (!list.length) { ul.innerHTML = `<li class="buddy-empty">${pws ? 'まだフレンドがいません。だれかがこのゲームを遊ぶと、ここに出てきます' : 'サーバーにつないでいます…'}</li>`; return; }
-    ul.innerHTML = list.map(f => {
+    if (!list.length) { ul._last = null; ul.innerHTML = `<li class="buddy-empty">${pws ? 'まだフレンドがいません。だれかがこのゲームを遊ぶと、ここに出てきます' : 'サーバーにつないでいます…'}</li>`; return; }
+    const html = list.map(f => {
       const y = S.YOKAI_BY_ID[f.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
       const st = f.status === 'off' ? `オフライン（${ago(f.seen)}）` : f.status === 'lobby' ? `募集中（${f.n}/4人）` : STATUS[f.status];
       const btn = f.room && f.status === 'lobby' ? `<button class="join" data-code="${f.room}">参加</button>`
         : f.room && f.status === 'battle' ? `<button class="watch" data-code="${f.room}">観戦</button>` : '';
       return `<li class="${f.status}" data-pid="${f.pid}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)} ${f.title ? titleTag(f.title) : ''}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
     }).join('');
+    if (ul._last === html) return; // 3秒ごとの更新で中身が同じなら作り直さない（軽くするため）
+    ul.innerHTML = html; ul._last = html;
     for (const li of ul.querySelectorAll('li[data-pid]')) li.onclick = e => { if (!e.target.closest('button')) openProfile(li.dataset.pid); };
     for (const b of ul.querySelectorAll('button.join')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'join', code: b.dataset.code }); };
     for (const b of ul.querySelectorAll('button.watch')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'watch', code: b.dataset.code }); };
