@@ -197,8 +197,13 @@
     red:   { name: '赤鬼', color: '#c8242a', hp: 1.15, dmg: 1.2, atkGap: 0.85, warn: 1.0,  drop: 50,  need: null },
     blue:  { name: '青鬼', color: '#2a5ad8', hp: 1.75, dmg: 1.55, atkGap: 0.7, warn: 0.95, drop: 100, need: 'red' },
     black: { name: '黒鬼', color: '#2a2030', hp: 2.6, dmg: 1.95, atkGap: 0.56, warn: 0.85, drop: 150, need: 'blue' },
+    // ここから先はチームで挑むボス（team: 1人・2人でも体力は3人分）
+    gold:   { name: '金鬼',   color: '#e0b030', hp: 3.4, dmg: 2.2, atkGap: 0.52, warn: 0.8,  drop: 200, need: 'black', team: true },
+    white:  { name: '白鬼',   color: '#e8f2ff', hp: 4.1, dmg: 2.4, atkGap: 0.5,  warn: 0.8,  drop: 230, need: 'gold',  team: true },
+    fuurai: { name: '風雷鬼', color: '#38c8a0', hp: 4.8, dmg: 2.5, atkGap: 0.48, warn: 0.78, drop: 260, need: 'white', team: true },
+    kishin: { name: '鬼神',   color: '#a01030', hp: 6.0, dmg: 2.7, atkGap: 0.45, warn: 0.75, drop: 300, need: 'fuurai', team: true },
   };
-  const BOSS_ORDER = ['red', 'blue', 'black'];
+  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {

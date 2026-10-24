@@ -538,7 +538,7 @@
     if (!img) return null;
     return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(img, 'repeat'));
   }
-  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff' };
+  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff', gold: '#ffd23a', white: '#bfe6ff', fuurai: '#5af0c0', kishin: '#ff3a6a' };
   let view = { l: 0, r: 0, t: 0, b: 0 }; // 今画面に見えている範囲（ワールド座標）
   const inView = (x, y, m = 0) => x > view.l - m && x < view.r + m && y > view.t - m && y < view.b + m;
   let spectateId = null;
@@ -1004,7 +1004,21 @@
       case 'use': if (ev.id === myId) beep(660, 0.1, 'square', 0.05); break;
       case 'stun': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#ffe14a', t: 0.6, max: 0.6 }); banner = { text: 'ボス鬼がしびれた！', t: 1.4, c: '#ffe14a' }; break;
       case 'oniDown': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 90, c: '#ffffff', t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) banner = { text: '見回り鬼をたおした！', t: 1.2 }; break;
-      case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: '攻撃がはげしくなるぞ', t: 2.2, c: '#ff4a3a' }; shake = 0.5; break;
+      case 'clang': floats.push({ x: ev.x, y: ev.y, text: 'カキン！', c: '#ffd23a', t: 0.7, small: true }); if (Math.random() < 0.5) beep(1800, 0.05, 'square', 0.03, 600); break;
+      case 'bliz': banner = { text: '❄ 吹雪だ！', sub: '白鬼の姿が見えない…赤い予告に気をつけろ', t: 2.4, c: '#bfe6ff' }; beep(300, 0.8, 'sawtooth', 0.04, -200); break;
+      case 'blizEnd': banner = { text: '吹雪がやんだ', t: 1.4, c: '#bfe6ff' }; break;
+      case 'mode': banner = ev.m === 'wind' ? { text: '🌪 風の型', sub: '突風で吹き飛ばしてくるぞ', t: 2.0, c: '#5af0c0' } : { text: '⚡ 雷の型', sub: '全員の足もとに雷が落ちる！', t: 2.0, c: '#ffe14a' }; shake = 0.3; break;
+      case 'bolt':
+        fx.push({ k: 'bolt', x: ev.x, y: ev.y, r: ev.r || 80, t: 0.35, max: 0.35 });
+        if (near(ev.x, ev.y)) { shake = Math.max(shake, 0.2); beep(1400, 0.12, 'sawtooth', 0.05, -1300); }
+        break;
+      case 'gust': fx.push({ k: 'gust', x: ev.x, y: ev.y, a: ev.a || 0, t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) beep(200, 0.4, 'triangle', 0.05, 400); break;
+      case 'phase':
+        banner = ev.n === 2 ? { text: '鬼神が変身した！', sub: '仲間の見回り鬼を呼んでくるぞ', t: 2.6, c: '#ff3a6a' } : { text: '鬼神 最後の姿！', sub: '町がせまくなっていく…赤い輪の中にいろ！', t: 3, c: '#ff3a6a' };
+        fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 420, c: '#ff3a6a', t: 0.9, max: 0.9 }); shake = 0.8; beep(60, 0.9, 'sawtooth', 0.12, -20);
+        break;
+      case 'summon': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 200, c: '#b08cff', t: 0.6, max: 0.6 }); break;
+      case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: bossType === 'gold' ? '金の鎧！正面からの攻撃はほとんど効かない。うしろに回りこめ！' : '攻撃がはげしくなるぞ', t: bossType === 'gold' ? 3 : 2.2, c: bossType === 'gold' ? '#ffd23a' : '#ff4a3a' }; shake = 0.5; break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
@@ -1316,6 +1330,8 @@
   }
 
   function drawBoss(b, pos, now) {
+    if (b.bliz) { ctx.save(); ctx.globalAlpha = 0.07 + 0.05 * Math.sin(now * 7); } // 吹雪の中ではほとんど見えない
+    else bossAura(b, pos, now);
     const wob = Math.sin(now * 5) * 3;
     if (b.st !== 'wander' && !b.stun) { ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 30; }
     const img = art('oni/boss-' + (b.type || 'red'));
@@ -1330,7 +1346,65 @@
       }
       ctx.fillStyle = '#ffe14a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ビリビリ…', pos.x, pos.y - 80);
     }
+    if (b.bliz) { ctx.restore(); return; }
     bar(pos.x - 50, pos.y - (img ? 132 : 72), 100, 6, b.hp / b.maxHp, '#ff8a3d');
+  }
+  // 金鬼から先のボスのまわりの光
+  function bossAura(b, pos, now) {
+    const cy = pos.y - 30;
+    if (b.type === 'gold' && b.rage) { // 金の鎧: 正面に盾
+      ctx.save(); ctx.translate(pos.x, cy);
+      ctx.strokeStyle = `rgba(255,215,60,${0.7 + 0.3 * Math.sin(now * 9)})`; ctx.lineWidth = 10; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, 105, b.face - 1.1, b.face + 1.1); ctx.stroke();
+      ctx.strokeStyle = '#fff8'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 112, b.face - 1.0, b.face + 1.0); ctx.stroke();
+      ctx.restore();
+    }
+    if (b.type === 'fuurai') {
+      ctx.save(); ctx.translate(pos.x, cy); ctx.lineCap = 'round';
+      if (b.mode === 'wind') {
+        ctx.strokeStyle = 'rgba(110,255,210,0.65)'; ctx.lineWidth = 5;
+        for (let k = 0; k < 3; k++) { const a = now * 4 + k * 2.1; ctx.beginPath(); ctx.arc(0, 0, 90 + k * 10, a, a + 1.4); ctx.stroke(); }
+      } else {
+        ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 3;
+        for (let k = 0; k < 4; k++) {
+          if (Math.sin(now * 23 + k * 7) < 0.2) continue;
+          const a = k * 1.57 + Math.floor(now * 8) * 0.9;
+          ctx.beginPath(); ctx.moveTo(Math.cos(a) * 60, Math.sin(a) * 60); ctx.lineTo(Math.cos(a + 0.15) * 85, Math.sin(a + 0.15) * 85); ctx.lineTo(Math.cos(a - 0.1) * 100, Math.sin(a - 0.1) * 100); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    if (b.type === 'kishin' && b.phase > 1) {
+      ctx.save(); ctx.translate(pos.x, cy);
+      for (let k = 0; k < b.phase; k++) { ctx.strokeStyle = `rgba(255,${40 + k * 30},80,${0.35 + 0.2 * Math.sin(now * 6 + k)})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, 95 + k * 16 + Math.sin(now * 5 + k) * 4, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+  // 鬼神の最後の形態: 輪の外を赤くする（町の座標で描く）
+  function drawRing(g, now) {
+    ctx.save();
+    ctx.fillStyle = `rgba(160,0,30,${0.32 + 0.06 * Math.sin(now * 4)})`;
+    ctx.beginPath(); ctx.rect(-2000, -2000, S.MAP_W + 4000, S.MAP_H + 4000); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2, true); ctx.fill('evenodd');
+    ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 8; ctx.setLineDash([30, 18]); ctx.lineDashOffset = -now * 60;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // 吹雪（画面の座標で描く）
+  const snowFlakes = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random(), s: 1.5 + Math.random() * 3, v: 0.25 + Math.random() * 0.5 }));
+  let blizA = 0;
+  function drawBlizzard(dt, now) {
+    blizA += ((snap.boss && snap.boss.bliz ? 1 : 0) - blizA) * Math.min(1, dt * 2.5);
+    if (blizA < 0.02) return;
+    ctx.save();
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.15, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, `rgba(230,242,255,${0.12 * blizA})`); g.addColorStop(1, `rgba(235,245,255,${0.78 * blizA})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(255,255,255,${0.85 * blizA})`;
+    for (const f of snowFlakes) {
+      f.x = (f.x - f.v * dt * 1.4 + 1) % 1; f.y = (f.y + f.v * dt + 1) % 1;
+      ctx.beginPath(); ctx.arc(f.x * W, f.y * H, f.s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 
   function drawPlayer(p, pos, me) {
@@ -1451,18 +1525,21 @@
     ctx.restore();
   }
 
+  const TELE_C = { bolt: ['255,225,60', 'rgba(255,240,120,0.95)'], wind: ['70,240,190', 'rgba(120,255,210,0.95)'] };
   function drawTelegraph(t) {
     ctx.save();
     ctx.translate(t.x, t.y);
-    ctx.fillStyle = 'rgba(255,40,40,0.22)';
-    ctx.strokeStyle = 'rgba(255,60,60,0.9)'; ctx.lineWidth = 3;
+    const tc = TELE_C[t.c], rgb = tc ? tc[0] : '255,40,40';
+    ctx.fillStyle = `rgba(${rgb},0.22)`;
+    ctx.strokeStyle = tc ? tc[1] : 'rgba(255,60,60,0.9)'; ctx.lineWidth = 3;
     if (t.shape === 'rect') {
       ctx.rotate(t.a);
       ctx.fillRect(0, -t.w / 2, t.len, t.w); ctx.strokeRect(0, -t.w / 2, t.len, t.w);
-      ctx.fillStyle = 'rgba(255,40,40,0.45)'; ctx.fillRect(0, -t.w / 2, t.len * t.p, t.w);
+      ctx.fillStyle = `rgba(${rgb},0.45)`; ctx.fillRect(0, -t.w / 2, t.len * t.p, t.w);
     } else {
       ctx.beginPath(); ctx.arc(0, 0, t.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = 'rgba(255,40,40,0.45)'; ctx.beginPath(); ctx.arc(0, 0, t.r * t.p, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(${rgb},0.45)`; ctx.beginPath(); ctx.arc(0, 0, t.r * t.p, 0, Math.PI * 2); ctx.fill();
+      if (t.c === 'bolt') { ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⚡', 0, 0); ctx.textBaseline = 'alphabetic'; }
     }
     ctx.restore();
   }
@@ -1495,7 +1572,8 @@
     }
     ctx.textBaseline = 'alphabetic';
     for (const e of snap.patrols) dot(e.x, e.y, 3, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#b08cff');
-    if (snap.boss) {
+    if (snap.ring) { ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ox + snap.ring.x * sx, oy + snap.ring.y * sx, snap.ring.r * sx, 0, Math.PI * 2); ctx.stroke(); }
+    if (snap.boss && !snap.boss.bliz) {
       dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + snap.boss.x * sx, oy + snap.boss.y * sx, 6, 0, Math.PI * 2); ctx.stroke();
     }
@@ -1818,6 +1896,7 @@
       ctx.font = '30px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💣', bm.x, bm.y); ctx.textBaseline = 'alphabetic';
       ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(Math.ceil(bm.t), bm.x, bm.y - 26);
     }
+    if (snap.ring) drawRing(snap.ring, now);
     for (const t of snap.tele) drawTelegraph(t);
 
     // 鬼玉
@@ -1927,6 +2006,19 @@
         const p = snap.players.find(q => q.id === e.id);
         if (p) { const pos = p.id === myId && myPred ? myPred : (ents.get('p' + p.id) || p); ctx.strokeStyle = e.k === 'buff' ? '#ffd84a' : '#ffffff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(pos.x, pos.y - 10, 30 + (1 - a) * 30, 0, Math.PI * 2); ctx.stroke(); }
       }
+      else if (e.k === 'bolt') { // 雷: 空から落ちる稲妻
+        ctx.strokeStyle = '#fff6a0'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(e.x + 30, e.y - 420);
+        for (let j = 1; j <= 6; j++) ctx.lineTo(e.x + (j % 2 ? -24 : 24) * (1 - j / 7), e.y - 420 + j * 70);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,240,120,0.55)'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1.2 - a * 0.4), 0, Math.PI * 2); ctx.fill();
+      }
+      else if (e.k === 'gust') { // 突風: 前に流れる風の線
+        ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.a);
+        ctx.strokeStyle = '#aaffe6'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        for (let j = 0; j < 6; j++) { const yy = (j - 2.5) * 34, x0 = (1 - a) * 700 * (0.5 + (j % 3) * 0.2); ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x0 + 140, yy); ctx.stroke(); }
+        ctx.restore();
+      }
       else if (e.k === 'ring') { ctx.strokeStyle = e.c; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(e.x, e.y, e.r * (1 - a), 0, Math.PI * 2); ctx.stroke(); }
       ctx.globalAlpha = 1;
     }
@@ -1950,6 +2042,7 @@
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
     if (movieLeft > 0) drawMovie(movieP, now);
     else {
+      drawBlizzard(dt, now);
       drawHUD(me, now);
       if (intro > 0) drawCountdown(intro);
     }

@@ -301,6 +301,14 @@ class Room {
 
   // ---- バトル開始 ----
   start() {
+    // デモ撮影用: 仲間のボットを足す（DEMO_BOTS=3 で4人チーム）
+    if (DEMO_AI && process.env.DEMO_BOTS && !this.demoBots) {
+      this.demoBots = true;
+      const fake = { readyState: 3, send() {}, close() {} };
+      const team = (process.env.DEMO_TEAM || 'kappa,karasutengu,yukionna').split(',');
+      for (let k = 0; k < +process.env.DEMO_BOTS; k++) this.addPlayer(fake, ['カッパ丸', 'テング', 'ユキ'][k] || 'ボット', team[k % team.length], null);
+    }
+    if (DEMO_AI && process.env.DEMO_YOKAI) this.players.values().next().value.yokai = process.env.DEMO_YOKAI;
     this.state = 'battle';
     this.time = 0;
     // 1回でもバトルに行った人はフレンド一覧に出す
@@ -374,12 +382,17 @@ class Room {
     const bp = this.farFromAll(this.gridB, spawns, 1800);
     const type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
     const kind = S.BOSSES[type];
-    const bossHp = Math.round((1500 + 1100 * n) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
+    // 金鬼から先はチームで挑むボス。1人・2人でも体力は3人分（ひとりで倒すのは、ほぼむり）
+    const bossHp = Math.round((1500 + 1100 * (kind.team ? Math.max(n, 3) : n)) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
     this.boss = {
       x: bp.x, y: bp.y, hp: bossHp, maxHp: bossHp, type, kind, name: kind.name, face: 0,
       state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
       stunT: 0, chargeDir: 0, hitFlash: 0, atkT: 2,
+      blizT: 14, bliz: 0,           // 白鬼: 吹雪
+      mode: 'wind', modeT: 12, boltT: 2, // 風雷鬼: 風の型・雷の型
+      phase: 1, summonT: 3,         // 鬼神: 変身の段階
     };
+    this.ring = null; // 鬼神の最後の形態: だんだんせまくなる安全な輪
     if (DEMO_AI) this.demoPlace(spawns[0]);
 
     this.broadcast({
@@ -419,6 +432,12 @@ class Room {
   // ---- ダメージ ----
   damageOni(src, e, amount) {
     if (e.hp <= 0) return;
+    if (e === this.boss && e.type === 'gold' && e.rage && src) {
+      // 金の鎧: 正面からは35%しか効かない。背中からは1.3倍
+      const off = angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face);
+      if (off < 1.1) { amount *= 0.35; if (Math.random() < 0.25) this.events.push({ k: 'clang', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 60) }); }
+      else if (off > 2.2) amount *= 1.3;
+    }
     e.hp = Math.max(0, e.hp - amount);
     e.hitFlash = 0.1;
     if (src) { src.dmgDealt += amount; if (!e.isPatrol) src.bossDmg += amount; }
@@ -481,6 +500,11 @@ class Room {
     };
     Object.assign(this.boss, near(380, 560, this.gridB), { state: 'engage', target: [...this.players.values()][0].id });
     this.boss.maxHp = this.boss.hp = this.boss.maxHp * 5; // 撮影中にすぐ倒れないように
+    // 仲間のボットは自分の近くから
+    for (const p of [...this.players.values()].slice(1)) { Object.assign(p, near(60, 200, this.gridS)); }
+    // 特別な仕組みを早く見せる（DEMO_HP=0.5 で体力を減らした状態から、DEMO_FAST=1 で吹雪・型の切りかえを早く）
+    if (process.env.DEMO_HP) { this.boss.hp = this.boss.maxHp * +process.env.DEMO_HP; }
+    if (process.env.DEMO_FAST) Object.assign(this.boss, { blizT: 4, modeT: 7 });
     for (const e of this.patrols.slice(0, 3)) Object.assign(e, near(220, 480, this.gridS));
   }
 
@@ -522,6 +546,7 @@ class Room {
     this.calmPatrol(e); // 伝達はここで途切れる
     this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
     e.respawnT = 25;
+    if (e.summoned) this.patrols = this.patrols.filter(q => q !== e);
   }
 
   canSee(e, p, range, halfAngle) {
@@ -586,6 +611,7 @@ class Room {
     if (b.stunT > 0) { b.stunT -= DT; return; }
     // 体力が半分を切ると怒る（攻撃の間隔が短くなる）
     if (!b.rage && b.hp < b.maxHp / 2) { b.rage = true; this.events.push({ k: 'rage', x: Math.round(b.x), y: Math.round(b.y) }); }
+    this.bossSpecial(b);
 
     // 自分の目で見つけたら戦闘
     if (b.state !== 'engage' && b.state !== 'charging' && b.state !== 'windup') {
@@ -632,11 +658,81 @@ class Room {
     }
   }
 
+  // 金鬼から先のボスの、それぞれの仕組み
+  bossSpecial(b) {
+    if (b.type === 'white') {
+      // 吹雪: 22秒ごとに8秒。白鬼の姿が消えて、攻撃の予告だけ見える
+      if (b.bliz > 0) { if ((b.bliz -= DT) <= 0) { b.bliz = 0; this.events.push({ k: 'blizEnd' }); } }
+      else if ((b.blizT -= DT) <= 0) { b.bliz = 8; b.blizT = 22; this.events.push({ k: 'bliz' }); }
+    }
+    if (b.type === 'fuurai') {
+      // 12秒ごとに 風の型 ⇔ 雷の型。雷の型のときは、町じゅうの全員の足もとに雷が落ちる
+      if ((b.modeT -= DT) <= 0) { b.mode = b.mode === 'wind' ? 'thunder' : 'wind'; b.modeT = 12; b.boltT = 1; this.events.push({ k: 'mode', m: b.mode }); }
+      if (b.mode === 'thunder' && (b.boltT -= DT) <= 0) {
+        b.boltT = b.rage ? 2.2 : 3;
+        for (const p of this.activePlayers()) {
+          const a = Math.random() * Math.PI * 2, r = rand(0, 60);
+          this.telegraphs.push({ id: genId(), shape: 'circle', x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r, r: 80, t: 1.1, max: 1.1, dmg: 26 * b.kind.dmg, c: 'bolt', bolt: true });
+        }
+      }
+    }
+    if (b.type === 'kishin') {
+      // 体力で3段階に変身。2段階目は見回り鬼を呼ぶ、3段階目は町がせまくなる
+      const ph = b.hp > b.maxHp * 0.66 ? 1 : b.hp > b.maxHp * 0.33 ? 2 : 3;
+      if (ph > b.phase) {
+        b.phase = ph; b.stunT = 1.2; // 変身のあいだは少し止まる
+        this.events.push({ k: 'phase', n: ph, x: Math.round(b.x), y: Math.round(b.y) });
+        if (ph === 3) this.ring = { x: b.x, y: b.y, r: 1500, min: 600 }; // 変身した場所を中心に、約35秒でせまくなる（鬼神のまわりに閉じこめられる）
+      }
+      if (b.phase === 2 && (b.summonT -= DT) <= 0) {
+        b.summonT = 14;
+        const t = b.target != null ? this.players.get(b.target) : this.activePlayers()[0];
+        if (t) for (let k = 0; k < 3; k++) this.summonPatrol(b, t);
+        this.events.push({ k: 'summon', x: Math.round(b.x), y: Math.round(b.y) });
+      }
+    }
+  }
+
+  // 鬼神が呼んだ見回り鬼（倒すと出てこない）
+  summonPatrol(b, t) {
+    if (this.patrols.filter(e => e.summoned && e.hp > 0).length >= 6) return;
+    const a = Math.random() * Math.PI * 2, p = { x: b.x + Math.cos(a) * 90, y: b.y + Math.sin(a) * 90 };
+    S.collide(this.map, p, PATROL_R);
+    this.patrols.push({
+      id: genId(), x: p.x, y: p.y, face: a, hp: 100, maxHp: 100, summoned: true,
+      state: 'alert', target: t.id, lostT: 0, wanderTo: null, path: null, whistleT: 0.5, hitFlash: 0,
+    });
+  }
+
+  // 鬼神の最後の形態: 輪がだんだんせまくなり、外にいると体力がへる
+  updateRing() {
+    const g = this.ring;
+    if (!g) return;
+    g.r = Math.max(g.min, g.r - 26 * DT);
+    for (const p of this.activePlayers()) if (dist(p, g) > g.r) { p.ringT = (p.ringT || 0) + DT; if (p.ringT >= 0.5) { p.ringT = 0; this.damagePlayer(p, 9); } }
+  }
+
   bossAttack(t) {
     const b = this.boss;
     const roll = Math.random();
     const warn = b.kind.warn;
     b.face = Math.atan2(t.y - b.y, t.x - b.x);
+    // 風雷鬼（風の型）: 前に向かって大きな突風。当たると吹き飛ばされる
+    if (b.type === 'fuurai' && b.mode === 'wind' && roll < 0.45) {
+      this.telegraphs.push({ id: genId(), shape: 'rect', x: b.x, y: b.y, a: b.face, len: 720, w: 220, t: warn + 0.15, max: warn + 0.15, dmg: 24 * b.kind.dmg, knock: 300, c: 'wind' });
+      b.state = 'windup'; b.stateT = warn + 0.45;
+      return;
+    }
+    // 鬼神: いままでのボスの技を全部使う（最初から乱れ打ちも使う）
+    if (b.type === 'kishin' && roll < 0.3 + 0.1 * b.phase) {
+      const k = 4 + b.phase;
+      for (let i = 0; i < k; i++) {
+        const a = i / k * Math.PI * 2 + Math.random(), r = i === 0 ? 0 : rand(60, 190);
+        this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r, r: 95, t: warn + i * 0.1, max: warn + i * 0.1, dmg: 32 * b.kind.dmg });
+      }
+      b.state = 'windup'; b.stateT = warn + 0.5;
+      return;
+    }
     // 怒り状態の青鬼・黒鬼は、まわりにいくつも落とす「乱れ打ち」も使う
     if (b.rage && b.type !== 'red' && roll < 0.3) {
       const k = b.type === 'black' ? 5 : 3;
@@ -671,9 +767,15 @@ class Room {
       if (tg.then === 'charge') { if (b && b.hp > 0) { b.state = 'charging'; b.stateT = 0.85; } continue; }
       for (const p of this.activePlayers()) {
         const hit = tg.shape === 'rect' ? inRect(p, tg, tg.a, tg.len, tg.w) : dist(p, tg) <= tg.r;
-        if (hit) this.damagePlayer(p, tg.dmg);
+        if (!hit) continue;
+        this.damagePlayer(p, tg.dmg);
+        if (tg.knock && !p.down) { // 突風: 向きにそって吹き飛ばす
+          const a = tg.shape === 'rect' ? tg.a : Math.atan2(p.y - tg.y, p.x - tg.x);
+          p.x += Math.cos(a) * tg.knock; p.y += Math.sin(a) * tg.knock;
+          S.collide(this.map, p, PLAYER_R);
+        }
       }
-      this.events.push({ k: 'boom', x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r });
+      this.events.push({ k: tg.bolt ? 'bolt' : tg.knock ? 'gust' : 'boom', x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r, a: tg.a });
     }
     this.telegraphs = this.telegraphs.filter(tg => tg.t > 0);
   }
@@ -858,6 +960,7 @@ class Room {
     this.updatePatrols();
     this.updateBoss();
     this.updateTelegraphs();
+    this.updateRing();
     this.updateItemsOnField();
     Combat.updateProjectiles(this);
     Combat.updateEffects(this);
@@ -922,13 +1025,15 @@ class Room {
         skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
-      boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage } : null,
+      boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage,
+        bliz: b.bliz > 0 || undefined, mode: b.type === 'fuurai' ? b.mode : undefined, phase: b.type === 'kishin' ? b.phase : undefined } : null,
+      ring: this.ring ? { x: Math.round(this.ring.x), y: Math.round(this.ring.y), r: Math.round(this.ring.r) } : null,
       items: this.items.map(it => ({ id: it.id, x: Math.round(it.x), y: Math.round(it.y), type: it.type })),
       traps: this.traps.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y) })),
       bombs: this.bombs.map(bm => ({ id: bm.id, x: Math.round(bm.x), y: Math.round(bm.y), t: +bm.t.toFixed(1) })),
       proj: this.projectiles.map(pr => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), r: pr.r, c: pr.c, punch: pr.punch, spin: pr.spin, lob: pr.lob, bomb: pr.bomb, a: +Math.atan2(pr.vy, pr.vx).toFixed(2) })),
       turrets: this.turrets.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), c: t.c, clone: t.clone })),
-      tele: this.telegraphs.map(tg => ({ id: tg.id, shape: tg.shape, x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r, a: tg.a, len: tg.len, w: tg.w, p: +(1 - tg.t / tg.max).toFixed(2) })),
+      tele: this.telegraphs.map(tg => ({ id: tg.id, shape: tg.shape, x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r, a: tg.a, len: tg.len, w: tg.w, c: tg.c, p: +(1 - tg.t / tg.max).toFixed(2) })),
       zones: this.zones.map(z => ({ id: z.id, x: Math.round(z.x), y: Math.round(z.y), r: z.r, kind: z.kind || 'heal', c: z.c, shape: z.shape, life: +z.life.toFixed(1) })),
       ev: this.events,
     };
@@ -1072,7 +1177,7 @@ function cleanProfile(p) {
   return {
     f: typeof p.f === 'string' && /^[0-9]{0,400}$/.test(p.f) ? p.f : '',
     s: Array.isArray(p.s) ? p.s.slice(0, 4).map(n) : [],
-    c: n(p.c) & 7, tc: n(p.tc), wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
+    c: n(p.c) & 127, tc: n(p.tc), wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
   };
 }
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));

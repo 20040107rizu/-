@@ -53,9 +53,10 @@ const oniPatrol = () => svg(`
   <path d="M150 74 L166 92" stroke="#c8242a" stroke-width="4" stroke-linecap="round"/>`, oniDefs);
 
 // ボス鬼（赤鬼・青鬼・黒鬼）: skin 肌、shade 影、mane たてがみ、glow 目の光
-function oniBoss({ skin, shade, mane, glow, pupil, aura }) {
+function oniBoss({ skin, shade, mane, glow, pupil, aura, back = '', front = '' }) {
   return svg(`
   ${aura ? `<circle cx="128" cy="120" r="118" fill="${aura}" opacity="0.55" filter="url(#soft)"/>` : ''}
+  ${back}
   <ellipse cx="128" cy="240" rx="88" ry="12" fill="#000" opacity="0.35"/>
   <path d="M196 232 L234 36" stroke="${INK}" stroke-width="32" stroke-linecap="round"/>
   <path d="M196 232 L234 36" stroke="#4a4a5a" stroke-width="22" stroke-linecap="round"/>
@@ -80,12 +81,48 @@ function oniBoss({ skin, shade, mane, glow, pupil, aura }) {
   <path d="M74 132 Q128 190 182 132 Q154 146 128 146 Q102 146 74 132Z" fill="#3a0008" ${O}/>
   <path d="M82 136 L90 150 L98 140 L106 152 L114 142 L122 154 L128 144 L134 154 L142 142 L150 152 L158 140 L166 150 L174 136" fill="#fff" ${O4}/>
   <path d="M92 160 L96 136 L104 158Z M152 158 L160 136 L164 160Z" fill="#fff" ${O4}/>
-  <path d="M168 66 L188 92 M174 64 L180 74" stroke="#f0d0c0" stroke-width="4" stroke-linecap="round" opacity="0.8"/>`, oniDefs);
+  <path d="M168 66 L188 92 M174 64 L180 74" stroke="#f0d0c0" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+  ${front}`, oniDefs);
 }
+// 金鬼の鎧（肩あてと胸あて）
+const goldArmor = `
+  <path d="M10 150 Q14 118 50 116 L66 150 Q40 160 10 150Z M246 158 Q242 126 206 124 L190 158 Q216 168 246 158Z" fill="#ffd23a" ${O}/>
+  <path d="M22 140 L56 132 M234 148 L200 140" stroke="#b07a10" stroke-width="5" stroke-linecap="round"/>
+  <path d="M76 148 Q128 132 180 148 L176 176 Q128 166 80 176Z" fill="#ffd23a" ${O}/>
+  <circle cx="128" cy="158" r="10" fill="#ff3a2a" ${O4}/>
+  <path d="M96 150 L100 170 M160 150 L156 170" stroke="#b07a10" stroke-width="4"/>
+  <path d="M84 40 L100 18 L112 36 L128 12 L144 36 L156 18 L172 40Z" fill="#ffd23a" ${O}/>
+  <circle cx="128" cy="30" r="6" fill="#ff3a2a" ${O4}/>
+  ${sparkle(40, 112, 10)}${sparkle(214, 70, 9)}${sparkle(150, 200, 7)}`;
+// 白鬼の氷（つのの先のつらら・雪の結晶）
+const snowflake = (x, y, r) => `<g stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.95">${[0, 60, 120].map(a => { const c = Math.cos(a * Math.PI / 180) * r, d = Math.sin(a * Math.PI / 180) * r; return `<path d="M${x - c} ${y - d} L${x + c} ${y + d}"/>`; }).join('')}</g>`;
+const whiteIce = `
+  <path d="M14 8 L4 30 L18 22 L16 44 L30 26Z M242 8 L252 30 L238 22 L240 44 L226 26Z" fill="#bfe8ff" ${O4}/>
+  <path d="M70 206 L74 232 L80 206 M176 206 L182 232 L186 206" fill="#bfe8ff" ${O4}/>
+  ${snowflake(28, 210, 14)}${snowflake(232, 214, 12)}${snowflake(222, 118, 10)}${snowflake(30, 108, 9)}`;
+// 風雷鬼の背中の太鼓（雷）と風の帯
+const drums = `
+  <path d="M20 128 Q10 20 128 14 Q246 20 236 128" stroke="#c8242a" stroke-width="10" fill="none"/>
+  ${[[20, 126], [22, 84], [44, 46], [212, 46], [234, 84], [236, 126]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="17" ry="14" fill="#ffe14a" ${O4}/><path d="M${x - 8} ${y - 4} Q${x} ${y + 8} ${x + 8} ${y - 4}" stroke="#c8242a" stroke-width="3" fill="none"/>`).join('')}`;
+const windSash = `
+  <path d="M40 190 Q-6 150 20 110 Q30 150 64 160 M216 190 Q262 150 236 110 Q226 150 192 160" fill="#7af0c8" ${O4} opacity="0.95"/>
+  <path d="M6 136 Q20 126 30 134 M228 132 Q240 120 252 128" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M204 16 L190 44 L204 42 L194 66 L218 34 L204 36 L214 16Z" fill="#ffe14a" ${O4}/>`;
+// 鬼神: 背中の炎の輪と3本目のつの
+const flameHalo = `${Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2, x = 128 + Math.cos(a) * 108, y = 112 + Math.sin(a) * 102, a2 = a * 180 / Math.PI + 90; return `<path d="M${x - 12} ${y + 6} Q${x} ${y - 32} ${x + 12} ${y + 6} Q${x} ${y + 14} ${x - 12} ${y + 6}Z" fill="#ff6a1a" ${O4} transform="rotate(${a2} ${x} ${y})"/>`; }).join('')}`;
+const kishinCrown = `
+  <path d="M116 52 Q128 -6 140 52Z" fill="#f6e6b0" ${O}/>
+  <path d="M122 36 L134 34 M124 22 L132 20" stroke="#b09a6a" stroke-width="3"/>
+  <ellipse cx="128" cy="70" rx="10" ry="7" fill="#ffe14a" ${O4}/><ellipse cx="128" cy="70" rx="2.5" ry="6" fill="#000"/>
+  <path d="M60 206 Q40 230 70 236 M196 206 Q216 230 186 236" stroke="#ff6a1a" stroke-width="6" fill="none" stroke-linecap="round"/>`;
 const BOSS_LOOK = {
   red:   { skin: '#d02a2a', shade: '#7a0a14', mane: '#1a0a14', glow: '#ffb000', pupil: '#1a0000' },
   blue:  { skin: '#2a5ad8', shade: '#142a7a', mane: '#0a0a2a', glow: '#ff3a2a', pupil: '#5a0000' },
   black: { skin: '#2a2030', shade: '#0a0610', mane: '#5a1a5a', glow: '#ff2a2a', pupil: '#000', aura: '#8a2ad8' },
+  gold:   { skin: '#f0b828', shade: '#9a6410', mane: '#5a2a00', glow: '#ff4a2a', pupil: '#3a0000', aura: '#ffd84a', front: goldArmor },
+  white:  { skin: '#eef4ff', shade: '#8aa0c8', mane: '#bcdcff', glow: '#3ac8ff', pupil: '#003a6a', aura: '#a8e0ff', front: whiteIce },
+  fuurai: { skin: '#26b48c', shade: '#0e6048', mane: '#1a2a20', glow: '#ffe14a', pupil: '#2a1a00', aura: '#5af0c0', back: drums, front: windSash },
+  kishin: { skin: '#8a0a22', shade: '#3a0010', mane: '#14000a', glow: '#ff2a2a', pupil: '#000', aura: '#ff1a4a', back: flameHalo, front: kishinCrown },
 };
 
 // ---------- アイテム ----------

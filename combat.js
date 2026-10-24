@@ -34,7 +34,10 @@ function hit(room, p, e, amount, el) {
 function applyElement(room, p, e, amount, el) {
   const isPatrol = !!e.isPatrol;
   switch (el) {
-    case 'fire': addDot(e, amount * 0.175, 2, p); break; // 2秒で当てたダメージの35%
+    case 'fire':
+      addDot(e, amount * 0.175, 2, p); // 2秒で当てたダメージの35%
+      if (e.type === 'white' && e.hp > 0) room.damageOni(p, e, amount * 0.5); // 白鬼は炎に弱い（+50%）
+      break;
     case 'poison': addDot(e, amount * 0.15, 3, p); break;
     case 'ice': slow(e, 0.55, 1.2); break;
     case 'water': slow(e, 0.75, 0.8); break;
