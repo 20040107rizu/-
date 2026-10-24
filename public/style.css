@@ -104,6 +104,9 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .update-bar.show { display: flex; animation: pop .4s; }
 .update-bar button { background: #fff; color: #1a5a3a; font-weight: bold; }
 #whatsNew { z-index: 70; }
+/* お知らせが長くても OK ボタンが画面の外に出ないよう、一覧だけスクロールさせる */
+#whatsNew h2, #whatsNew > button { flex-shrink: 0; }
+#whatsNewList { flex: 0 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 8px; }
 .notes { margin: 0; padding-left: 1.2em; line-height: 1.9; font-size: 15px; max-width: 600px; }
 
 .build-info { position: fixed; right: max(6px, env(safe-area-inset-right)); bottom: 4px; z-index: 40; font: 10px/1.2 ui-monospace, monospace; opacity: .45; pointer-events: none; display: none; }
