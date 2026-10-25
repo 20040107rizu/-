@@ -36,6 +36,9 @@ button:disabled { opacity: .4; }
 
 .yk { position: relative; padding: 4px 2px; border-radius: 10px; background: #2a1840; border: 3px solid transparent; text-align: center; cursor: pointer; font-size: 11px; line-height: 1.2; }
 .yk.sel { border-color: #ffe36b; background: #4a2a66; }
+.yk.fav { border-color: #ffd23a; background: #4a3a20; }
+.yk.fav::after { content: '⭐'; position: absolute; right: 4px; bottom: 30px; font-size: 16px; }
+.fav-hint { display: block; color: #ffd23a; font-size: 11px; margin-top: 2px; }
 .yk.locked { opacity: .35; cursor: default; }
 .yk .face { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 2px; border: 2px solid #fff; }
 .yk .rk { position: absolute; top: 2px; left: 4px; font-weight: bold; font-size: 12px; text-shadow: 0 1px 2px #000; }

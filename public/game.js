@@ -37,6 +37,8 @@
   stats.seals = stats.seals || {};     // レジェンドの封印 { legendId: { frag: 欠片, trial: レジェンドの試練をクリアした } }
   // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
   let myTitle = localStorage.getItem('title') || null;
+  let favYokai = localStorage.getItem('fav') || null; // プロフィールに出すお気に入りのお友達
+  if (!friends[favYokai]) favYokai = null;
   let weeklyTitles = loadJSON('wtitles', []).filter(id => S.weeklyTitle(id)); // ランキング1位でもらった称号
   const titlesDone = () => S.titleProgress(friends, stats.feats).filter(t => t.done).map(t => t.title.id).concat(weeklyTitles);
   const titleInfo = id => S.TITLE_BY_ID[id] || S.weeklyTitle(id);
@@ -74,7 +76,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]) };
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -89,7 +91,7 @@
     const seals = {};
     S.LEGENDS.forEach((l, i) => { const g = (d.g || [])[i]; if (Array.isArray(g) && (g[0] || g[2])) seals[l.id] = { frag: Math.min(99, Math.floor(+g[0] || 0)), trial: !!g[2] }; }); // g[1] は前の「黒鬼を倒した」（いまは使わない）
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
-    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
+    return { fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
       feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
   }
 
@@ -127,7 +129,7 @@
       f: PROF_YOKAI.map(y => Math.min(9, friends[y.id] || 0)).join(''),
       s: [stats.plays, stats.escapes, stats.best, stats.dama],
       c: S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0),
-      tc: titlesDone().length, wt: weeklyTitles,
+      tc: titlesDone().length, wt: weeklyTitles, fv: favYokai,
     };
   }
   function helloAgain() {
@@ -179,7 +181,8 @@
     const b = self ? { name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() } : buddies[profPid] || {};
     const live = self ? { status: 'me' } : buddyLive.find(f => f.pid === profPid) || { status: 'off', seen: b.seen };
     const pr = b.prof;
-    const y = S.YOKAI_BY_ID[live.yokai || b.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
+    const fav = pr && pr.fv && S.YOKAI_BY_ID[pr.fv]; // お気に入りがあれば、いまのお友達の代わりに出す
+    const y = fav || S.YOKAI_BY_ID[live.yokai || b.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
     const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
     const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
@@ -187,7 +190,8 @@
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
       <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
       <div><span class="st ${live.status}">${st}</span></div>
-      <div>いまのお友達：<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</span></div>
+      <div>${fav ? '⭐ お気に入り' : 'いまのお友達'}：<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</span></div>
+      ${self ? `<small class="fav-hint">右のお友達をタップすると、お気に入りにできます${fav ? '（もう一度タップではずす）' : ''}</small>` : ''}
       ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　🌈 レジェンド ${legends.length}体` : ''}</dd>
         <dt>遊んだ</dt><dd>${pr.s[0] || 0}回（脱出 ${pr.s[1] || 0}回）</dd>
         <dt>鬼玉</dt><dd>最高 ${pr.s[2] || 0}個・合計 ${(pr.s[3] || 0).toLocaleString('ja-JP')}個</dd>
@@ -209,8 +213,14 @@
     const list = pool.filter(q => counts[q.id]);
     $('profGrid').innerHTML = !pr ? '' : list.length ? list.map(q => {
       const n = counts[q.id], tt = S.totsuOf(n);
-      return `<div class="yk${q.legend ? ' legend' : ''}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
+      return `<div class="yk${q.legend ? ' legend' : ''}${fav && fav.id === q.id ? ' fav' : ''}" data-id="${q.id}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
     }).join('') : '<p class="sub">このランクのお友達はまだいません</p>';
+    if (self) for (const el of $('profGrid').querySelectorAll('.yk')) el.onclick = () => {
+      favYokai = favYokai === el.dataset.id ? null : el.dataset.id;
+      try { if (favYokai) localStorage.setItem('fav', favYokai); else localStorage.removeItem('fav'); } catch {}
+      helloAgain(); // フレンドにも見えるように送る
+      const top = $('profGrid').scrollTop; renderProfile(state); $('profGrid').scrollTop = top;
+    };
   }
   $('btnProfClose').onclick = () => { show('buddyScreen'); renderBuddies(); };
 
@@ -511,6 +521,7 @@
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
     myTitle = data.title; checkMyTitle(); try { localStorage.setItem('title', myTitle || ''); } catch {}
+    favYokai = data.fav && friends[data.fav] ? data.fav : null; try { if (favYokai) localStorage.setItem('fav', favYokai); else localStorage.removeItem('fav'); } catch {}
     if (data.pid) { pid = data.pid; try { localStorage.setItem('pid', pid); } catch {} helloAgain(); }
     saveAll(); updateFriendCount();
     openSave();

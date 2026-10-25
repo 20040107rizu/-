@@ -1209,7 +1209,7 @@ function cleanProfile(p) {
   return {
     f: typeof p.f === 'string' && /^[0-9]{0,400}$/.test(p.f) ? p.f : '',
     s: Array.isArray(p.s) ? p.s.slice(0, 4).map(n) : [],
-    c: n(p.c) & 127, tc: n(p.tc), wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
+    c: n(p.c) & 127, tc: n(p.tc), fv: S.YOKAI_BY_ID[p.fv] ? p.fv : null, wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
   };
 }
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
