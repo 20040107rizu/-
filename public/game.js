@@ -624,9 +624,13 @@
         }
         let seen = null;
         try { seen = localStorage.getItem('seenVersion'); localStorage.setItem('seenVersion', info.v); } catch {}
-        // 更新したあとに開いたら、変わったところを見せる
-        if (seen && seen !== info.v && Array.isArray(info.notes) && info.notes.length && $('title').classList.contains('active')) {
-          $('whatsNewList').innerHTML = info.notes.map(n => `<li>${esc(n)}</li>`).join('');
+        // 更新したあとに開いたら、変わったところを見せる。一度見たお知らせは出さず、新しいものだけ
+        const notes = Array.isArray(info.notes) ? info.notes : [];
+        const seenNotes = loadJSON('seenNotes', null);
+        const fresh = seenNotes ? notes.filter(n => !seenNotes.includes(n)) : seen === info.v ? [] : notes; // seenNotes がない人は、前と同じく版が変わったときだけ
+        try { localStorage.setItem('seenNotes', JSON.stringify([...new Set([...(seenNotes || []), ...notes])].slice(-200))); } catch {}
+        if (seen && seen !== info.v && fresh.length && $('title').classList.contains('active')) {
+          $('whatsNewList').innerHTML = fresh.map(n => `<li>${esc(n)}</li>`).join('');
           show('whatsNew');
         }
       } else if (info.v !== loadedVersion) {
