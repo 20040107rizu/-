@@ -357,7 +357,7 @@
   // ---------- 週替わりランキング ----------
   let rankData = null;
   async function loadRanking(week) {
-    const r = await fetch(`ranking?pid=${encodeURIComponent(pid)}${week ? `&week=${week}` : ''}`, { cache: 'no-store' });
+    const r = await fetch(`ranking?pid=${encodeURIComponent(pid)}${week != null ? `&week=${week}` : ''}`, { cache: 'no-store' }); // 第1回は 0 なので != null で見る
     if (!r.ok) throw new Error(r.status);
     return r.json();
   }
@@ -376,16 +376,32 @@
   function rewardText(r) {
     return { black: '黒玉チケット', gold: '金玉チケット', red: '赤玉チケット', blue: '青玉チケット', green: '緑玉チケット' }[r.ticket] + (r.title ? '＋限定称号' : '');
   }
+  // 終わった週の結果（タップで見られる）
+  let rankView = null; // null = 今週、数字 = その週（終わった週）
+  const pastRank = {}; // 週の番号 → 結果（終わった週は変わらないので覚えておく）
+  async function viewWeek(idx) {
+    rankView = idx;
+    renderRanking();
+    if (idx == null || pastRank[idx]) return;
+    try { pastRank[idx] = await loadRanking(idx); } catch { return; }
+    if (rankView === idx) renderRanking();
+  }
   function renderRanking() {
     const now = rankData ? rankData.idx : S.weekIndex();
-    $('rankSched').innerHTML = [-1, 0, 1, 2, 3].map(k => {
+    const sel = rankView == null ? now : rankView;
+    $('rankSched').innerHTML = [-3, -2, -1, 0, 1, 2].map(k => {
       const t = S.themeOf(now + k);
       if (now + k < 0) return '';
-      return `<div class="sched${k === 0 ? ' on' : k < 0 ? ' past' : ''}"><span class="ic">${t.icon}</span><div><small>第${t.no}回${k === 0 ? '（開催中）' : k < 0 ? '（終了）' : k === 1 ? '（来週）' : ''}</small><br>${esc(t.name)}</div>${k === 0 ? '<span class="now">いま</span>' : ''}</div>`;
+      const tap = k <= 0 ? ` data-week="${now + k}"` : '';
+      return `<div class="sched${now + k === sel ? ' on' : ''}${k < 0 ? ' past' : ''}${tap ? ' tap' : ''}"${tap}><span class="ic">${t.icon}</span><div><small>第${t.no}回${k === 0 ? '（開催中）' : k < 0 ? '（終了・結果を見る）' : k === 1 ? '（来週）' : ''}</small><br>${esc(t.name)}</div>${k === 0 ? '<span class="now">いま</span>' : ''}</div>`;
     }).join('');
-    if (!rankData) { $('rankList').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
-    const d = rankData, th = d.theme;
-    $('rankBanner').innerHTML = `<span class="ic">${th.icon}</span><div class="txt"><b>第${th.no}回：${esc(th.name)}</b><br>${esc(th.desc)}</div><div class="left">のこり<br><b>${left(d.end)}</b></div>`;
+    for (const el of $('rankSched').querySelectorAll('[data-week]')) el.onclick = () => viewWeek(+el.dataset.week === now ? null : +el.dataset.week);
+    const ended = rankView != null && rankView < now;
+    const d = ended ? pastRank[rankView] : rankData;
+    if (!d) { $('rankList').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
+    const th = d.theme;
+    $('rankBanner').innerHTML = `<span class="ic">${th.icon}</span><div class="txt"><b>第${th.no}回：${esc(th.name)}</b><br>${esc(th.desc)}</div>`
+      + (ended ? `<div class="left">結果<br><b>終了</b></div>` : `<div class="left">のこり<br><b>${left(d.end)}</b></div>`);
     $('rankCount').textContent = `参加 ${d.total}人` + (d.dbError ? '（⚠️ 記録の保存に失敗しています）' : d.saved ? '（記録は保存されています）' : '（試験運転中：サーバーが更新されると記録が消えます）');
     const rows = d.rows.map((r, i) => ({ ...r, rank: i + 1 }));
     const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
@@ -393,13 +409,13 @@
       const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
       return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}
         <div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b><small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
-    }).join('') : `<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>`;
+    }).join('') : `<p class="sub empty">${ended ? 'この回の記録はありません' : 'まだ記録がありません。一番乗りをめざそう！'}</p>`;
     const me = d.me;
     const prizes = d.idx >= 1 ? '🥇 限定称号＋黒玉チケット　🥈 金玉チケット　🥉 赤玉チケット' : '🥇 限定称号＋金玉チケット　🥈🥉 赤玉チケット';
     $('rankReward').innerHTML = `🎁 報酬　${prizes.replace('限定称号', `限定称号《第${th.no}回 ${esc(th.crown)}》`)}　〜10位 青玉チケット　参加賞 緑玉チケット`
-      + `<br>あなた：${me.rank ? `<b>${me.rank}位</b>（${esc(S.fmtScore(th, me.score))}）→ ${rewardText(S.weeklyReward(me.rank, d.idx))}` : me.joined ? '参加済み（まだ記録なし）→ 緑玉チケット' : 'まだ参加していません'}`;
+      + `<br>あなた：${me.rank ? `<b>${me.rank}位</b>（${esc(S.fmtScore(th, me.score))}）→ ${rewardText(S.weeklyReward(me.rank, d.idx))}` : me.joined ? `参加済み${ended ? '' : '（まだ記録なし）'}→ 緑玉チケット` : ended ? 'この回は参加していません' : 'まだ参加していません'}`;
   }
-  $('btnRank').onclick = () => { show('rankScreen'); renderRanking(); refreshRanking(); };
+  $('btnRank').onclick = () => { rankView = null; show('rankScreen'); renderRanking(); refreshRanking(); };
   $('btnRankClose').onclick = () => show('title');
   setInterval(() => { if ($('title').classList.contains('active') || $('rankScreen').classList.contains('active')) refreshRanking(); }, 60000);
 

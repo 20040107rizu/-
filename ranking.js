@@ -28,8 +28,9 @@ function week(idx) {
         .then(list => { dbError = null; for (const row of list) if (!w.rows.has(row.pid)) w.rows.set(row.pid, row); })
         .catch(e => { console.error('ランキングの読み込みに失敗:', e.message); dbError = e.message.slice(0, 200); }); // 読み込めなくても、メモリの記録はそのまま使う
     }
-    // 古い週はメモリから外す（今週と先週だけ持っておく）
-    for (const k of weeks.keys()) if (k < idx - 1) weeks.delete(k);
+    // 古い週はメモリから外す（今週と先週はいつも持っておく。終わった週を見に来た分は、多くなったら古い順に外す）
+    const cur = S.weekIndex();
+    for (const k of [...weeks.keys()].sort((a, b) => a - b)) if (weeks.size > 8 && k < cur - 1 && k !== idx) weeks.delete(k);
   }
   return w;
 }

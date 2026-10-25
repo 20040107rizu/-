@@ -63,10 +63,10 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ v: VERSION, ...whatsNew() }));
   }
-  // 週替わりランキング: /ranking?pid=...&week=prev（先週）
+  // 週替わりランキング: /ranking?pid=...&week=prev（先週）／week=3（第4回。終わった週の結果も見られる）
   if (urlPath === '/ranking') {
-    const q = new URL(req.url, 'http://x').searchParams;
-    const idx = S.weekIndex() - (q.get('week') === 'prev' ? 1 : 0);
+    const q = new URL(req.url, 'http://x').searchParams, w = q.get('week'), cur = S.weekIndex();
+    const idx = w === 'prev' ? cur - 1 : /^\d{1,4}$/.test(w || '') ? Math.min(cur, +w) : cur;
     Ranking.board(idx, cleanPid(q.get('pid'))).then(b => {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify(b));

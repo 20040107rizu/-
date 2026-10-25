@@ -361,7 +361,9 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .sched small { font-size: 9px; opacity: .75; }
 .sched .ic { font-size: 16px; width: 20px; text-align: center; }
 .sched.on { border-color: #ffe36b; background: #4a2a66; }
-.sched.past { opacity: .45; }
+.sched.past { opacity: .7; }
+.sched.past.on { opacity: 1; }
+.sched.tap { cursor: pointer; }
 .sched .now { margin-left: auto; font-size: 9px; background: #ff3a6a; border-radius: 6px; padding: 0 5px; }
 .rank-banner { display: flex; align-items: center; gap: 10px; border-radius: 12px; padding: 6px 10px; background: linear-gradient(90deg, #1a3a9a, #5a2ad8); font-size: 11px; line-height: 1.4; }
 .rank-banner .ic { font-size: 26px; }
