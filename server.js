@@ -628,12 +628,13 @@ class Room {
     if (this.timeLeft < 120 || Math.random() >= BONUS_RATE) return;
     const pool = (this.players.size === 1 ? ['red', 'blue', 'black'] : S.BOSS_ORDER).filter(k => k !== this.firstBoss.type);
     const type = pool[Math.floor(Math.random() * pool.length)];
-    this.bonus = { type, t: 3.2, boss: null }; // カットインのあいだ待ってから降らせる
-    this.events.push({ k: 'bonusBoss', type });
+    this.bonus = { type, wait: 5, t: 3.2, boss: null }; // 倒してから5秒たったらカットイン、カットインのあいだ待ってから降らせる
   }
   updateBonus() {
     const bn = this.bonus;
-    if (!bn || bn.boss || (bn.t -= DT) > 0) return;
+    if (!bn || bn.boss) return;
+    if (bn.wait > 0) { if ((bn.wait -= DT) <= 0) this.events.push({ k: 'bonusBoss', type: bn.type }); return; }
+    if ((bn.t -= DT) > 0) return;
     // まだ戦っている仲間のだれかの近くに、見えるところへ降らせる
     const ps = this.activePlayers(), t = ps[Math.floor(Math.random() * ps.length)];
     if (!t) { this.bonus = null; return; }
