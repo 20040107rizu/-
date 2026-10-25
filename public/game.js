@@ -1705,10 +1705,28 @@
       dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + snap.boss.x * sx, oy + snap.boss.y * sx, 6, 0, Math.PI * 2); ctx.stroke();
     }
+    const MM = new URLSearchParams(location.search).get('mm'); // 見本用（あとで消す）
     for (const p of snap.players) {
       if (p.esc) continue;
       const pos = p.id === myId && myPred ? myPred : p;
-      dot(pos.x, pos.y, p.id === myId ? 4.5 : 3.5, p.id === myId ? '#ffe36b' : S.YOKAI_BY_ID[p.yokai].color);
+      const x = ox + pos.x * sx, y = oy + pos.y * sx, mine = p.id === myId;
+      if (!MM) { dot(pos.x, pos.y, mine ? 4.5 : 3.5, mine ? '#ffe36b' : S.YOKAI_BY_ID[p.yokai].color); continue; }
+      const col = mine ? '#ffe36b' : '#3ad8ff';
+      if (MM === 'A') {
+        if (!mine) { ctx.strokeStyle = `rgba(58,216,255,${0.5 + 0.5 * Math.sin(now * 6)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.fillStyle = p.down ? '#ff4040' : col; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y, mine ? 6 : 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        continue;
+      }
+      const img = art('yokai/' + p.yokai), r = 9;
+      ctx.fillStyle = '#1a1030'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (img) { ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(img, x - r * 1.3, y - r * 1.2, r * 2.6, r * 2.6); ctx.restore(); }
+      ctx.strokeStyle = p.down ? (Math.sin(now * 10) > 0 ? '#ff4040' : '#fff') : col; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      if (MM === 'C' && !mine) {
+        ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+        ctx.strokeText(p.name, x, y + r + 9); ctx.fillText(p.name, x, y + r + 9);
+      }
     }
     ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 1;
     ctx.strokeRect(ox + Math.max(0, view.l) * sx, oy + Math.max(0, view.t) * sx, (Math.min(map.w, view.r) - Math.max(0, view.l)) * sx, (Math.min(map.h, view.b) - Math.max(0, view.t)) * sx);
@@ -1716,6 +1734,30 @@
     return mh + oy;
   }
 
+  // 画面の外にいる仲間の方向を、画面のふちに顔アイコンで出す（見本）
+  function drawAllyMarkers(now) {
+    if (!myPred) return;
+    const cx = W / 2, cy = H / 2;
+    for (const p of snap.players) {
+      if (p.id === myId || p.esc) continue;
+      const pos = ents.get('p' + p.id) || p;
+      if (inView(pos.x, pos.y, -20)) continue;
+      const a = Math.atan2(pos.y - myPred.y, pos.x - myPred.x);
+      // 画面のふちにはミニマップ・タイマー・ボタンがあるので、自分のまわりの楕円の上に出す（方位磁針のように）
+      const x = cx + Math.cos(a) * W * 0.22, y = cy + Math.sin(a) * H * 0.3, r = 18;
+      ctx.save(); ctx.translate(x, y);
+      ctx.rotate(a); ctx.fillStyle = p.down ? '#ff4040' : '#3ad8ff'; ctx.beginPath(); ctx.moveTo(r + 12, 0); ctx.lineTo(r - 2, -8); ctx.lineTo(r - 2, 8); ctx.closePath(); ctx.fill(); ctx.rotate(-a);
+      ctx.fillStyle = '#1a1030'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      const img = art('yokai/' + p.yokai);
+      if (img) { ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(img, -r * 1.3, -r * 1.2, r * 2.6, r * 2.6); ctx.restore(); }
+      ctx.strokeStyle = p.down ? (Math.sin(now * 10) > 0 ? '#ff4040' : '#fff') : '#3ad8ff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+      const dm = Math.round(Math.hypot(pos.x - myPred.x, pos.y - myPred.y) / 50);
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = '#fff';
+      const label = p.down ? `${p.name} SOS!` : `${p.name} ${dm}m`;
+      ctx.strokeText(label, 0, r + 13); ctx.fillText(label, 0, r + 13);
+      ctx.restore();
+    }
+  }
   // 画面の外から自分を見つけた見回り鬼の方向を、画面のふちに赤い矢印で出す
   function drawSpotterArrows(now) {
     if (!myPred) return;
@@ -1739,6 +1781,7 @@
     Stages.drawTint(ctx, W, H, stage);
     drawMinimap(me, now);
     drawSpotterArrows(now);
+    if (new URLSearchParams(location.search).get('mm') === 'C') drawAllyMarkers(now); // 見本用
 
     // タイマー
     const tl = Math.max(0, snap.timeLeft);
