@@ -34,7 +34,7 @@
   let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
   stats.feats = stats.feats || {};     // バトルでの手がら（称号用） { kishin: true, solo: true }
-  stats.seals = stats.seals || {};     // レジェンドの封印 { legendId: { frag: 欠片, black: 封印の地で黒鬼を倒した } }
+  stats.seals = stats.seals || {};     // レジェンドの封印 { legendId: { frag: 欠片, trial: レジェンドの試練をクリアした } }
   // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
   let myTitle = localStorage.getItem('title') || null;
   let weeklyTitles = loadJSON('wtitles', []).filter(id => S.weeklyTitle(id)); // ランキング1位でもらった称号
@@ -74,7 +74,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, stats.seals[l.id]?.black ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]) };
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]) };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -87,7 +87,7 @@
     S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
     S.LEGENDS.forEach((l, i) => { if ((d.l || [])[i] > 0) f[l.id] = 1; });
     const seals = {};
-    S.LEGENDS.forEach((l, i) => { const g = (d.g || [])[i]; if (Array.isArray(g) && (g[0] || g[1])) seals[l.id] = { frag: Math.min(99, Math.floor(+g[0] || 0)), black: !!g[1] }; });
+    S.LEGENDS.forEach((l, i) => { const g = (d.g || [])[i]; if (Array.isArray(g) && (g[0] || g[2])) seals[l.id] = { frag: Math.min(99, Math.floor(+g[0] || 0)), trial: !!g[2] }; }); // g[1] は前の「黒鬼を倒した」（いまは使わない）
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
     return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
       feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
@@ -867,11 +867,13 @@
     // レジェンドの封印の欠片
     result.sealNote = null;
     if (mine && mine.seal) {
-      const sl = (stats.seals[mine.seal.legend] = stats.seals[mine.seal.legend] || { frag: 0, black: false });
+      const sl = (stats.seals[mine.seal.legend] = stats.seals[mine.seal.legend] || { frag: 0 });
       sl.frag += mine.seal.frag;
-      if (mine.seal.black) sl.black = true;
       const l = S.YOKAI_BY_ID[mine.seal.legend];
-      result.sealNote = `🔮 封印の欠片をゲット！（${l.name}の封印 ${Math.min(sl.frag, S.SEAL.fragments)}/${S.SEAL.fragments}）`;
+      const firstTrial = mine.seal.trial && !sl.trial;
+      if (mine.seal.trial) sl.trial = true;
+      result.sealNote = [mine.seal.frag ? `🔮 封印の欠片を${mine.seal.frag}個ゲット！（${l.name}の封印 ${Math.min(sl.frag, S.SEAL.fragments)}/${S.SEAL.fragments}）` : '',
+        firstTrial ? `🌈 ${l.name}の試練をクリア！` : ''].filter(Boolean).join('　');
     }
     if (mine) { saveAll(); updateFriendCount(); helloAgain(); }
     const id = ++gachaRun;

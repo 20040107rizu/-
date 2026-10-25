@@ -320,6 +320,7 @@ class Room {
     this.timeLimit = this.challenge && this.challenge.rule === 'short' ? Math.min(180, TIME_LIMIT) : TIME_LIMIT;
     this.timeLeft = this.timeLimit;
     this.bossKillT = null;
+    this.anyDown = false; this.blizKill = false; // レジェンドの試練用
     this.introT = INTRO_MOVIE + COUNTDOWN;
     this.events = [];
     this.projectiles = [];
@@ -349,10 +350,11 @@ class Room {
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
+        seenByPatrol: false, atKill: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
         legend: !!S.YOKAI_BY_ID[p.yokai].legend, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, nyoi: null, diveLeft: 0, // レジェンド
       });
       S.collide(this.map, p, PLAYER_R);
-      if (DEMO_AI) { p.maxHp *= 5; p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
+      if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
     }
     const spawn = spawns[0];
 
@@ -472,7 +474,7 @@ class Room {
     if (p.passive === 'bossGuard') amount *= 0.7; // ウラ: ボス鬼からのダメージ -30%
     p.hp -= amount;
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
-    if (p.hp <= 0) { p.hp = 0; p.down = true; p.reviveProg = 0; this.events.push({ k: 'down', id: p.id }); }
+    if (p.hp <= 0) { p.hp = 0; p.down = true; p.reviveProg = 0; this.anyDown = true; this.events.push({ k: 'down', id: p.id }); }
   }
 
   healPlayer(p, amount) {
@@ -499,9 +501,10 @@ class Room {
       return grid.randomFreePoint();
     };
     Object.assign(this.boss, near(380, 560, this.gridB), { state: 'engage', target: [...this.players.values()][0].id });
-    this.boss.maxHp = this.boss.hp = this.boss.maxHp * 5; // 撮影中にすぐ倒れないように
     // 仲間のボットは自分の近くから
     for (const p of [...this.players.values()].slice(1)) { Object.assign(p, near(60, 200, this.gridS)); }
+    if (process.env.DEMO_SIM) return; // 試練がクリアできるかの検証: ボスの強さ・見回り鬼の場所はそのまま
+    this.boss.maxHp = this.boss.hp = this.boss.maxHp * 5; // 撮影中にすぐ倒れないように
     // 特別な仕組みを早く見せる（DEMO_HP=0.5 で体力を減らした状態から、DEMO_FAST=1 で吹雪・型の切りかえを早く）
     if (process.env.DEMO_HP) { this.boss.hp = this.boss.maxHp * +process.env.DEMO_HP; }
     if (process.env.DEMO_FAST) Object.assign(this.boss, { blizT: 4, modeT: 7 });
@@ -512,7 +515,7 @@ class Room {
   demoInput(p) {
     if (p.down || p.escaped) return;
     const b = this.boss && this.boss.hp > 0 ? this.boss : null;
-    const t = b && dist(b, p) < 1200 ? b : this.nearestEnemy(p, 1500) || b;
+    const t = b && (dist(b, p) < 1200 || process.env.DEMO_SIM) ? b : this.nearestEnemy(p, 1500) || b; // 検証のときはボスだけをねらう
     const role = S.YOKAI_BY_ID[p.yokai].role;
     const want = role === 'fighter' || role === 'tank' ? 85 : 260;
     let mx = 0, my = 0;
@@ -529,6 +532,7 @@ class Room {
   alertPatrol(e, target) {
     e.state = 'alert'; e.target = target.id; e.lostT = 0; e.path = null;
     target.spotted = true;
+    target.seenByPatrol = true;
     this.events.push({ k: 'whistle', id: e.id, target: target.id });
     // ボス鬼に報告
     const b = this.boss;
@@ -599,6 +603,10 @@ class Room {
     const b = this.boss;
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
     if (this.bossKillT == null) this.bossKillT = this.time;
+    this.blizKill = b.bliz > 0; // 吹雪の中でとどめをさした
+    // 試練は倒した瞬間の様子で決める（倒したあとに見つかったり倒れたりしても大丈夫）
+    this.anyDownAtKill = this.anyDown;
+    for (const p of this.players.values()) p.atKill = { seen: p.seenByPatrol, dama: p.dama };
     this.dropDama(b.x, b.y, 1, b.kind.drop);
     this.telegraphs = [];
   }
@@ -1002,7 +1010,8 @@ class Room {
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
       gacha: rollGacha(p.escaped ? judged : judged / 2),
-      seal: S.sealDrop(this.stage, this.boss.type, this.boss.hp <= 0), // レジェンドの封印の欠片（封印の地でボスを倒したとき）
+      // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
+      seal: S.sealDrop({ stage: this.stage, boss: this.boss.type, bossDown: this.boss.hp <= 0, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
     const b = this.boss;
     this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });
@@ -1303,7 +1312,7 @@ setInterval(() => {
   }
   if (draining) drainStep();
   const ms = performance.now() - t0; load.ticks++; load.tickMs += ms; load.maxMs = Math.max(load.maxMs, ms);
-}, 1000 / TICK_RATE);
+}, 1000 / TICK_RATE / (+process.env.SIM_SPEED || 1)); // SIM_SPEED: 検証用に早回し
 
 if (require.main === module) {
   server.listen(PORT, () => console.log(`鬼バスターズ server: http://localhost:${PORT}`));

@@ -119,7 +119,28 @@
   // ---------- レジェンドの封印 ----------
   // 全部そろうと図鑑で「封印をとく」が押せる
   const SEAL = { totsuNeed: 3, totsuCount: 3, fragments: 5 };
-  // friends: { id: 数 }、seals: { legendId: { frag: 欠片の数, black: 封印の地で黒鬼を倒したか } }
+  // レジェンドの試練: 封印の地のステージで、決められたボス鬼を、決められたやり方で倒す
+  const TRIALS = {
+    ura:         { boss: 'kishin', desc: '鬼神を倒す' },
+    songoku:     { boss: 'fuurai', desc: '風雷鬼を倒す' },
+    nurarihyon:  { boss: 'white',  rule: 'unseen',   desc: '白鬼を、自分が一度も見回り鬼に見つからずに倒す' },
+    jerseydevil: { boss: 'white',  rule: 'blizKill', desc: '白鬼を倒す（とどめは吹雪の中で）' },
+    melusine:    { boss: 'gold',   rule: 'noDown',   desc: '金鬼を、チームのだれも倒れずに倒す' },
+    curupira:    { boss: 'gold',   rule: 'dama100',  desc: '金鬼を倒すまでに、自分が鬼玉を100個集める' },
+  };
+  // r: ボスを倒した瞬間の { stage, boss, bossDown, seen: 自分が見回り鬼に見つかった, anyDown: だれかが倒れた, blizKill: 吹雪の中で倒した, dama: 自分の鬼玉 }
+  function trialDone(legend, r) {
+    const t = TRIALS[legend.id];
+    if (!t || r.stage !== legend.stage || r.boss !== t.boss || !r.bossDown) return false;
+    switch (t.rule) {
+      case 'unseen': return !r.seen;
+      case 'blizKill': return !!r.blizKill;
+      case 'noDown': return !r.anyDown;
+      case 'dama100': return r.dama >= 100;
+      default: return true;
+    }
+  }
+  // friends: { id: 数 }、seals: { legendId: { frag: 欠片の数, trial: レジェンドの試練をクリアしたか } }
   function sealProgress(legend, friends, seals) {
     const st = (seals && seals[legend.id]) || {};
     const got = legend.seal.filter(id => friends[id]).length;
@@ -128,19 +149,22 @@
     const conds = [
       { label: '決められた妖怪8体をお友達にする', got, need: legend.seal.length },
       { label: `そのうち${SEAL.totsuCount}体を凸${SEAL.totsuNeed}以上にする`, got: Math.min(totsu, SEAL.totsuCount), need: SEAL.totsuCount },
-      { label: `「${STAGES_N[legend.stage]}」ステージで黒鬼を倒す`, got: st.black ? 1 : 0, need: 1 },
-      { label: `封印の欠片を${SEAL.fragments}個集める（「${STAGES_N[legend.stage]}」で黒鬼：必ず1個／青鬼：3回に1個）`, got: frag, need: SEAL.fragments },
+      { label: `試練：「${STAGES_N[legend.stage]}」ステージで${TRIALS[legend.id].desc}`, got: st.trial ? 1 : 0, need: 1 },
+      { label: `封印の欠片を${SEAL.fragments}個集める（「${STAGES_N[legend.stage]}」でボス鬼を倒すともらえる。強いボスほど多い）`, got: frag, need: SEAL.fragments },
     ];
     return { conds, ready: conds.every(c => c.got >= c.need) };
   }
-  // バトルの結果から、もらえる欠片を決める（サーバーで使う）
-  function sealDrop(stage, boss, bossDown, rnd = Math.random) {
-    if (!bossDown) return null;
-    const l = LEGENDS.find(x => x.stage === stage);
+  // 封印の欠片: 青鬼は3回に1個、黒鬼は必ず1個、金鬼・白鬼は2個、風雷鬼・鬼神は3個
+  const SEAL_FRAG = { blue: 1 / 3, black: 1, gold: 2, white: 2, fuurai: 3, kishin: 3 };
+  // バトルの結果から、もらえる欠片と試練を決める（サーバーで使う）。r は trialDone と同じ
+  function sealDrop(r, rnd = Math.random) {
+    if (!r.bossDown) return null;
+    const l = LEGENDS.find(x => x.stage === r.stage);
     if (!l) return null;
-    if (boss === 'black') return { legend: l.id, frag: 1, black: true };
-    if (boss === 'blue' && rnd() < 1 / 3) return { legend: l.id, frag: 1 };
-    return null;
+    const f = SEAL_FRAG[r.boss] || 0;
+    const frag = f < 1 ? (rnd() < f ? 1 : 0) : f;
+    const trial = trialDone(l, r);
+    return frag || trial ? { legend: l.id, frag, trial } : null;
   }
 
   // ---------- 週替わりランキング ----------
@@ -204,8 +228,8 @@
     // ここから先はチームで挑むボス（team: 1人・2人でも体力は3人分）
     gold:   { name: '金鬼',   color: '#e0b030', hp: 3.4, dmg: 2.2, atkGap: 0.52, warn: 0.8,  drop: 200, need: 'black', team: true },
     white:  { name: '白鬼',   color: '#e8f2ff', hp: 4.1, dmg: 2.4, atkGap: 0.5,  warn: 0.8,  drop: 230, need: 'gold',  team: true },
-    fuurai: { name: '風雷鬼', color: '#38c8a0', hp: 4.8, dmg: 2.5, atkGap: 0.48, warn: 0.78, drop: 260, need: 'white', team: true },
-    kishin: { name: '鬼神',   color: '#a01030', hp: 6.0, dmg: 2.7, atkGap: 0.45, warn: 0.75, drop: 300, need: 'fuurai', team: true },
+    fuurai: { name: '風雷鬼', color: '#38c8a0', hp: 4.4, dmg: 2.5, atkGap: 0.48, warn: 0.78, drop: 260, need: 'white', team: true },
+    kishin: { name: '鬼神',   color: '#a01030', hp: 5.0, dmg: 2.7, atkGap: 0.45, warn: 0.75, drop: 300, need: 'fuurai', team: true },
   };
   const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
@@ -371,5 +395,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });
