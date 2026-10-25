@@ -17,6 +17,7 @@ const SEND_RATE = 15;              // 状態送信回数/秒
 const DT = 1 / TICK_RATE;
 const MAX_PLAYERS = 4;
 const TIME_LIMIT = +process.env.TIME_LIMIT || 300; // 制限時間（秒）
+const BONUS_RATE = process.env.BONUS_RATE != null ? +process.env.BONUS_RATE : 0.3; // 乱入ボスが来る確率
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
@@ -383,17 +384,9 @@ class Room {
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
     const type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
-    const kind = S.BOSSES[type];
-    // 金鬼から先はチームで挑むボス。1人・2人でも体力は3人分（ひとりで倒すのは、ほぼむり）
-    const bossHp = Math.round((1500 + 1100 * (kind.team ? Math.max(n, 3) : n)) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
-    this.boss = {
-      x: bp.x, y: bp.y, hp: bossHp, maxHp: bossHp, type, kind, name: kind.name, face: 0,
-      state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
-      stunT: 0, chargeDir: 0, hitFlash: 0, atkT: 2,
-      blizT: 14, bliz: 0,           // 白鬼: 吹雪
-      mode: 'wind', modeT: 12, boltT: 2, // 風雷鬼: 風の型・雷の型
-      phase: 1, sweep: null, sweepT: 0, // 鬼神: 変身の段階・大なぎ払い
-    };
+    this.boss = this.makeBoss(type, bp);
+    this.firstBoss = this.boss; // 最初に選んだボス（結果・解放・封印・ランキングはこのボスで決める）
+    this.bonus = null;          // 乱入ボス
     this.ring = null; // 鬼神の最後の形態: だんだんせまくなる安全な輪
     if (DEMO_AI) this.demoPlace(spawns[0]);
 
@@ -599,16 +592,57 @@ class Room {
   }
 
   // ---- ボス鬼 ----
+  makeBoss(type, pos) {
+    const kind = S.BOSSES[type], n = this.players.size;
+    // 金鬼から先はチームで挑むボス。1人・2人でも体力は3人分（ひとりで倒すのは、ほぼむり）
+    const hp = Math.round((1500 + 1100 * (kind.team ? Math.max(n, 3) : n)) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
+    return {
+      x: pos.x, y: pos.y, hp, maxHp: hp, type, kind, name: kind.name, face: 0,
+      state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
+      stunT: 0, chargeDir: 0, hitFlash: 0, atkT: 2,
+      blizT: 14, bliz: 0,           // 白鬼: 吹雪
+      mode: 'wind', modeT: 12, boltT: 2, // 風雷鬼: 風の型・雷の型
+      phase: 1, sweep: null, sweepT: 0, // 鬼神: 変身の段階・大なぎ払い
+    };
+  }
+
   killBoss() {
     const b = this.boss;
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
-    if (this.bossKillT == null) this.bossKillT = this.time;
-    this.blizKill = b.bliz > 0; // 吹雪の中でとどめをさした
-    // 試練は倒した瞬間の様子で決める（倒したあとに見つかったり倒れたりしても大丈夫）
-    this.anyDownAtKill = this.anyDown;
-    for (const p of this.players.values()) p.atKill = { seen: p.seenByPatrol, dama: p.dama };
+    if (b === this.firstBoss) {
+      this.bossKillT = this.time;
+      this.blizKill = b.bliz > 0; // 吹雪の中でとどめをさした
+      // 試練は倒した瞬間の様子で決める（倒したあとに見つかったり倒れたりしても大丈夫）
+      this.anyDownAtKill = this.anyDown;
+      for (const p of this.players.values()) p.atKill = { seen: p.seenByPatrol, dama: p.dama };
+      this.maybeBonus();
+    }
     this.dropDama(b.x, b.y, 1, b.kind.drop);
     this.telegraphs = [];
+    this.ring = null;
+  }
+
+  // 乱入ボス（プレイヤーには知らせていない仕組み）:
+  // 残り2分以上でボスを倒すと、30%で新しいボス鬼が空から降ってくる。ひとりなら赤鬼・青鬼・黒鬼、2人以上ならすべての鬼から
+  maybeBonus() {
+    if (this.timeLeft < 120 || Math.random() >= BONUS_RATE) return;
+    const pool = (this.players.size === 1 ? ['red', 'blue', 'black'] : S.BOSS_ORDER).filter(k => k !== this.firstBoss.type);
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    this.bonus = { type, t: 3.2, boss: null }; // カットインのあいだ待ってから降らせる
+    this.events.push({ k: 'bonusBoss', type });
+  }
+  updateBonus() {
+    const bn = this.bonus;
+    if (!bn || bn.boss || (bn.t -= DT) > 0) return;
+    // まだ戦っている仲間のだれかの近くに、見えるところへ降らせる
+    const ps = this.activePlayers(), t = ps[Math.floor(Math.random() * ps.length)];
+    if (!t) { this.bonus = null; return; }
+    let pos = null;
+    for (let k = 0; k < 2000 && !pos; k++) { const q = this.gridB.randomFreePoint(); const d = dist(q, t); if (d > 330 && d < 520 && S.lineOfSight(this.map, q, t)) pos = q; }
+    pos = pos || this.gridB.randomFreePoint();
+    this.boss = bn.boss = this.makeBoss(bn.type, pos);
+    Object.assign(this.boss, { state: 'engage', target: t.id, atkT: 2.5 });
+    this.events.push({ k: 'bossDrop', type: bn.type, x: Math.round(pos.x), y: Math.round(pos.y) });
   }
 
   updateBoss() {
@@ -988,6 +1022,7 @@ class Room {
     for (const p of this.players.values()) this.updatePlayer(p);
     this.updateRevive();
     this.updatePatrols();
+    this.updateBonus();
     this.updateBoss();
     this.updateTelegraphs();
     this.updateRing();
@@ -1011,10 +1046,10 @@ class Room {
       count: p.escaped ? team : Math.floor(team / 2),
       gacha: rollGacha(p.escaped ? judged : judged / 2),
       // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
-      seal: S.sealDrop({ stage: this.stage, boss: this.boss.type, bossDown: this.boss.hp <= 0, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
+      seal: S.sealDrop({ stage: this.stage, boss: this.firstBoss.type, bossDown: this.firstBoss.hp <= 0, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
-    const b = this.boss;
-    this.lastResult = { t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 };
+    const b = this.firstBoss, bn = this.bonus && this.bonus.boss;
+    this.lastResult = { t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined };
     this.broadcast(this.lastResult);
     for (const p of this.players.values()) p.missedResult = !!p.away; // 通信が切れていた人には、つなぎ直したときに送る
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
@@ -1030,7 +1065,7 @@ class Room {
       switch (th.key) {
         case 'dama': value = p.dama; break;
         case 'bossTime':
-          if (this.boss.type === th.boss && this.bossKillT != null) { value = this.bossKillT; detail = `${n}人`; }
+          if (this.firstBoss.type === th.boss && this.bossKillT != null) { value = this.bossKillT; detail = `${n}人`; }
           break;
         case 'challenge':
           if (this.challenge) { value = r.count; detail = `${p.escaped ? '脱出' : '鬼玉半分'}・${n}人`; }

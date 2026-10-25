@@ -484,6 +484,8 @@
   let serverUpdating = false; // サーバーの更新で切れた
   // 開始時の演出: introMovie 秒の映像 → introCount 秒のカウントダウン（サーバーの intro が残り時間）
   let introMovie = 0, introCount = 0, landed = false, lastCount = 0, started = true, chaseHold = 0;
+  let cutin = null;  // 乱入ボスのカットイン { type, t, max }
+  let dropAnim = 0;  // 乱入ボスが空から落ちてくる残り時間（秒）
 
   $('name').value = localStorage.getItem('name') || '';
   const urlRoom = new URLSearchParams(location.search).get('room');
@@ -752,7 +754,7 @@
         stage = S.STAGES[m.stage] ? m.stage : 'oni';
         spectateId = null;
         introMovie = m.movie || 0; introCount = m.countdown || 0;
-        landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0;
+        landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0; cutin = null; dropAnim = 0;
         banner = started ? { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
         if (m.rejoin) banner = { text: '📡 つなぎ直しました！', t: 1.6, c: '#7dff9a' };
@@ -925,6 +927,7 @@
     // ボス鬼を倒したら次の鬼が解放される（その回に参加していた全員）
     result.newClear = false;
     if (mine && result.bossDown && !stats.cleared[result.boss]) { stats.cleared[result.boss] = true; result.newClear = true; }
+    if (mine && result.bonus && result.bonus.down && result.bonus.type === 'kishin') stats.feats.kishin = true; // 乱入してきた鬼神をたおした
     if (mine && result.bossDown) {
       if (result.boss === 'kishin') stats.feats.kishin = true;
       if (S.BOSSES[result.boss].team && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
@@ -983,6 +986,7 @@
       notes.push(esc(next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
         : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`));
     }
+    if (result.bonus) notes.push(esc(result.bonus.down ? `💥 乱入してきた${S.BOSSES[result.bonus.type].name}もたおした！` : `乱入してきた${S.BOSSES[result.bonus.type].name}からは生きのびた…`));
     if (result.sealNote) notes.push(esc(result.sealNote));
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
     $('resUnlock').hidden = !notes.length;
@@ -1095,6 +1099,16 @@
         break;
       case 'sweep': banner = { text: '⚠ 地獄の大なぎ払い！', sub: '建物のうしろにかくれろ！（回避でもよけられる）', t: 2.2, c: '#ff3a6a' }; beep(120, 1.2, 'sawtooth', 0.08, 300); break;
       case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: bossType === 'gold' ? '金の鎧！正面からの攻撃はほとんど効かない。うしろに回りこめ！' : '攻撃がはげしくなるぞ', t: bossType === 'gold' ? 3 : 2.2, c: bossType === 'gold' ? '#ffd23a' : '#ff4a3a' }; shake = 0.5; break;
+      case 'bonusBoss': // 乱入ボス: カットインのあと、空から降ってくる
+        cutin = { type: ev.type, t: 3.2, max: 3.2 }; banner = null; shake = 0.4;
+        Music.stop();
+        for (let i = 0; i < 6; i++) setTimeout(() => beep(i % 2 ? 660 : 880, 0.22, 'square', 0.07), i * 260); // サイレン
+        navigator.vibrate?.([120, 80, 120, 80, 200]);
+        break;
+      case 'bossDrop':
+        bossType = ev.type; dropAnim = 0.9; ents.delete('boss');
+        Music.play('normal');
+        break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
@@ -1922,6 +1936,38 @@
     }
     ctx.globalAlpha = 1;
   }
+  // 乱入ボスのカットイン: 画面が暗くなり、赤い警告の帯とボスの顔が横から飛びこんでくる
+  function drawCutin(dt, now) {
+    cutin.t -= dt;
+    if (cutin.t <= 0) { cutin = null; return; }
+    const p = 1 - cutin.t / cutin.max, col = BOSS_UI[cutin.type] || '#ff3a3a';
+    const fadeIn = Math.min(1, p * 6), fadeOut = Math.min(1, cutin.t * 3), a = Math.min(fadeIn, fadeOut);
+    ctx.save();
+    ctx.globalAlpha = a * 0.65; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    // 警告の帯（上と下）
+    ctx.globalAlpha = a;
+    for (const y of [H * 0.13, H * 0.79]) {
+      ctx.fillStyle = Math.sin(now * 14) > 0 ? '#c80018' : '#7a0010'; ctx.fillRect(0, y, W, H * 0.08);
+      ctx.fillStyle = '#ffe14a'; ctx.font = `bold ${Math.round(H * 0.05)}px sans-serif`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      const off = (now * 220) % 300;
+      for (let x = -off; x < W + 300; x += 300) ctx.fillText('⚠ WARNING', x, y + H * 0.04);
+    }
+    // ななめの帯とボスの顔
+    const slide = Math.min(1, p * 4), sx = W * (1.2 - slide * 0.7);
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(-0.12);
+    ctx.fillStyle = col; ctx.globalAlpha = a * 0.85; ctx.fillRect(-W, -H * 0.17, W * 2, H * 0.34);
+    ctx.globalAlpha = a; ctx.fillStyle = '#000a'; ctx.fillRect(-W, -H * 0.17, W * 2, 4); ctx.fillRect(-W, H * 0.17 - 4, W * 2, 4);
+    ctx.restore();
+    const img = art('oni/boss-' + cutin.type), sz = H * 0.62;
+    if (img) ctx.drawImage(img, sx - sz / 2, H / 2 - sz * 0.55, sz, sz);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const tx = W * (-0.2 + slide * 0.55);
+    ctx.font = `bold ${Math.round(H * 0.085)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
+    ctx.strokeText('新たなボス鬼が', tx, H * 0.43); ctx.fillStyle = '#fff'; ctx.fillText('新たなボス鬼が', tx, H * 0.43);
+    ctx.font = `bold ${Math.round(H * 0.11)}px sans-serif`;
+    ctx.strokeText('降ってくる！', tx, H * 0.57); ctx.fillStyle = '#ffe14a'; ctx.fillText('降ってくる！', tx, H * 0.57);
+    ctx.restore();
+  }
   function drawCountdown(intro) {
     const n = Math.ceil(intro), f = intro - Math.floor(intro); // f: 1→0 で数字が縮む
     ctx.save();
@@ -2030,6 +2076,18 @@
         fx.push({ k: 'ring', x: snap.boss.x, y: snap.boss.y, r: 360, c: BOSS_UI[bossType], t: 0.8, max: 0.8 });
         fx.push({ k: 'boom', x: snap.boss.x, y: snap.boss.y + 30, r: 140, t: 0.6, max: 0.6 });
         beep(55, 0.7, 'sawtooth', 0.12, -20); navigator.vibrate?.(200);
+      }
+    }
+    if (dropAnim > 0 && snap.boss) { // 乱入ボスが空から降ってくる
+      dropAnim = Math.max(0, dropAnim - dt);
+      const fall = 1 - dropAnim / 0.9;
+      bossDrop = -900 * (1 - fall * fall);
+      if (dropAnim === 0) {
+        bossDrop = 0; shake = 0.8;
+        fx.push({ k: 'ring', x: snap.boss.x, y: snap.boss.y, r: 360, c: BOSS_UI[bossType], t: 0.8, max: 0.8 });
+        fx.push({ k: 'boom', x: snap.boss.x, y: snap.boss.y + 30, r: 140, t: 0.6, max: 0.6 });
+        beep(55, 0.7, 'sawtooth', 0.12, -20); navigator.vibrate?.(200);
+        banner = { text: `${S.BOSSES[bossType].name}が乱入してきた！`, t: 2.6, c: BOSS_UI[bossType] };
       }
     }
     view = { l: cam.x - cam.vw / 2, r: cam.x + cam.vw / 2, t: cam.y - cam.vh / 2, b: cam.y + cam.vh / 2 };
@@ -2220,6 +2278,7 @@
       drawBlizzard(dt, now);
       drawHUD(me, now);
       if (intro > 0) drawCountdown(intro);
+      if (cutin) drawCutin(dt, now);
     }
   }
   requestAnimationFrame(frame);
