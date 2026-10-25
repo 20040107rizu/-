@@ -124,6 +124,21 @@
     <button id="btnInstallClose" class="big">とじる</button>
   </section>
 
+  <!-- 招待リンクをブラウザで開いたときの案内（iPhone ではリンクからアプリを直接開けないため） -->
+  <section id="inviteHelp" class="screen overlay">
+    <h2>👹 招待が届いています！</h2>
+    <p class="invite-code">ルームコード <b id="inviteCode">----</b></p>
+    <ol class="steps">
+      <li><b>ホーム画面の「鬼バスターズ」アプリ</b>を開く（データはアプリの中にあります）</li>
+      <li>「フレンド」の <b>参加</b> ボタンを押すか、このコードを入れて <b>参加する</b></li>
+    </ol>
+    <div class="row">
+      <button id="btnInviteCopy" class="big">コードをコピー</button>
+      <button id="btnInviteBrowser" class="big alt">このままブラウザで参加</button>
+    </div>
+    <p class="sub">アプリをまだ入れていない人は「このままブラウザで参加」で遊べます（あとでホーム画面に追加できます）</p>
+  </section>
+
   <!-- セーブ -->
   <section id="saveScreen" class="screen overlay">
     <h2>💾 セーブデータ</h2>
@@ -194,6 +209,8 @@
 
   <div id="buildInfo" class="build-info"></div>
 
+  <!-- 通信が切れたときのお知らせ -->
+  <div id="netMsg" class="net-msg" hidden></div>
   <!-- 更新のお知らせ -->
   <div id="updateBar" class="update-bar">
     <span>✨ 新しいバージョンがあります</span>

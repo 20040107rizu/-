@@ -4,7 +4,7 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -12,7 +12,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -581,6 +581,15 @@
   });
   window.addEventListener('appinstalled', () => { installPrompt = null; $('btnInstall').style.display = 'none'; });
   if (isIOS && !standalone) $('btnInstall').style.display = 'inline-block';
+  // 招待リンクをブラウザで開いたとき: iPhone ではリンクからホーム画面のアプリを開けないので、アプリで参加する方法を案内する
+  if (urlRoom && !standalone) {
+    $('inviteCode').textContent = urlRoom.toUpperCase();
+    show('inviteHelp');
+  }
+  $('btnInviteCopy').onclick = () => {
+    navigator.clipboard?.writeText(urlRoom.toUpperCase()).then(() => { $('btnInviteCopy').textContent = 'コピーしました！'; }).catch(() => {});
+  };
+  $('btnInviteBrowser').onclick = () => show('title');
   $('btnInstall').onclick = () => {
     if (installPrompt) {
       installPrompt.prompt();
@@ -660,6 +669,32 @@
     goFullscreen();
     beep(1, 0.01, 'sine', 0.0001); // iOSで音を有効にする
     Music.unlock();
+    openSocket(first);
+  }
+  // ---- 通信が切れたときのつなぎ直し ----
+  // 招待を送るためにアプリを裏に回すと、iPhone は通信を切る。サーバーは90秒は席を残しているので、もどってきたら同じルームにつなぎ直す
+  let rejoin = null; // { code, until }
+  function netMsg(text) { $('netMsg').hidden = !text; $('netMsg').textContent = text || ''; }
+  function startRejoin() {
+    rejoin = { code: lobby.code, until: Date.now() + 85000 };
+    netMsg('📡 通信が切れました。つなぎ直しています…');
+    tryRejoin();
+  }
+  function tryRejoin() {
+    if (!rejoin || ws || document.hidden) return; // アプリが裏にあるあいだは待つ（もどったときにつなぐ）
+    if (Date.now() > rejoin.until) { giveUpRejoin('接続が切れました'); return; }
+    openSocket({ t: 'rejoin', code: rejoin.code });
+  }
+  function giveUpRejoin(msg) {
+    rejoin = null; netMsg('');
+    myId = null; snap = null; watcher = false; lobby = null;
+    Music.stop();
+    show('title');
+    $('err').textContent = msg;
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tryRejoin(); });
+  function openSocket(first) {
+    const name = $('name').value.trim() || 'プレイヤー';
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     watcher = first.t === 'watch';
     ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), title: myTitle });
@@ -672,6 +707,9 @@
         renderResult();
         return;
       }
+      // ロビーやバトルの途中で切れたら、同じ席につなぎ直す
+      if (rejoin) { setTimeout(tryRejoin, 2000); return; }
+      if (!watcher && !serverUpdating && lobby && ($('lobby').classList.contains('active') || $('game').classList.contains('active'))) { startRejoin(); return; }
       myId = null; snap = null; watcher = false;
       Music.stop();
       show('title');
@@ -685,9 +723,13 @@
       case 'error':
         $('err').textContent = m.msg;
         ws.onclose = null; ws.close(); ws = null;
+        if (m.rejoinFailed) { giveUpRejoin(m.msg); break; }
         if (watcher || $('buddyScreen').classList.contains('active')) { $('buddyMsg').textContent = m.msg; if (watcher) { watcher = false; snap = null; show('buddyScreen'); } }
         break;
-      case 'welcome': myId = m.id; offline = false; serverUpdating = false; break;
+      case 'welcome':
+        myId = m.id; offline = false; serverUpdating = false;
+        if (m.rejoin) { rejoin = null; netMsg(''); }
+        break;
       case 'serverUpdate': serverUpdating = true; break;
       case 'lobbyMsg': $('lobbyMsg').hidden = false; $('lobbyMsg').textContent = '⚠️ ' + m.msg; break;
       case 'lobby':
@@ -709,6 +751,7 @@
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0;
         banner = started ? { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
+        if (m.rejoin) banner = { text: '📡 つなぎ直しました！', t: 1.6, c: '#7dff9a' };
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
         break;
       case 'state':
@@ -733,6 +776,8 @@
   $('btnStart').onclick = () => send({ t: 'start' });
   // ルームを抜けてタイトルへ
   function leaveRoom() {
+    send({ t: 'leave' }); // 自分で抜けたときは、席を残さずすぐ空ける
+    rejoin = null; netMsg('');
     if (ws) { ws.onclose = null; ws.close(); }
     ws = null; myId = null; lobby = null; snap = null; watcher = false; result = null;
     Music.stop();
@@ -750,7 +795,9 @@
   };
   $('btnShare').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${lobby.code}`;
-    if (navigator.share) navigator.share({ title: '鬼バスターズ', text: '一緒に鬼の世界へ行こう！', url }).catch(() => {});
+    // iPhone ではリンクからアプリを開けないので、アプリで参加する方法とコードも書いておく
+    const text = `一緒に鬼の世界へ行こう！\nルームコード：${lobby.code}\n📱アプリの人は、アプリを開いて「フレンド」の参加ボタンか、コード入力で参加してね`;
+    if (navigator.share) navigator.share({ title: '鬼バスターズ', text, url }).catch(() => {});
     else navigator.clipboard?.writeText(url).then(() => { $('btnShare').textContent = 'コピー済'; });
   };
 
@@ -766,7 +813,7 @@
         // みんなが連れていく妖怪が絵でわかるように
         const y = S.YOKAI_BY_ID[p.yokai];
         if (p.id === myId) li.className = 'me';
-        li.innerHTML = `${faceImg(y)}${totsuTag(p.totsu)}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>${p.title ? titleTag(p.title) : ''}<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span></div>`;
+        li.innerHTML = `${faceImg(y)}${totsuTag(p.totsu)}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>${p.title ? titleTag(p.title) : ''}<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${y.name}</span>${p.away ? '<small class="away">📡 つなぎ直し中…</small>' : ''}</div>`;
       } else { li.className = 'empty'; li.textContent = 'あき'; }
       ul.appendChild(li);
     }

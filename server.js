@@ -268,10 +268,10 @@ class Room {
     for (const w of this.watchers) if (w.readyState === 1) { w.send(data); load.bytes += data.length; }
   }
 
-  // 途中から観戦する人に、今のバトルの様子を送る
-  watchStart(ws) {
+  // 途中から観戦する人（つなぎ直した人）に、今のバトルの様子を送る
+  watchStart(ws, watch = true) {
     ws.send(JSON.stringify({
-      t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: this.timeLimit, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch: true,
+      t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: this.timeLimit, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch, rejoin: !watch,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
     }));
   }
@@ -279,7 +279,7 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, title: p.title })),
+      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, title: p.title, away: !!p.away || undefined })),
     };
   }
 
@@ -1014,7 +1014,9 @@ class Room {
       seal: S.sealDrop({ stage: this.stage, boss: this.boss.type, bossDown: this.boss.hp <= 0, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
     const b = this.boss;
-    this.broadcast({ t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 });
+    this.lastResult = { t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0 };
+    this.broadcast(this.lastResult);
+    for (const p of this.players.values()) p.missedResult = !!p.away; // 通信が切れていた人には、つなぎ直したときに送る
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
     this.recordRanking(players);
   }
@@ -1115,6 +1117,24 @@ wss.on('connection', ws => {
         room.watchStart(ws);
         break;
       }
+      case 'rejoin': { // 通信が切れたあと、同じルームの自分の席にもどる
+        if (room) return;
+        const target = rooms.get(String(msg.code || '').toUpperCase()), id = cleanPid(msg.pid);
+        const p = target && id && [...target.players.values()].find(q => q.pid === id);
+        if (!p) return send({ t: 'error', msg: 'ルームがなくなりました（時間がたったか、みんなが抜けたかも）', rejoinFailed: true });
+        if (p.ws && p.ws !== AWAY_WS) { const old = p.ws; p.ws = null; try { old.close(); } catch {} } // 前の接続がまだ残っていたら閉じる
+        room = target; me = p; pid = id;
+        p.ws = ws; p.away = null;
+        send({ t: 'welcome', id: p.id, rejoin: true });
+        if (room.state === 'battle') room.watchStart(ws, false);
+        room.broadcast(room.lobbyInfo());
+        if (room.state === 'result' && p.missedResult && room.lastResult) { p.missedResult = false; send(room.lastResult); } // 切れている間にバトルが終わっていた
+        break;
+      }
+      case 'leave': // 自分で「ホーム」を押して抜けた（すぐに席を空ける）
+        if (room && me && !watching) dropPlayer(room, me);
+        room = null; me = null;
+        break;
       case 'create':
       case 'join': {
         if (room) return;
@@ -1184,17 +1204,30 @@ wss.on('connection', ws => {
   ws.on('close', () => {
     presence.delete(ws);
     if (room && watching) { room.watchers.delete(ws); return; }
-    if (!room || !me) return;
-    room.removePlayer(me.id);
-    if (room.players.size === 0) {
-      rooms.delete(room.code);
-      // だれもいなくなったバトルを観戦していた人はホームへ
-      room.broadcast({ t: 'error', msg: 'みんながいなくなったので、観戦を終わりました' });
-      for (const w of room.watchers) w.close();
-    }
-    else room.broadcast(room.lobbyInfo());
+    if (!room || !me || me.ws !== ws) return; // me.ws がちがう = もう新しい接続でつなぎ直している
+    // 通信が切れただけかもしれない（招待を送るためにアプリを裏に回した、電波が切れた など）。
+    // すぐには抜けさせず、しばらく席を残して戻ってくるのを待つ
+    const r = room, p = me;
+    p.ws = AWAY_WS; p.away = Date.now();
+    p.input = { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false, ult: false };
+    r.broadcast(r.lobbyInfo());
+    setTimeout(() => { if (p.away && r.players.get(p.id) === p) dropPlayer(r, p); }, REJOIN_GRACE);
   });
 });
+
+// ---------- 通信が切れた人の席 ----------
+const REJOIN_GRACE = (+process.env.REJOIN_GRACE || 90) * 1000; // この秒数のあいだは席を残す
+const AWAY_WS = { readyState: 3, send() {}, close() {} };       // 切れている間の、なにもしない接続
+function dropPlayer(room, p) {
+  room.removePlayer(p.id);
+  if (room.players.size === 0) {
+    rooms.delete(room.code);
+    // だれもいなくなったバトルを観戦していた人はホームへ
+    room.broadcast({ t: 'error', msg: 'みんながいなくなったので、観戦を終わりました' });
+    for (const w of room.watchers) w.close();
+  }
+  else room.broadcast(room.lobbyInfo());
+}
 
 // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
 const MAX_WATCHERS = 8;

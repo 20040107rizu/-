@@ -101,6 +101,13 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .yk.locked small, .yk.locked .rk { opacity: .55; }
 .yk small { font-size: 9px; opacity: .8; }
 
+/* ---- 通信が切れたときのお知らせ ---- */
+.net-msg { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 80; padding: 8px 16px; border-radius: 999px;
+  background: #1a2a4acc; border: 2px solid #5aa7ff; color: #fff; font-size: 14px; font-weight: bold; white-space: nowrap; pointer-events: none; }
+.net-msg[hidden] { display: none; }
+.invite-code { margin: 0; font-size: 16px; }
+.invite-code b { font-size: 30px; letter-spacing: .2em; color: #ffe36b; margin-left: 6px; }
+.pinfo .away { display: block; color: #8ac8ff; font-size: 10px; }
 /* ---- 更新のお知らせ ---- */
 .update-bar { display: none; position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 60;
   align-items: center; gap: 10px; padding: 8px 10px 8px 16px; border-radius: 999px; background: #2f8a5a; box-shadow: 0 4px 16px #0008; font-size: 14px; font-weight: bold; white-space: nowrap; }
