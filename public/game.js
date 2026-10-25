@@ -134,7 +134,7 @@
     if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() }));
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) presenceConnect(); });
-  const STATUS = { home: 'ホームにいる', lobby: '募集中', battle: '出撃中', result: '結果を見ている', off: 'オフライン' };
+  const STATUS = { me: 'あなたのプロフィール（フレンドにはこう見えます）', home: 'ホームにいる', lobby: '募集中', battle: '出撃中', result: '結果を見ている', off: 'オフライン' };
   const ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 60 ? `${Math.max(1, m)}分前` : m < 1440 ? `${Math.floor(m / 60)}時間前` : `${Math.floor(m / 1440)}日前`; };
   function renderBuddies() {
     const live = new Map(buddyLive.map(f => [f.pid, f]));
@@ -167,14 +167,17 @@
     profPid = id; profTab = 'all';
     show('profileScreen');
     renderProfile();
-    if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'profile', pid: id }));
+    if (id !== pid && pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'profile', pid: id }));
   }
   function gotProfile(m) {
     if (m.ok && buddies[m.pid]) { buddies[m.pid].prof = m.prof; try { localStorage.setItem('buddies', JSON.stringify(buddies)); } catch {} } // オフラインでも見られるように覚えておく
     if (m.pid === profPid) renderProfile(m.ok ? null : 'none');
   }
   function renderProfile(state) {
-    const b = buddies[profPid] || {}, live = buddyLive.find(f => f.pid === profPid) || { status: 'off', seen: b.seen };
+    // 自分のプロフィールは、この端末の記録から作る（フレンドに見えているのと同じ内容）
+    const self = profPid === pid;
+    const b = self ? { name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() } : buddies[profPid] || {};
+    const live = self ? { status: 'me' } : buddyLive.find(f => f.pid === profPid) || { status: 'off', seen: b.seen };
     const pr = b.prof;
     const y = S.YOKAI_BY_ID[live.yokai || b.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
     const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
@@ -213,6 +216,7 @@
 
   $('btnBuddies').onclick = () => { $('buddyMsg').textContent = ''; show('buddyScreen'); renderBuddies(); presenceConnect(); };
   $('btnBuddyClose').onclick = () => show('title');
+  $('btnMyProfile').onclick = () => openProfile(pid);
   $('name').addEventListener('change', helloAgain);
 
   // ---------- 妖怪図鑑 ----------
