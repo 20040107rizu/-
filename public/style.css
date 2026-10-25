@@ -205,14 +205,20 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 
 
 /* ボス鬼えらび */
-.boss-pick { display: flex; gap: 5px; }
-.boss-card { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-width: 0; padding: 3px 4px; border-radius: 10px;
+/* 7体あるので、はみ出す分は横にスクロール */
+.boss-pick { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.boss-pick::-webkit-scrollbar { display: none; }
+.boss-card { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 66px; min-width: 0; padding: 3px 2px; border-radius: 10px;
   border: 2px solid #ffffff30; color: #fff; font-weight: bold; line-height: 1.15; opacity: .55; }
 .boss-card .bname { font-size: 15px; }
 .boss-card small { font-size: 9px; font-weight: normal; opacity: .9; white-space: nowrap; }
-.boss-card.red { background: linear-gradient(#a8222a, #5a0e14); }
-.boss-card.blue { background: linear-gradient(#2a56c8, #0e1e5a); }
-.boss-card.black { background: linear-gradient(#3a2e44, #0c0810); }
+.boss-card.bk-red { background: linear-gradient(#a8222a, #5a0e14); }
+.boss-card.bk-blue { background: linear-gradient(#2a56c8, #0e1e5a); }
+.boss-card.bk-black { background: linear-gradient(#3a2e44, #0c0810); }
+.boss-card.bk-gold { background: linear-gradient(#c8961a, #5a3a06); }
+.boss-card.bk-white { background: linear-gradient(#8ab0d8, #2a4060); }
+.boss-card.bk-fuurai { background: linear-gradient(#1e9a78, #0a3a2c); }
+.boss-card.bk-kishin { background: linear-gradient(#a0102e, #2a0008); }
 .boss-card.on { opacity: 1; border-color: #ffe36b; box-shadow: 0 0 12px #ffe36b88; }
 .boss-card.lock { background: #222; color: #aaa; opacity: .8; }
 .boss-card:disabled { cursor: default; }
@@ -385,6 +391,10 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .prof-btns { justify-content: space-between; flex-wrap: nowrap; }
 .prof-btns button.big { padding: 8px 18px; font-size: 15px; }
 .pboss { display: inline-block; font-size: 10px; padding: 0 5px; margin-right: 3px; border-radius: 6px; background: #333; color: #888; }
-.pboss.on.red { background: #a8222a; color: #fff; }
-.pboss.on.blue { background: #2a56c8; color: #fff; }
-.pboss.on.black { background: #3a2e44; color: #fff; border: 1px solid #c8a0ff; }
+.pboss.on.bk-red { background: #a8222a; color: #fff; }
+.pboss.on.bk-blue { background: #2a56c8; color: #fff; }
+.pboss.on.bk-black { background: #3a2e44; color: #fff; border: 1px solid #c8a0ff; }
+.pboss.on.bk-gold { background: #c8961a; color: #fff; }
+.pboss.on.bk-white { background: #8ab0d8; color: #fff; }
+.pboss.on.bk-fuurai { background: #1e9a78; color: #fff; }
+.pboss.on.bk-kishin { background: #a0102e; color: #fff; border: 1px solid #ff8aa8; }

@@ -33,11 +33,12 @@
   let friends = loadFriends();
   let stats = loadJSON('stats', { plays: 0, escapes: 0, dama: 0, best: 0 });
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
+  stats.feats = stats.feats || {};     // バトルでの手がら（称号用） { kishin: true, solo: true }
   stats.seals = stats.seals || {};     // レジェンドの封印 { legendId: { frag: 欠片, black: 封印の地で黒鬼を倒した } }
   // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
   let myTitle = localStorage.getItem('title') || null;
   let weeklyTitles = loadJSON('wtitles', []).filter(id => S.weeklyTitle(id)); // ランキング1位でもらった称号
-  const titlesDone = () => S.titleProgress(friends).filter(t => t.done).map(t => t.title.id).concat(weeklyTitles);
+  const titlesDone = () => S.titleProgress(friends, stats.feats).filter(t => t.done).map(t => t.title.id).concat(weeklyTitles);
   const titleInfo = id => S.TITLE_BY_ID[id] || S.weeklyTitle(id);
   function checkMyTitle() { if (myTitle && !titlesDone().includes(myTitle)) myTitle = null; }
   checkMyTitle();
@@ -73,7 +74,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, stats.seals[l.id]?.black ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)] };
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, stats.seals[l.id]?.black ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]) };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -88,7 +89,8 @@
     const seals = {};
     S.LEGENDS.forEach((l, i) => { const g = (d.g || [])[i]; if (Array.isArray(g) && (g[0] || g[1])) seals[l.id] = { frag: Math.min(99, Math.floor(+g[0] || 0)), black: !!g[1] }; });
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
-    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])) } };
+    return { pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
+      feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
   }
 
   // ---------- フレンド（このゲームで遊んだ人はみんなフレンド） ----------
@@ -178,7 +180,7 @@
     const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
     const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
-    const bosses = S.BOSS_ORDER.map((k, i) => `<span class="pboss ${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join('');
+    const bosses = S.BOSS_ORDER.map((k, i) => `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join('');
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
       <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
       <div><span class="st ${live.status}">${st}</span></div>
@@ -216,7 +218,7 @@
   // ---------- 妖怪図鑑 ----------
   let zukanRank = 'all', zukanRole = 'all', zukanSel = null;
   function renderTitles() {
-    const prog = S.titleProgress(friends);
+    const prog = S.titleProgress(friends, stats.feats);
     $('zukanGrid').innerHTML = '';
     $('zukanTitles').innerHTML = prog.map(({ title: t, got, need, done }) => `<div class="title-row${done ? ' done' : ''}${myTitle === t.id ? ' on' : ''}">
         <div class="tinfo">${done ? titleTag(t.id) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
@@ -770,10 +772,12 @@
     $('bossPick').innerHTML = S.BOSS_ORDER.map(k => {
       const b = S.BOSSES[k], open = S.bossUnlocked(k, stats.cleared), sel = lobby.boss === k;
       const lock = isHost && !open;
-      const sub = lock ? `🔒 ${S.BOSSES[b.need].name}を倒すと解放` : stats.cleared[k] ? '✔ たおした' : `大鬼玉 ${b.drop}個`;
-      return `<button class="boss-card ${k}${sel ? ' on' : ''}${lock ? ' lock' : ''}" data-k="${k}" ${isHost && open ? '' : 'disabled'}>
-        <span class="bname">${lock ? '？？' : b.name}</span><small>${sub}</small></button>`;
+      const sub = lock ? `🔒 ${S.BOSSES[b.need].name}のあと` : stats.cleared[k] ? '✔ たおした' : `大鬼玉 ${b.drop}個`;
+      return `<button class="boss-card bk-${k}${sel ? ' on' : ''}${lock ? ' lock' : ''}" data-k="${k}" ${isHost && open ? '' : 'disabled'}>
+        <span class="bname">${lock ? '？？' : b.name}</span><small>${sub}</small>${b.team ? '<small>👥 チーム向け</small>' : ''}</button>`;
     }).join('');
+    const on = $('bossPick').querySelector('.boss-card.on'); // えらんでいるボスが見えるように
+    if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     const th = S.themeOf(lobby.week ?? S.weekIndex());
     if (th.key === 'challenge') {
       $('bossPick').innerHTML += `<button class="boss-card challenge${lobby.challenge ? ' on' : ''}" data-ch="1" ${isHost ? '' : 'disabled'}><span class="bname">🎯</span><small>今週のチャレンジ</small></button>`;
@@ -855,6 +859,10 @@
     // ボス鬼を倒したら次の鬼が解放される（その回に参加していた全員）
     result.newClear = false;
     if (mine && result.bossDown && !stats.cleared[result.boss]) { stats.cleared[result.boss] = true; result.newClear = true; }
+    if (mine && result.bossDown) {
+      if (result.boss === 'kishin') stats.feats.kishin = true;
+      if (S.BOSSES[result.boss].team && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
+    }
     result.newTitles = mine ? titlesDone().filter(id => !titlesBefore.includes(id)) : [];
     // レジェンドの封印の欠片
     result.sealNote = null;
@@ -1132,7 +1140,8 @@
         return;
       }
     }
-    if (pt.x < W * 0.5 && !stick.active) Object.assign(stick, { active: true, id: e.pointerId, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
+    // 左半分をさわったら、いつでもその指をスティックにする（前の指の「はなした」が届いていなくても、さわり直せば直る）
+    if (pt.x < W * 0.5) Object.assign(stick, { active: true, id: e.pointerId, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
     e.preventDefault();
   }
   function pointerMove(e) { if (stick.active && e.pointerId === stick.id) { const pt = toCanvas(e); stick.x = pt.x; stick.y = pt.y; } }
@@ -1140,13 +1149,31 @@
     if (stick.active && e.pointerId === stick.id) stick.active = false;
     for (const k in btnHold) if (btnHold[k] === e.pointerId) btnHold[k] = null;
   }
+  // 指をはなしたのに「はなした」の知らせが来ないことがある（iPhone で画面のふちに指が出たとき、通知センターなどの操作が割りこんだとき）。
+  // そのままだとスティックやボタンが押しっぱなしになるので、いくつかの方法で確かめて戻す
+  function releaseAll() {
+    stick.active = false;
+    for (const k in btnHold) btnHold[k] = null;
+  }
+  function checkTouches(e) {
+    if (!e.touches.length) return releaseAll(); // 画面にさわっている指が1本もない
+    if (stick.active) { // スティックの近くに指が残っていなければ、スティックをはなす
+      const r = cv.getBoundingClientRect();
+      const near = [...e.touches].some(t => Math.hypot(((t.clientX - r.left) * W) / (r.width || W) - stick.x, ((t.clientY - r.top) * H) / (r.height || H) - stick.y) < STICK_R * 3);
+      if (!near) stick.active = false;
+    }
+  }
   cv.addEventListener('pointerdown', pointerDown);
   window.addEventListener('pointermove', pointerMove);
   window.addEventListener('pointerup', pointerUp);
   window.addEventListener('pointercancel', pointerUp);
+  window.addEventListener('touchend', checkTouches);
+  window.addEventListener('touchcancel', checkTouches);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+  window.addEventListener('pagehide', releaseAll);
   window.addEventListener('keydown', e => keys.add(e.code));
   window.addEventListener('keyup', e => keys.delete(e.code));
-  window.addEventListener('blur', () => keys.clear());
+  window.addEventListener('blur', () => { keys.clear(); releaseAll(); });
 
   const STICK_R = 60;
   function readInput() {

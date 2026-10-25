@@ -69,11 +69,15 @@
     { id: 'world',  name: '世界の妖怪コンプ',   color: '#5ad8c8', of: y => regionOf(y) === 'world', desc: 'アフリカ・アメリカ・中東などの妖怪を全部集める' },
     { id: 'totsu',  name: '限界突破',           color: '#ff5ad8', totsu: true, desc: 'どれか1体を凸5（凸MAX）にする' },
     { id: 'all',    name: '妖怪マスター',       color: 'gold', count: 'all', desc: '170体ぜんぶ集める（名前が金色になる）' },
+    // バトルでの手がら（feat）でもらえる称号
+    { id: 'kishin', name: '鬼神殺し',           color: '#ff3a6a', feat: 'kishin', desc: '鬼神をたおす' },
+    { id: 'solo',   name: '孤高の鬼殺し',       color: '#ffb0d0', feat: 'solo', desc: '金鬼から先のボス鬼を、ひとりで出撃してたおす' },
   ];
   const TITLE_BY_ID = Object.fromEntries(TITLES.map(t => [t.id, t]));
-  // friends: { id: 持っている数 } → [{ title, got, need, done }]
-  function titleProgress(friends) {
+  // friends: { id: 持っている数 }、feats: { kishin: true, ... } バトルでの手がら → [{ title, got, need, done }]
+  function titleProgress(friends, feats = {}) {
     return TITLES.map(t => {
+      if (t.feat) { const ok = !!feats[t.feat]; return { title: t, got: ok ? 1 : 0, need: 1, done: ok }; }
       if (t.totsu) { const best = Math.max(0, ...YOKAI.map(y => totsuOf(friends[y.id] || 0))); return { title: t, got: best, need: TOTSU_MAX, done: best >= TOTSU_MAX }; }
       const pool = t.of ? YOKAI.filter(t.of) : YOKAI;
       const got = pool.filter(y => friends[y.id]).length;
