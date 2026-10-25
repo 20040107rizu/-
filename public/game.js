@@ -107,8 +107,10 @@
     pws.onmessage = e => {
       const m = JSON.parse(e.data);
       if (m.t === 'profile') return gotProfile(m);
+      if (m.t === 'invited') return gotInvite(m);
       if (m.t !== 'friends') return;
       buddyLive = m.list;
+      if (!$('invitePanel').hidden) renderInviteList();
       for (const f of m.list) buddies[f.pid] = { ...buddies[f.pid], name: f.name, yokai: f.yokai, seen: Math.max(f.seen, buddies[f.pid]?.seen || 0), ok: 1 }; // プロフィールは消さずに残す
       const keep = Object.entries(buddies).sort((a, b) => b[1].seen - a[1].seen).slice(0, 200);
       buddies = Object.fromEntries(keep);
@@ -675,6 +677,7 @@
     goFullscreen();
     beep(1, 0.01, 'sine', 0.0001); // iOSで音を有効にする
     Music.unlock();
+    hideInvite(); $('invitePanel').hidden = true;
     openSocket(first);
   }
   // ---- 通信が切れたときのつなぎ直し ----
@@ -738,12 +741,16 @@
         break;
       case 'serverUpdate': serverUpdating = true; break;
       case 'lobbyMsg': $('lobbyMsg').hidden = false; $('lobbyMsg').textContent = '⚠️ ' + m.msg; break;
+      case 'inviteSent':
+        if (!m.ok) { const f = buddyLive.find(q => q.pid === m.to); $('inviteMsg').textContent = `${f ? f.name : 'その人'}は、もうホームにいなかったみたい`; }
+        break;
       case 'lobby':
         lobby = m;
         if (m.state === 'lobby') { renderLobby(); show('lobby'); }
         else if (m.state === 'battle') show('game');
         break;
       case 'start':
+        $('invitePanel').hidden = true;
         map = S.generateCity(m.seed);
         fusuma = m.fusuma;
         timeLimit = m.timeLimit;
@@ -799,6 +806,46 @@
     if (offline) { offline = false; myId = null; snap = null; result = null; show('title'); if (serverUpdating) checkVersion(); return; }
     send({ t: 'toLobby' });
   };
+  // ---- ロビーから、ホームにいるフレンドをボタンひとつで誘う ----
+  const invitedAt = {}; // pid → 誘った時刻（10秒は同じ人を誘えない）
+  function renderInviteList() {
+    const home = buddyLive.filter(f => f.status === 'home' && f.pid !== pid);
+    const now = Date.now();
+    $('inviteList').innerHTML = home.length ? home.map(f => {
+      const y = S.YOKAI_BY_ID[f.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id), wait = now - (invitedAt[f.pid] || 0) < 10000;
+      return `<li>${url ? `<img src="${url}" alt="">` : ''}<span class="who">${nameTag(f.name, f.title)}</span><button class="small" data-pid="${f.pid}"${wait ? ' disabled' : ''}>${wait ? '誘った✓' : '誘う'}</button></li>`;
+    }).join('') : '<li class="sub">いまホームにいるフレンドはいません</li>';
+    for (const b of $('inviteList').querySelectorAll('button')) b.onclick = () => {
+      invitedAt[b.dataset.pid] = Date.now();
+      send({ t: 'invite', to: b.dataset.pid });
+      $('inviteMsg').textContent = '';
+      renderInviteList();
+      setTimeout(() => { if (!$('invitePanel').hidden) renderInviteList(); }, 10100);
+    };
+  }
+  $('btnInviteFriends').onclick = () => { $('invitePanel').hidden = !$('invitePanel').hidden; $('inviteMsg').textContent = ''; presenceConnect(); renderInviteList(); };
+  $('btnInvitePanelClose').onclick = () => { $('invitePanel').hidden = true; };
+
+  // ---- 誘われたとき: ホームにいるときだけ通知を出して、そこから参加できる ----
+  let invite = null, inviteTimer = null;
+  const atHome = () => !ws && !['lobby', 'game', 'gacha', 'result'].some(id => $(id).classList.contains('active'));
+  function gotInvite(m) {
+    if (!atHome() || !/^[A-Z0-9]{4}$/.test(m.code || '')) return; // ゲーム中・ロビーにいるときは出さない
+    invite = m;
+    const y = S.YOKAI_BY_ID[m.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
+    $('invitedFace').innerHTML = url ? `<img src="${url}" alt="">` : '';
+    $('invitedFrom').innerHTML = `${nameTag(m.from || 'フレンド', m.title)} から招待！`;
+    $('invitedSub').textContent = `ルーム ${m.code}（${Math.min(4, m.n || 1)}/4人）${S.BOSSES[m.boss] ? `・${S.BOSSES[m.boss].name}` : ''}`;
+    $('invitedCard').hidden = false;
+    [784, 988].forEach((f, i) => setTimeout(() => beep(f, 0.15, 'triangle', 0.08), i * 140));
+    navigator.vibrate?.([80, 60, 80]);
+    clearTimeout(inviteTimer);
+    inviteTimer = setTimeout(hideInvite, 25000); // しばらくしたら消える
+  }
+  function hideInvite() { invite = null; $('invitedCard').hidden = true; clearTimeout(inviteTimer); }
+  $('btnInvitedJoin').onclick = () => { const code = invite && invite.code; hideInvite(); if (code && atHome()) connect({ t: 'join', code }); };
+  $('btnInvitedLater').onclick = hideInvite;
+
   $('btnShare').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${lobby.code}`;
     // iPhone ではリンクからアプリを開けないので、アプリで参加する方法とコードも書いておく

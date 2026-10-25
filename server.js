@@ -1136,6 +1136,21 @@ wss.on('connection', ws => {
         sendFriends(ws);
         break;
       }
+      case 'invite': { // ロビーから、ホームにいるフレンドを誘う（相手のホーム画面の接続に届ける）
+        const to = cleanPid(msg.to);
+        if (!room || !me || watching || room.state !== 'lobby' || !to || to === me.pid) break;
+        const key = `${me.pid || me.id}>${to}`, now = Date.now();
+        if (now - (inviteAt.get(key) || 0) < 10000) break; // 同じ人を何度も誘いすぎない（10秒に1回）
+        inviteAt.set(key, now);
+        if (inviteAt.size > 2000) inviteAt.clear();
+        let sent = 0;
+        for (const [pws, id] of presence) if (id === to && pws.readyState === 1) {
+          pws.send(JSON.stringify({ t: 'invited', code: room.code, from: me.name, yokai: me.yokai, title: me.title, n: room.players.size, boss: room.bossSel }));
+          sent++;
+        }
+        send({ t: 'inviteSent', to, ok: sent > 0 });
+        break;
+      }
       case 'profile': { // フレンドのくわしい情報
         const id = cleanPid(msg.pid), k = id && known.get(id);
         send({ t: 'profile', pid: msg.pid, ok: !!(k && k.prof), name: k && k.name, yokai: k && k.yokai, title: k && k.title, prof: k && k.prof });
@@ -1269,6 +1284,7 @@ function dropPlayer(room, p) {
 const MAX_WATCHERS = 8;
 const known = new Map();    // pid → { name, yokai, title, seen, played, prof }
 const presence = new Map(); // ホーム画面の接続 → pid
+const inviteAt = new Map(); // 「誘った人>誘われた人」→ 最後に誘った時刻
 const usableYokai = id => !!S.YOKAI_BY_ID[id];
 const isLegend = id => !!(S.YOKAI_BY_ID[id] && S.YOKAI_BY_ID[id].legend);
 // プロフィール: f=持っている妖怪の数（1けた×176）、s=[遊んだ回数, 脱出, 最高鬼玉, 集めた鬼玉]、c=倒したボス、tc=称号の数、wt=限定称号

@@ -168,6 +168,13 @@
         <span>ルーム</span>
         <strong id="roomCode">----</strong>
         <button id="btnShare" class="small">招待</button>
+        <button id="btnInviteFriends" class="small alt">👥 フレンドを誘う</button>
+      </div>
+      <!-- ホームにいるフレンドを誘う -->
+      <div id="invitePanel" class="invite-panel" hidden>
+        <div class="ip-head"><b>🏠 ホームにいるフレンド</b><button id="btnInvitePanelClose" class="small">✕</button></div>
+        <ul id="inviteList" class="invite-list"></ul>
+        <p id="inviteMsg" class="sub"></p>
       </div>
       <div id="yokaiInfo" class="lb-preview"></div>
       <ul id="plist" class="plist"></ul>
@@ -209,6 +216,13 @@
 
   <div id="buildInfo" class="build-info"></div>
 
+  <!-- フレンドから誘われたときの通知（ホームにいるときだけ） -->
+  <div id="invitedCard" class="invited-card" hidden>
+    <div id="invitedFace" class="ic-face"></div>
+    <div class="ic-text"><b id="invitedFrom"></b><small id="invitedSub"></small></div>
+    <button id="btnInvitedJoin" class="small">参加する</button>
+    <button id="btnInvitedLater" class="small alt">あとで</button>
+  </div>
   <!-- 通信が切れたときのお知らせ -->
   <div id="netMsg" class="net-msg" hidden></div>
   <!-- 更新のお知らせ -->

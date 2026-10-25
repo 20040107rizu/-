@@ -105,6 +105,24 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .net-msg { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 80; padding: 8px 16px; border-radius: 999px;
   background: #1a2a4acc; border: 2px solid #5aa7ff; color: #fff; font-size: 14px; font-weight: bold; white-space: nowrap; pointer-events: none; }
 .net-msg[hidden] { display: none; }
+/* ロビー: フレンドを誘う */
+.invite-panel { position: fixed; z-index: 40; top: max(56px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); width: min(380px, 92vw); max-height: 70vh;
+  display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; background: #241238f2; border: 2px solid #8a5ac8; box-shadow: 0 6px 24px #000a; }
+.invite-panel[hidden] { display: none; }
+.ip-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.invite-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; touch-action: pan-y; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+.invite-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 10px; background: #ffffff10; }
+.invite-list img { width: 38px; height: 38px; object-fit: contain; }
+.invite-list .who { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-list button:disabled { opacity: .6; }
+/* 誘われたときの通知 */
+.invited-card { position: fixed; z-index: 85; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 16px; background: #2a1450f5; border: 3px solid #ffd23a; box-shadow: 0 6px 24px #000c; animation: icIn .35s ease-out; max-width: 94vw; }
+.invited-card[hidden] { display: none; }
+.ic-face img { width: 46px; height: 46px; object-fit: contain; display: block; }
+.ic-text { display: flex; flex-direction: column; font-size: 15px; white-space: nowrap; }
+.ic-text small { font-size: 11px; opacity: .85; }
+@keyframes icIn { from { transform: translate(-50%, -120%); } to { transform: translate(-50%, 0); } }
 .invite-code { margin: 0; font-size: 16px; }
 .invite-code b { font-size: 30px; letter-spacing: .2em; color: #ffe36b; margin-left: 6px; }
 .pinfo .away { display: block; color: #8ac8ff; font-size: 10px; }
