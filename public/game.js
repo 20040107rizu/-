@@ -1157,15 +1157,33 @@
         return;
       }
     }
-    // 左半分をさわったら、いつでもその指をスティックにする（前の指の「はなした」が届いていなくても、さわり直せば直る）
-    if (pt.x < W * 0.5) Object.assign(stick, { active: true, id: e.pointerId, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
+    // 指のスティックは下の touch の処理で動かす（マウスのときだけここで）
+    if (e.pointerType === 'mouse' && pt.x < W * 0.5) Object.assign(stick, { active: true, id: e.pointerId, touch: null, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
     e.preventDefault();
   }
-  function pointerMove(e) { if (stick.active && e.pointerId === stick.id) { const pt = toCanvas(e); stick.x = pt.x; stick.y = pt.y; } }
+  function pointerMove(e) { if (stick.active && stick.touch == null && e.pointerId === stick.id) { const pt = toCanvas(e); stick.x = pt.x; stick.y = pt.y; } }
   function pointerUp(e) {
-    if (stick.active && e.pointerId === stick.id) stick.active = false;
+    if (stick.active && stick.touch == null && e.pointerId === stick.id) stick.active = false;
     for (const k in btnHold) if (btnHold[k] === e.pointerId) btnHold[k] = null;
   }
+  // ---- 指のスティック ----
+  // どの指かを番号（identifier）でおぼえて追いかける。指を大きく動かしても、その指をはなすまではスティックのまま
+  const touchPt = t => { const r = cv.getBoundingClientRect(); return { x: ((t.clientX - r.left) * W) / (r.width || W), y: ((t.clientY - r.top) * H) / (r.height || H) }; };
+  const onButton = pt => Object.values(buttons()).some(b => Math.hypot(pt.x - b.x, pt.y - b.y) < b.r * 1.2);
+  cv.addEventListener('touchstart', e => {
+    if (!playing() || watcher) return;
+    const me = snap && snap.players.find(p => p.id === myId);
+    if (me && me.esc) return;
+    for (const t of e.changedTouches) {
+      const pt = touchPt(t);
+      // 左半分をさわったら、いつでもその指をスティックにする（前の指の「はなした」が届いていなくても、さわり直せば直る）
+      if (pt.x < W * 0.5 && !onButton(pt)) Object.assign(stick, { active: true, id: null, touch: t.identifier, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
+    }
+  }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (!stick.active || stick.touch == null) return;
+    for (const t of e.changedTouches) if (t.identifier === stick.touch) { const pt = touchPt(t); stick.x = pt.x; stick.y = pt.y; }
+  }, { passive: true });
   // 指をはなしたのに「はなした」の知らせが来ないことがある（iPhone で画面のふちに指が出たとき、通知センターなどの操作が割りこんだとき）。
   // そのままだとスティックやボタンが押しっぱなしになるので、いくつかの方法で確かめて戻す
   function releaseAll() {
@@ -1174,11 +1192,8 @@
   }
   function checkTouches(e) {
     if (!e.touches.length) return releaseAll(); // 画面にさわっている指が1本もない
-    if (stick.active) { // スティックの近くに指が残っていなければ、スティックをはなす
-      const r = cv.getBoundingClientRect();
-      const near = [...e.touches].some(t => Math.hypot(((t.clientX - r.left) * W) / (r.width || W) - stick.x, ((t.clientY - r.top) * H) / (r.height || H) - stick.y) < STICK_R * 3);
-      if (!near) stick.active = false;
-    }
+    // スティックの指が、もう画面にさわっていなければはなす（その指の番号で確かめる）
+    if (stick.active && stick.touch != null && ![...e.touches].some(t => t.identifier === stick.touch)) stick.active = false;
   }
   cv.addEventListener('pointerdown', pointerDown);
   window.addEventListener('pointermove', pointerMove);
