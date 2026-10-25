@@ -13,7 +13,7 @@ html, body {
 .screen.active { display: flex; }
 .overlay { background: rgba(10, 5, 20, .88); z-index: 5; }
 #game { padding: 0; background: #120a1a; }
-canvas { display: block; width: 100%; height: 100%; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; } /* 長押しのメニューや虫めがねを出さない（出るとタッチが途中で切れる） */
 
 h1 { margin: 0; font-size: clamp(32px, 10vh, 64px); letter-spacing: .12em;
   background: linear-gradient(#ffe36b, #ff4a3a); -webkit-background-clip: text; background-clip: text; color: transparent;

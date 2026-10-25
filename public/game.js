@@ -1170,7 +1170,9 @@
   // どの指かを番号（identifier）でおぼえて追いかける。指を大きく動かしても、その指をはなすまではスティックのまま
   const touchPt = t => { const r = cv.getBoundingClientRect(); return { x: ((t.clientX - r.left) * W) / (r.width || W), y: ((t.clientY - r.top) * H) / (r.height || H) }; };
   const onButton = pt => Object.values(buttons()).some(b => Math.hypot(pt.x - b.x, pt.y - b.y) < b.r * 1.2);
+  // passive: false で preventDefault して「このタッチはゲームが使う」と伝える（iPhone が長押しやスクロールだと思ってタッチを打ち切らないように）
   cv.addEventListener('touchstart', e => {
+    if (playing()) e.preventDefault();
     if (!playing() || watcher) return;
     const me = snap && snap.players.find(p => p.id === myId);
     if (me && me.esc) return;
@@ -1179,11 +1181,12 @@
       // 左半分をさわったら、いつでもその指をスティックにする（前の指の「はなした」が届いていなくても、さわり直せば直る）
       if (pt.x < W * 0.5 && !onButton(pt)) Object.assign(stick, { active: true, id: null, touch: t.identifier, ox: pt.x, oy: pt.y, x: pt.x, y: pt.y });
     }
-  }, { passive: true });
+  }, { passive: false });
   window.addEventListener('touchmove', e => {
+    if (playing()) e.preventDefault();
     if (!stick.active || stick.touch == null) return;
     for (const t of e.changedTouches) if (t.identifier === stick.touch) { const pt = touchPt(t); stick.x = pt.x; stick.y = pt.y; }
-  }, { passive: true });
+  }, { passive: false });
   // 指をはなしたのに「はなした」の知らせが来ないことがある（iPhone で画面のふちに指が出たとき、通知センターなどの操作が割りこんだとき）。
   // そのままだとスティックやボタンが押しっぱなしになるので、いくつかの方法で確かめて戻す
   function releaseAll() {
