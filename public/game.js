@@ -772,7 +772,7 @@
     $('bossPick').innerHTML = S.BOSS_ORDER.map(k => {
       const b = S.BOSSES[k], open = S.bossUnlocked(k, stats.cleared), sel = lobby.boss === k;
       const lock = isHost && !open;
-      const sub = lock ? `🔒 ${S.BOSSES[b.need].name}のあと` : stats.cleared[k] ? '✔ たおした' : `大鬼玉 ${b.drop}個`;
+      const sub = lock ? `🔒 ${S.BOSSES[b.need].name}のあと` : `鬼玉 ${b.drop}個`; // 倒すと落とす鬼玉の数
       return `<button class="boss-card bk-${k}${sel ? ' on' : ''}${lock ? ' lock' : ''}" data-k="${k}" ${isHost && open ? '' : 'disabled'}>
         <span class="bname">${lock ? '？？' : b.name}</span><small>${sub}</small>${b.team ? '<small>👥 チーム向け</small>' : ''}</button>`;
     }).join('');
