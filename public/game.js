@@ -374,7 +374,7 @@
   }
   const left = end => { const ms = Math.max(0, end - Date.now()), d = Math.floor(ms / 86400000), h = Math.floor(ms / 3600000) % 24, m = Math.floor(ms / 60000) % 60; return d ? `${d}日${h}時間` : h ? `${h}時間${m}分` : `${m}分`; };
   function rewardText(r) {
-    return { gold: '金玉チケット', red: '赤玉チケット', blue: '青玉チケット', green: '緑玉チケット' }[r.ticket] + (r.title ? '＋限定称号' : '');
+    return { black: '黒玉チケット', gold: '金玉チケット', red: '赤玉チケット', blue: '青玉チケット', green: '緑玉チケット' }[r.ticket] + (r.title ? '＋限定称号' : '');
   }
   function renderRanking() {
     const now = rankData ? rankData.idx : S.weekIndex();
@@ -395,8 +395,9 @@
         <div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b><small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
     }).join('') : `<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>`;
     const me = d.me;
-    $('rankReward').innerHTML = `🎁 報酬　🥇 限定称号《第${th.no}回 ${esc(th.crown)}》＋金玉チケット　🥈🥉 赤玉チケット　〜10位 青玉チケット　参加賞 緑玉チケット`
-      + `<br>あなた：${me.rank ? `<b>${me.rank}位</b>（${esc(S.fmtScore(th, me.score))}）→ ${rewardText(S.weeklyReward(me.rank))}` : me.joined ? '参加済み（まだ記録なし）→ 緑玉チケット' : 'まだ参加していません'}`;
+    const prizes = d.idx >= 1 ? '🥇 限定称号＋黒玉チケット　🥈 金玉チケット　🥉 赤玉チケット' : '🥇 限定称号＋金玉チケット　🥈🥉 赤玉チケット';
+    $('rankReward').innerHTML = `🎁 報酬　${prizes.replace('限定称号', `限定称号《第${th.no}回 ${esc(th.crown)}》`)}　〜10位 青玉チケット　参加賞 緑玉チケット`
+      + `<br>あなた：${me.rank ? `<b>${me.rank}位</b>（${esc(S.fmtScore(th, me.score))}）→ ${rewardText(S.weeklyReward(me.rank, d.idx))}` : me.joined ? '参加済み（まだ記録なし）→ 緑玉チケット' : 'まだ参加していません'}`;
   }
   $('btnRank').onclick = () => { show('rankScreen'); renderRanking(); refreshRanking(); };
   $('btnRankClose').onclick = () => show('title');
@@ -415,13 +416,13 @@
     let d;
     try { d = await loadRanking('prev'); } catch { return; }
     if (!d.me.joined) { try { localStorage.setItem('rewardWeek', prev); } catch {} return; }
-    const r = S.weeklyReward(d.me.rank || 999), th = d.theme;
+    const r = S.weeklyReward(d.me.rank || 999, d.idx), th = d.theme;
     $('rewardWeek').textContent = `第${th.no}回 ${th.name} の結果`;
     $('rewardTitle').textContent = d.me.rank ? `${d.me.rank <= 3 ? ['🥇', '🥈', '🥉'][d.me.rank - 1] : '🏅'} ${d.me.rank}位！` : '🎉 参加ありがとう！';
     $('rewardSub').textContent = d.me.rank ? `記録 ${S.fmtScore(th, d.me.score)}（参加 ${d.total}人）` : `参加 ${d.total}人`;
     const ball = S.BALLS.find(b => b.key === r.ticket);
     $('rewardPrizes').innerHTML = (r.title ? `<div class="prize"><div class="i">🏅</div>限定称号<br>${titleTag('w' + prev)}</div>` : '')
-      + `<div class="prize"><div class="i" style="color:${ball.color}">●</div>${ball.name}玉チケット<br>×1</div>`;
+      + `<div class="prize"><div class="i" style="color:${ball.color}${ball.key === 'black' ? ';text-shadow:0 0 8px #fff' : ''}">●</div>${ball.name}玉チケット<br>×1</div>`; // 黒玉は暗い背景で見えるように光らせる
     $('btnRewardOk').onclick = () => {
       tickets[r.ticket] = (tickets[r.ticket] || 0) + 1;
       if (r.title && !weeklyTitles.includes('w' + prev)) weeklyTitles.push('w' + prev);
@@ -437,7 +438,7 @@
   // チケットガチャ: その色のガチャ玉が必ず出る
   let ticketMode = false;
   $('btnTicket').onclick = () => {
-    const key = ['gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
+    const key = ['black', 'gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
     if (!key) return;
     tickets[key]--;
     if (!tickets[key]) delete tickets[key];

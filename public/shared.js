@@ -205,9 +205,16 @@
   }
   const fmtScore = (theme, v) => theme.lower ? `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}` : `${Math.round(v).toLocaleString('ja-JP')}${theme.unit}`;
   // 順位ごとの報酬（チケットは、ホームの「チケットガチャ」でその色の玉が必ず出る）
-  function weeklyReward(rank) {
-    if (rank === 1) return { ticket: 'gold', title: true };
-    if (rank <= 3) return { ticket: 'red' };
+  // 第2回（idx 1）から: 1位 黒玉＋称号、2位 金玉、3位 赤玉、〜10位 青玉、それより下は緑玉（参加賞）
+  function weeklyReward(rank, idx = weekIndex()) {
+    if (idx >= 1) {
+      if (rank === 1) return { ticket: 'black', title: true };
+      if (rank === 2) return { ticket: 'gold' };
+      if (rank === 3) return { ticket: 'red' };
+    } else { // 第1回
+      if (rank === 1) return { ticket: 'gold', title: true };
+      if (rank <= 3) return { ticket: 'red' };
+    }
     if (rank <= 10) return { ticket: 'blue' };
     return { ticket: 'green' }; // 参加賞
   }
