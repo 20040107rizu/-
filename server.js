@@ -18,7 +18,7 @@ const DT = 1 / TICK_RATE;
 const MAX_PLAYERS = 4;
 const TIME_LIMIT = +process.env.TIME_LIMIT || 300; // 制限時間（秒）
 const BONUS_RATE = process.env.BONUS_RATE != null ? +process.env.BONUS_RATE : 0.3; // 乱入ボスが来る確率
-const SHIN_RATE = process.env.SHIN_RATE != null ? +process.env.SHIN_RATE : 0.1;    // 鬼神をだれも倒れずに倒したとき、鬼神・真が目覚める確率
+const SHIN_RATE = process.env.SHIN_RATE != null ? +process.env.SHIN_RATE : 0.1;    // 鬼神を倒したとき、鬼神・真が目覚める確率
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
@@ -640,8 +640,8 @@ class Room {
       // 試練は倒した瞬間の様子で決める（倒したあとに見つかったり倒れたりしても大丈夫）
       this.anyDownAtKill = this.anyDown;
       for (const p of this.players.values()) p.atKill = { seen: p.seenByPatrol, dama: p.dama };
-      // 隠し: 鬼神をだれも倒れずに倒すと、まれに鬼神・真が目覚める（そのときは乱入はなし）
-      if (b.type === 'kishin' && !this.anyDown && Math.random() < SHIN_RATE) this.drop = { type: 'shin', kind: 'shin', wait: 4, t: 3.6 };
+      // 隠し: 鬼神を倒すと、まれに鬼神・真が目覚める（そのときは乱入はなし）
+      if (b.type === 'kishin' && Math.random() < SHIN_RATE) this.drop = { type: 'shin', kind: 'shin', wait: 4, t: 3.6 };
       else if (!b.kind.hidden) this.maybeBonus();
     }
     // 百鬼王のボスラッシュ: 次のボス、7体倒したら百鬼王
