@@ -183,7 +183,7 @@
       case 'dama': return { ...t, icon: '🟣', name: '鬼玉ランキング', desc: '1週間に集めた鬼玉の合計で勝負！', unit: '個', crown: '鬼玉王' };
       case 'bossTime': {
         const boss = ['red', 'blue', 'red', 'black'][round % 4];
-        return { ...t, icon: '⏱️', boss, name: `${BOSSES_N[boss]}討伐タイム`, desc: `${BOSSES_N[boss]}を倒すまでの最速タイムで勝負！（何回挑戦してもOK・一番いい記録が残ります）`, lower: true, crown: `${BOSSES_N[boss]}討伐王` };
+        return { ...t, icon: '⏱️', boss, name: `${BOSSES_N[boss]}討伐タイム`, desc: `${BOSSES_N[boss]}をひとりで倒すまでの最速タイムで勝負！（ひとりで出撃したときだけ記録・何回挑戦してもOK）`, lower: true, crown: `${BOSSES_N[boss]}討伐王` };
       }
       case 'challenge': {
         const stage = ['france', 'usa', 'china', 'brazil', 'japan', 'oni'][round % 6];

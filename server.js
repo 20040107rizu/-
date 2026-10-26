@@ -1066,7 +1066,7 @@ class Room {
       switch (th.key) {
         case 'dama': value = p.dama; break;
         case 'bossTime':
-          if (this.firstBoss.type === th.boss && this.bossKillT != null) { value = this.bossKillT; detail = `${n}人`; }
+          if (n === 1 && this.firstBoss.type === th.boss && this.bossKillT != null) value = this.bossKillT; // ひとりで出撃したときのタイムだけ
           break;
         case 'challenge':
           if (this.challenge) { value = r.count; detail = `${p.escaped ? '脱出' : '鬼玉半分'}・${n}人`; }

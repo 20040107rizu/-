@@ -76,11 +76,17 @@ async function board(idx, pid) {
   if (w.loading) await w.loading;
   const all = [...w.rows.values()];
   const ranked = all.filter(r => r.score > 0).sort((a, b) => (theme.lower ? a.score - b.score : b.score - a.score));
+  // 同じ記録（画面に出る数字が同じ）の人は同じ順位にする（例: 1位・1位・3位）
+  const ranks = new Map();
+  ranked.forEach((r, i) => {
+    const prev = ranked[i - 1];
+    ranks.set(r, prev && S.fmtScore(theme, prev.score) === S.fmtScore(theme, r.score) ? ranks.get(prev) : i + 1);
+  });
   const meRow = pid && w.rows.get(pid);
-  const myRank = meRow && meRow.score > 0 ? ranked.indexOf(meRow) + 1 : null;
+  const myRank = meRow && meRow.score > 0 ? ranks.get(meRow) : null;
   return {
     idx, theme, start: S.weekStart(idx), end: S.weekStart(idx + 1), saved: enabled && !dbError, dbError: enabled ? dbError : null,
-    total: all.length, rows: ranked.slice(0, 300),
+    total: all.length, rows: ranked.slice(0, 300).map(r => ({ ...r, rank: ranks.get(r) })),
     me: meRow ? { rank: myRank, score: meRow.score, joined: true } : { rank: null, score: 0, joined: false },
   };
 }

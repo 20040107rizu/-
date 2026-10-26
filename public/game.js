@@ -403,7 +403,7 @@
     $('rankBanner').innerHTML = `<span class="ic">${th.icon}</span><div class="txt"><b>第${th.no}回：${esc(th.name)}</b><br>${esc(th.desc)}</div>`
       + (ended ? `<div class="left">結果<br><b>終了</b></div>` : `<div class="left">のこり<br><b>${left(d.end)}</b></div>`);
     $('rankCount').textContent = `参加 ${d.total}人` + (d.dbError ? '（⚠️ 記録の保存に失敗しています）' : d.saved ? '（記録は保存されています）' : '（試験運転中：サーバーが更新されると記録が消えます）');
-    const rows = d.rows.map((r, i) => ({ ...r, rank: i + 1 }));
+    const rows = d.rows.map((r, i) => ({ ...r, rank: r.rank || i + 1 })); // 同じ記録の人は同じ順位（サーバーが決める）
     const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
     $('rankList').innerHTML = rows.length ? rows.map(r => {
       const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
