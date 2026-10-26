@@ -1035,15 +1035,15 @@
     if (mine && result.bonus && result.bonus.down && result.bonus.type === 'kishin') stats.feats.kishin = true; // 乱入してきた鬼神をたおした
     // 隠しボスの報酬: 称号（と、はじめて倒したときだけ黒玉チケット）
     result.secretNotes = [];
-    const secret = (feat, name, black) => {
+    const secret = (feat, name, ticket, num) => {
       const first = !stats.feats[feat];
       stats.feats[feat] = true;
-      if (first && black) { tickets.black = (tickets.black || 0) + black; try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {} renderTicketButton(); }
-      result.secretNotes.push(`💀 ${name}をたおした！${first ? `　限定称号《${S.TITLE_BY_ID[feat].name}》${black ? `＋黒玉チケット${black}枚` : ''}をゲット！` : ''}`);
+      if (first) { tickets[ticket] = (tickets[ticket] || 0) + num; try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {} renderTicketButton(); }
+      result.secretNotes.push(`💀 ${name}をたおした！${first ? `　限定称号《${S.TITLE_BY_ID[feat].name}》＋${{ gold: '金', black: '黒' }[ticket]}玉チケット${num}枚をゲット！` : ''}`);
     };
-    if (mine && result.bossDown && result.boss === 'gokuou') secret('gokuou', '獄王', 0);
-    if (mine && result.bossDown && result.boss === 'hyakki') secret('hyakki', '百鬼王', 1);
-    if (mine && result.shin && result.shin.down) secret('shin', '鬼神・真', 2);
+    if (mine && result.bossDown && result.boss === 'gokuou') secret('gokuou', '獄王', 'gold', 1);
+    if (mine && result.bossDown && result.boss === 'hyakki') secret('hyakki', '百鬼王', 'black', 1);
+    if (mine && result.shin && result.shin.down) secret('shin', '鬼神・真', 'black', 2);
     if (mine && result.bossDown) {
       if (result.boss === 'kishin') stats.feats.kishin = true;
       if (S.BOSSES[result.boss].team && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
