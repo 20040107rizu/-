@@ -407,6 +407,8 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .seal-box .mem { display: flex; gap: 3px; flex-wrap: wrap; margin: 3px 0; }
 .seal-box .mem span { font-size: 9px; padding: 1px 5px; border-radius: 6px; background: #0006; }
 .seal-box .mem span.got { background: #2fbf6a55; }
+.seal-box .mem span.got.ok { background: #ffd23a55; } /* 次の凸の分がそろった */
+#sealGachaMsg img { width: 28px; height: 28px; vertical-align: middle; }
 .seal-box button.big { align-self: flex-start; font-size: 14px; padding: 7px 16px; margin-top: 2px; }
 .legend-face { filter: drop-shadow(0 0 10px #c85aff); }
 .legend-name { background: linear-gradient(90deg, #ff9a2a, #ffe24a, #4ae07a, #3ac8ff, #c85aff); -webkit-background-clip: text; background-clip: text; color: transparent; }

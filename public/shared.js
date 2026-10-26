@@ -118,7 +118,11 @@
 
   // ---------- レジェンドの封印 ----------
   // 全部そろうと図鑑で「封印をとく」が押せる
-  const SEAL = { totsuNeed: 3, totsuCount: 3, fragments: 5 };
+  const SEAL = { totsuNeed: 3, totsuCount: 3, fragments: 5, gacha: 10 }; // gacha: 封印ガチャ1回に使う欠片
+  // レジェンドの凸 = 封印の8体の中でいちばん低い凸（8体全員が凸1ならレジェンドも凸1、全員凸5なら凸5）
+  function legendTotsu(legend, friends) {
+    return Math.min(...legend.seal.map(id => totsuOf(friends[id] || 0)));
+  }
   // レジェンドの試練: 封印の地のステージで、決められたボス鬼を、決められたやり方で倒す
   const TRIALS = {
     ura:         { boss: 'kishin', desc: '鬼神を倒す' },
@@ -402,5 +406,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

@@ -44,7 +44,9 @@
   const titleInfo = id => S.TITLE_BY_ID[id] || S.weeklyTitle(id);
   function checkMyTitle() { if (myTitle && !titlesDone().includes(myTitle)) myTitle = null; }
   checkMyTitle();
-  const myTotsu = () => S.totsuOf(friends[selYokai] || 0);
+  // 持っている数（レジェンドは「1＋凸」として数える。凸は封印の8体で決まる）
+  const countOf = id => { const y = S.YOKAI_BY_ID[id]; return y && y.legend ? (friends[id] ? 1 + S.legendTotsu(y, friends) : 0) : friends[id] || 0; };
+  const myTotsu = () => S.totsuOf(countOf(selYokai));
   const titleTag = id => { const t = titleInfo(id); return t ? `<span class="ttl${t.color === 'gold' ? ' gold' : ''}" style="${t.color === 'gold' ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
   const nameTag = (name, title) => `<span class="${title === 'all' ? 'gold' : ''}">${esc(name)}</span>`;
   const totsuTag = n => (n > 0 ? `<span class="totsu">${n >= S.TOTSU_MAX ? '凸MAX' : `凸${n}`}</span>` : '');
@@ -128,7 +130,7 @@
   const PROF_YOKAI = S.YOKAI.concat(S.LEGENDS);
   function myProfile() {
     return {
-      f: PROF_YOKAI.map(y => Math.min(9, friends[y.id] || 0)).join(''),
+      f: PROF_YOKAI.map(y => Math.min(9, countOf(y.id))).join(''),
       s: [stats.plays, stats.escapes, stats.best, stats.dama],
       c: S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0),
       tc: titlesDone().length, wt: weeklyTitles, fv: favYokai,
@@ -308,10 +310,10 @@
     const grid = $('zukanGrid');
     grid.innerHTML = '';
     for (const l of S.LEGENDS) {
-      const owned = friends[l.id], ready = !owned && S.sealProgress(l, friends, stats.seals).ready;
+      const owned = friends[l.id], ready = !owned && S.sealProgress(l, friends, stats.seals).ready, lt = owned ? S.legendTotsu(l, friends) : 0;
       const d = document.createElement('div');
       d.className = 'yk legend' + (l.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
-      d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : lt ? `<span class="cnt">${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</span>` : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
       d.onclick = () => { zukanSel = l.id; renderZukan(); };
       grid.appendChild(d);
     }
@@ -319,15 +321,48 @@
     const prog = S.sealProgress(l, friends, stats.seals);
     const box = document.createElement('div');
     box.className = 'seal-box';
-    box.innerHTML = owned
-      ? `<b>🌈 封印はとけています</b><br><small>ロビーで連れていけます（チームで1体まで）</small>`
+    box.innerHTML = owned ? legendTotsuBox(l)
       : `<b>🔒 封印をとく条件（ぜんぶ必要）</b>
         ${prog.conds.map(c => `<div class="cond${c.got >= c.need ? ' ok' : ''}"><span class="ck">${c.got >= c.need ? '✓' : ''}</span><span class="cl">${esc(c.label)}</span><span class="pg">${c.got}/${c.need}</span></div><div class="tbar"><i style="width:${Math.round((c.got / c.need) * 100)}%"></i></div>`).join('')}
         <div class="mem">${l.seal.map(id => { const y = S.YOKAI_BY_ID[id], n = friends[id]; return `<span class="${n ? 'got' : ''}">${n ? `${y.name}${S.totsuOf(n) ? ` 凸${S.totsuOf(n)}` : ''}` : '？'.repeat([...y.name].length)}</span>`; }).join('')}</div>
         <button id="btnUnseal" class="big"${prog.ready ? '' : ' disabled'}>${prog.ready ? '🔓 封印をとく！' : '🔒 封印をとく（条件がそろうと押せる）'}</button>`;
     grid.appendChild(box);
     if ($('btnUnseal')) $('btnUnseal').onclick = () => unseal(l);
+    if ($('btnSealGacha')) $('btnSealGacha').onclick = () => sealGacha(l);
     renderLegendInfo(l);
+  }
+  // 封印をといたあと: レジェンドの凸と封印ガチャ
+  function legendTotsuBox(l) {
+    const lt = S.legendTotsu(l, friends), frag = (stats.seals[l.id] && stats.seals[l.id].frag) || 0;
+    const next = Math.min(S.TOTSU_MAX, lt + 1), short = l.seal.filter(id => S.totsuOf(friends[id] || 0) < next).length;
+    return `<b>🌈 ${esc(l.name)}　${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</b>${lt ? `<small>（HP・攻撃 +${Math.round(lt * S.TOTSU_STEP * 100)}%）</small>` : ''}
+      <br><small>封印の8体が全員そろって凸すると、${esc(l.name)}も凸します${lt < S.TOTSU_MAX ? `（凸${next}まで：あと${short}体）` : ''}</small>
+      <div class="mem">${l.seal.map(id => { const y = S.YOKAI_BY_ID[id], t = S.totsuOf(friends[id] || 0); return `<span class="got${t >= next && lt < S.TOTSU_MAX ? ' ok' : ''}">${y.name} ${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>`; }).join('')}</div>
+      <div class="cond"><span class="cl">🔮 封印の欠片（${S.STAGES[l.stage].name}でボスを倒すともらえる）</span><span class="pg">${frag}個</span></div>
+      <button id="btnSealGacha" class="big"${frag >= S.SEAL.gacha && lt < S.TOTSU_MAX ? '' : ' disabled'}>🔮 封印ガチャ（欠片${S.SEAL.gacha}個：封印の8体のどれかが出る）</button>
+      <p id="sealGachaMsg" class="sub"></p>`;
+  }
+  function sealGacha(l) {
+    const sl = stats.seals[l.id];
+    if (!friends[l.id] || !sl || sl.frag < S.SEAL.gacha) return;
+    const before = S.legendTotsu(l, friends);
+    sl.frag -= S.SEAL.gacha;
+    const id = l.seal[Math.floor(Math.random() * l.seal.length)], y = S.YOKAI_BY_ID[id];
+    friends[id] = (friends[id] || 0) + 1;
+    saveAll(); updateFriendCount(); helloAgain();
+    const after = S.legendTotsu(l, friends), t = S.totsuOf(friends[id]);
+    beep(660, 0.15, 'triangle', 0.07); setTimeout(() => beep(990, 0.25, 'triangle', 0.08), 140);
+    if (after > before) { // レジェンドが凸した！
+      $('rewardWeek').textContent = '🌈 レジェンド';
+      $('rewardTitle').textContent = `${l.name}が${after >= S.TOTSU_MAX ? '凸MAX' : `凸${after}`}になった！`;
+      $('rewardSub').textContent = `封印の8体が全員そろった！ HP・攻撃 +${Math.round(after * S.TOTSU_STEP * 100)}%`;
+      $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + l.id) || ''}" alt="">`;
+      $('btnRewardOk').onclick = () => { show('zukan'); renderZukan(); };
+      show('rewardScreen');
+      return;
+    }
+    renderZukan();
+    $('sealGachaMsg').innerHTML = `${faceImg(y)} <b>${esc(y.name)}</b> が出た！（${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）`;
   }
   function renderLegendInfo(l) {
     const owned = friends[l.id], url = artUrl('yokai/' + l.id);
@@ -341,6 +376,7 @@
   function unseal(l) {
     if (friends[l.id] || !S.sealProgress(l, friends, stats.seals).ready) return;
     friends[l.id] = 1;
+    stats.seals[l.id].frag -= S.SEAL.fragments; // 封印をとくのに欠片を使う（残りは封印ガチャに使える）
     saveAll(); updateFriendCount(); helloAgain();
     beep(523, 0.2, 'triangle', 0.08); setTimeout(() => beep(784, 0.2, 'triangle', 0.08), 150); setTimeout(() => beep(1046, 0.5, 'triangle', 0.09), 300);
     $('rewardWeek').textContent = '🌈 レジェンド';
@@ -951,7 +987,7 @@
     const list = friendTab === 'own' ? S.LEGENDS.filter(y => friends[y.id]).concat(S.YOKAI.filter(y => friends[y.id])) : S.YOKAI.filter(y => y.rank === friendTab);
     const legendTaken = lobby && lobby.players.some(p => p.id !== myId && S.YOKAI_BY_ID[p.yokai]?.legend);
     for (const y of list) {
-      const owned = friends[y.id];
+      const owned = countOf(y.id);
       const blocked = y.legend && legendTaken; // レジェンドはチームで1体まで
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '') + (blocked ? ' blocked' : '');
