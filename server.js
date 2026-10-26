@@ -287,7 +287,7 @@ class Room {
 
   addPlayer(ws, name, yokai, pid, totsu, title) {
     const p = {
-      id: genId(), ws, pid, totsu: cleanTotsu(totsu), title: cleanTitle(title), name: (name || 'プレイヤー').slice(0, 10), yokai: usableYokai(yokai) ? yokai : 'nekomata',
+      id: genId(), ws, pid, totsu: cleanTotsu(totsu), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
       input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false, ult: false }, prevItem: false,
     };
@@ -1203,7 +1203,25 @@ class Room {
 // ---------- WebSocket ----------
 const wss = new WebSocketServer({ server });
 
+// 名前: 空白（全角スペースや見えない文字）だけの名前は、名前なしとして扱う
+function cleanName(v) {
+  const s = String(v || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().slice(0, 10);
+  return s.replace(/[\s\u3000]/g, '') ? s : '';
+}
+
+// つながっているかの確認: 30秒ごとに ping を送り、返事がない接続は切る。
+// スマホのスリープや電波切れでは「切れた」という知らせが届かないことがあり、そのままだとフレンド一覧で「ホームにいる」が残り続ける
+setInterval(() => {
+  for (const c of wss.clients) {
+    if (c.isAlive === false) { c.terminate(); continue; }
+    c.isAlive = false;
+    try { c.ping(); } catch {}
+  }
+}, +process.env.HEARTBEAT_MS || 30000);
+
 wss.on('connection', ws => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
   let room = null;
   let me = null;
   let watching = false;
@@ -1392,7 +1410,7 @@ function touchPlayer(pid, name, yokai, title) {
   const k = known.get(pid) || {};
   known.set(pid, {
     ...k, // バトルに行ったか・プロフィールはそのまま残す
-    name: String(name || k.name || 'プレイヤー').slice(0, 10),
+    name: cleanName(name) || k.name || 'プレイヤー',
     yokai: S.YOKAI_BY_ID[yokai] ? yokai : k.yokai || 'nekomata',
     title: title === undefined ? k.title || null : cleanTitle(title),
     seen: Date.now(),
@@ -1495,7 +1513,7 @@ if (require.main === module) {
     for (const r of list) {
       if (!r.pid || known.has(r.pid)) continue; // 新しい記録が先に来るので、同じ人の古い週の記録は飛ばす
       n++;
-      known.set(r.pid, { name: String(r.name || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[r.yokai] ? r.yokai : 'nekomata', title: cleanTitle(r.title), seen: Date.parse(r.updated_at) || 0, played: true });
+      known.set(r.pid, { name: cleanName(r.name) || 'プレイヤー', yokai: S.YOKAI_BY_ID[r.yokai] ? r.yokai : 'nekomata', title: cleanTitle(r.title), seen: Date.parse(r.updated_at) || 0, played: true });
     }
     if (n) console.log(`フレンドを ${n} 人読み込みました`);
   });

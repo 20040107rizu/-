@@ -106,7 +106,7 @@
   let buddies = loadJSON('buddies', {}); // 一度会った人（サーバーが再起動しても一覧に残す） pid → { name, yokai, seen, ok, prof }
   // ok: サーバーが「バトルに行ったことがある人」として送ってきた印。印のない古い記録（開いただけの人）は出さない
   function presenceConnect() {
-    if (pws && pws.readyState <= 1) return;
+    if (document.hidden || (pws && pws.readyState <= 1)) return; // アプリが裏にあるあいだはつながない（もどったらつなぐ）
     pws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     pws.onopen = () => { pwsWait = 2000; helloAgain(); };
     pws.onmessage = e => {
@@ -142,7 +142,11 @@
   function helloAgain() {
     if (pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'hello', pid, name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() }));
   }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) presenceConnect(); });
+  // アプリを裏に回したら、ホームの接続は自分で切る（フレンドから「ホームにいる」に見えたままにならないように）
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { presenceConnect(); return; }
+    if (pws) { const w = pws; w.onclose = null; pws = null; buddyLive = []; w.close(); pwsWait = 2000; }
+  });
   const STATUS = { me: 'あなたのプロフィール（フレンドにはこう見えます）', home: 'ホームにいる', lobby: '募集中', battle: '出撃中', result: '結果を見ている', off: 'オフライン' };
   const ago = t => { const m = Math.floor((Date.now() - t) / 60000); return m < 60 ? `${Math.max(1, m)}分前` : m < 1440 ? `${Math.floor(m / 60)}時間前` : `${Math.floor(m / 1440)}日前`; };
   function renderBuddies() {
