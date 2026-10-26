@@ -72,6 +72,10 @@
     // バトルでの手がら（feat）でもらえる称号
     { id: 'kishin', name: '鬼神殺し',           color: '#ff3a6a', feat: 'kishin', desc: '鬼神をたおす' },
     { id: 'solo',   name: '孤高の鬼殺し',       color: '#ffb0d0', feat: 'solo', desc: '金鬼から先のボス鬼を、ひとりで出撃してたおす' },
+    // 隠しボスの称号（hidden: 手に入れるまで称号の一覧に出さない）
+    { id: 'gokuou', name: '獄王討伐',           color: '#ff3a1a', feat: 'gokuou', hidden: true, desc: '獄王をたおす' },
+    { id: 'hyakki', name: '百鬼の覇者',         color: 'gold', feat: 'hyakki', hidden: true, desc: '百鬼王をたおす' },
+    { id: 'shin',   name: '真・鬼神殺し',       color: 'rainbow', feat: 'shin', hidden: true, desc: '目覚めた鬼神・真をたおす' },
   ];
   const TITLE_BY_ID = Object.fromEntries(TITLES.map(t => [t.id, t]));
   // friends: { id: 持っている数 }、feats: { kishin: true, ... } バトルでの手がら → [{ title, got, need, done }]
@@ -159,7 +163,7 @@
     return { conds, ready: conds.every(c => c.got >= c.need) };
   }
   // 封印の欠片: 青鬼は3回に1個、黒鬼は必ず1個、金鬼・白鬼は2個、風雷鬼・鬼神は3個
-  const SEAL_FRAG = { blue: 1 / 3, black: 1, gold: 2, white: 2, fuurai: 3, kishin: 3 };
+  const SEAL_FRAG = { blue: 1 / 3, black: 1, gold: 2, white: 2, fuurai: 3, kishin: 3, gokuou: 3, hyakki: 3 };
   // バトルの結果から、もらえる欠片と試練を決める（サーバーで使う）。r は trialDone と同じ
   function sealDrop(r, rnd = Math.random) {
     if (!r.bossDown) return null;
@@ -241,8 +245,13 @@
     white:  { name: '白鬼',   color: '#e8f2ff', hp: 4.1, dmg: 2.4, atkGap: 0.5,  warn: 0.8,  drop: 230, need: 'gold',  team: true },
     fuurai: { name: '風雷鬼', color: '#38c8a0', hp: 4.4, dmg: 2.5, atkGap: 0.48, warn: 0.78, drop: 260, need: 'white', team: true },
     kishin: { name: '鬼神',   color: '#a01030', hp: 5.0, dmg: 2.7, atkGap: 0.45, warn: 0.75, drop: 300, need: 'fuurai', team: true },
+    // 隠しボス（hidden: 前のボスを倒した人にしか、ボス選びに出てこない。time: このボスだけの制限時間）
+    gokuou: { name: '獄王',   color: '#8a0a0a', hp: 6.0, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 350, need: 'kishin', team: true, hidden: true, time: 360 },
+    hyakki: { name: '百鬼王', color: '#5a1a8a', hp: 5.5, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 400, need: 'gokuou', team: true, hidden: true, time: 480,
+              rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
+    shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
   };
-  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'];
+  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {

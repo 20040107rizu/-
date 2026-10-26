@@ -247,6 +247,8 @@ button.install { display: none; font-size: 14px; padding: 8px 14px; background: 
 .boss-card.bk-white { background: linear-gradient(#8ab0d8, #2a4060); }
 .boss-card.bk-fuurai { background: linear-gradient(#1e9a78, #0a3a2c); }
 .boss-card.bk-kishin { background: linear-gradient(#a0102e, #2a0008); }
+.boss-card.bk-gokuou { background: linear-gradient(#5a0a06, #120004); border-color: #ff5a1a88; }
+.boss-card.bk-hyakki { background: linear-gradient(#4a1a7a, #0e0418); border-color: #b07aff88; }
 .boss-card.on { opacity: 1; border-color: #ffe36b; box-shadow: 0 0 12px #ffe36b88; }
 .boss-card.lock { background: #222; color: #aaa; opacity: .8; }
 .boss-card:disabled { cursor: default; }
@@ -334,6 +336,8 @@ button.mid { font-size: 15px; font-weight: bold; padding: 8px 16px; background: 
 .plist li .ttl { font-size: 9px; }
 .ttl { font-size: 11px; font-weight: bold; white-space: nowrap; }
 .ttl.locked { color: #888; }
+.ttl.rainbow { background: linear-gradient(90deg, #ff4a4a, #ffd23a, #5aff8a, #5ac8ff, #c85aff, #ff4a4a); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: bold; animation: rbw 2s linear infinite; }
+@keyframes rbw { to { background-position: 200% 0; } }
 .gold, .ttl.gold { background: linear-gradient(#fff3a0, #ffb000 60%, #ff8a00); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: bold; }
 .title-list { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 5px; padding: 2px; }
 .title-row { display: flex; align-items: center; gap: 8px; background: #2a1840; border-radius: 10px; padding: 5px 8px; border: 2px solid transparent; }
@@ -430,3 +434,5 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .pboss.on.bk-white { background: #8ab0d8; color: #fff; }
 .pboss.on.bk-fuurai { background: #1e9a78; color: #fff; }
 .pboss.on.bk-kishin { background: #a0102e; color: #fff; border: 1px solid #ff8aa8; }
+.pboss.on.bk-gokuou { background: #5a0a06; color: #fff; border: 1px solid #ff5a1a; }
+.pboss.on.bk-hyakki { background: #4a1a7a; color: #fff; border: 1px solid #b07aff; }

@@ -47,7 +47,10 @@
   // 持っている数（レジェンドは「1＋凸」として数える。凸は封印の8体で決まる）
   const countOf = id => { const y = S.YOKAI_BY_ID[id]; return y && y.legend ? (friends[id] ? 1 + S.legendTotsu(y, friends) : 0) : friends[id] || 0; };
   const myTotsu = () => S.totsuOf(countOf(selYokai));
-  const titleTag = id => { const t = titleInfo(id); return t ? `<span class="ttl${t.color === 'gold' ? ' gold' : ''}" style="${t.color === 'gold' ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
+  const titleTag = id => { const t = titleInfo(id), fx = t && (t.color === 'gold' || t.color === 'rainbow'); return t ? `<span class="ttl${fx ? ' ' + t.color : ''}" style="${fx ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
+  // 称号の一覧に出す称号（隠しボスの称号は、手に入れるまで出さない）
+  const titleShown = t => !t.hidden || !!stats.feats[t.feat];
+  const titleTotal = () => S.TITLES.filter(titleShown).length;
   const nameTag = (name, title) => `<span class="${title === 'all' ? 'gold' : ''}">${esc(name)}</span>`;
   const totsuTag = n => (n > 0 ? `<span class="totsu">${n >= S.TOTSU_MAX ? '凸MAX' : `凸${n}`}</span>` : '');
 
@@ -190,7 +193,7 @@
     const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
     const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
-    const bosses = S.BOSS_ORDER.map((k, i) => `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join('');
+    const bosses = S.BOSS_ORDER.map((k, i) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join('');
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
       <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
       <div><span class="st ${live.status}">${st}</span></div>
@@ -238,7 +241,7 @@
   function renderTitles() {
     const prog = S.titleProgress(friends, stats.feats);
     $('zukanGrid').innerHTML = '';
-    $('zukanTitles').innerHTML = prog.map(({ title: t, got, need, done }) => `<div class="title-row${done ? ' done' : ''}${myTitle === t.id ? ' on' : ''}">
+    $('zukanTitles').innerHTML = prog.filter(x => titleShown(x.title)).map(({ title: t, got, need, done }) => `<div class="title-row${done ? ' done' : ''}${myTitle === t.id ? ' on' : ''}">
         <div class="tinfo">${done ? titleTag(t.id) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
         <div class="tbar"><i style="width:${Math.round((got / need) * 100)}%"></i></div></div>
         <span class="tnum">${got}/${need}</span>
@@ -254,7 +257,7 @@
   }
   function renderMyTitle() {
     const done = titlesDone().length;
-    $('zukanInfo').innerHTML = `<div class="pv"><b>🏅 称号</b><div>${done} / ${S.TITLES.length} 個ゲット</div>
+    $('zukanInfo').innerHTML = `<div class="pv"><b>🏅 称号</b><div>${done} / ${titleTotal()} 個ゲット</div>
       <div style="margin:6px 0">いまの称号：${myTitle ? titleTag(myTitle) : 'なし'}</div>
       <small>図鑑をコンプリートすると称号がもらえます。つけた称号は、ロビーやフレンド一覧で名前といっしょに表示されます。「妖怪マスター」をつけると名前が金色に！</small></div>`;
   }
@@ -268,7 +271,7 @@
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
     }).join('') + `<button class="tab legend-tab${zukanRank === 'legend' ? ' on' : ''}" data-k="legend">🌈 レジェンド <small>${S.LEGENDS.filter(l => friends[l.id]).length}/${S.LEGENDS.length}</small></button>`
-      + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${S.TITLES.length}</small></button>`;
+      + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${titleTotal()}</small></button>`;
     $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
       `<button class="tab${zukanRole === k ? ' on' : ''}" data-k="${k}">${label}</button>`).join('');
     for (const b of $('zukanTabs').querySelectorAll('button')) b.onclick = () => { zukanRank = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
@@ -541,6 +544,8 @@
   let introMovie = 0, introCount = 0, landed = false, lastCount = 0, started = true, chaseHold = 0;
   let cutin = null;  // 乱入ボスのカットイン { type, t, max }
   let dropAnim = 0;  // 乱入ボスが空から落ちてくる残り時間（秒）
+  let dropLabel = null; // 降ってきたときの見出し（ボスラッシュ・鬼神・真）
+  const JUDGE = { noAtk: { name: '攻撃するな', icon: '🚫⚔', sub: 'しばらく攻撃・スキル・必殺技を使うと大ダメージ' }, noMove: { name: '動くな', icon: '🚫🦶', sub: 'しばらく動く・ダッシュすると大ダメージ' }, save: { name: '仲間を助けよ', icon: '🤝', sub: '倒れた仲間を起こさないと、全員にダメージ' } };
 
   $('name').value = localStorage.getItem('name') || '';
   const urlRoom = new URLSearchParams(location.search).get('room');
@@ -612,7 +617,7 @@
     if (!img) return null;
     return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(img, 'repeat'));
   }
-  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff', gold: '#ffd23a', white: '#bfe6ff', fuurai: '#5af0c0', kishin: '#ff3a6a' };
+  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff', gold: '#ffd23a', white: '#bfe6ff', fuurai: '#5af0c0', kishin: '#ff3a6a', gokuou: '#ff5a1a', hyakki: '#b07aff', shin: '#ff1a3a' };
   let view = { l: 0, r: 0, t: 0, b: 0 }; // 今画面に見えている範囲（ワールド座標）
   const inView = (x, y, m = 0) => x > view.l - m && x < view.r + m && y > view.t - m && y < view.b + m;
   let spectateId = null;
@@ -937,7 +942,7 @@
   }
 
   function renderBossPick(isHost) {
-    $('bossPick').innerHTML = S.BOSS_ORDER.map(k => {
+    $('bossPick').innerHTML = S.BOSS_ORDER.filter(k => !S.BOSSES[k].hidden || S.bossUnlocked(k, stats.cleared) || lobby.boss === k).map(k => {
       const b = S.BOSSES[k], open = S.bossUnlocked(k, stats.cleared), sel = lobby.boss === k;
       const lock = isHost && !open;
       const sub = lock ? `🔒 ${S.BOSSES[b.need].name}のあと` : `鬼玉 ${b.drop}個`; // 倒すと落とす鬼玉の数
@@ -1028,6 +1033,17 @@
     result.newClear = false;
     if (mine && result.bossDown && !stats.cleared[result.boss]) { stats.cleared[result.boss] = true; result.newClear = true; }
     if (mine && result.bonus && result.bonus.down && result.bonus.type === 'kishin') stats.feats.kishin = true; // 乱入してきた鬼神をたおした
+    // 隠しボスの報酬: 称号（と、はじめて倒したときだけ黒玉チケット）
+    result.secretNotes = [];
+    const secret = (feat, name, black) => {
+      const first = !stats.feats[feat];
+      stats.feats[feat] = true;
+      if (first && black) { tickets.black = (tickets.black || 0) + black; try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {} renderTicketButton(); }
+      result.secretNotes.push(`💀 ${name}をたおした！${first ? `　限定称号《${S.TITLE_BY_ID[feat].name}》${black ? `＋黒玉チケット${black}枚` : ''}をゲット！` : ''}`);
+    };
+    if (mine && result.bossDown && result.boss === 'gokuou') secret('gokuou', '獄王', 0);
+    if (mine && result.bossDown && result.boss === 'hyakki') secret('hyakki', '百鬼王', 1);
+    if (mine && result.shin && result.shin.down) secret('shin', '鬼神・真', 2);
     if (mine && result.bossDown) {
       if (result.boss === 'kishin') stats.feats.kishin = true;
       if (S.BOSSES[result.boss].team && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
@@ -1086,6 +1102,8 @@
       notes.push(esc(next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
         : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`));
     }
+    for (const n of result.secretNotes || []) notes.push(esc(n));
+    if (result.shin && !result.shin.down) notes.push(esc('目覚めた鬼神・真からは生きのびた…'));
     if (result.bonus) notes.push(esc(result.bonus.down ? `💥 乱入してきた${S.BOSSES[result.bonus.type].name}もたおした！` : `乱入してきた${S.BOSSES[result.bonus.type].name}からは生きのびた…`));
     if (result.sealNote) notes.push(esc(result.sealNote));
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
@@ -1200,15 +1218,25 @@
       case 'sweep': banner = { text: '⚠ 地獄の大なぎ払い！', sub: '建物のうしろにかくれろ！（回避でもよけられる）', t: 2.2, c: '#ff3a6a' }; beep(120, 1.2, 'sawtooth', 0.08, 300); break;
       case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: bossType === 'gold' ? '金の鎧！正面からの攻撃はほとんど効かない。うしろに回りこめ！' : '攻撃がはげしくなるぞ', t: bossType === 'gold' ? 3 : 2.2, c: bossType === 'gold' ? '#ffd23a' : '#ff4a3a' }; shake = 0.5; break;
       case 'bonusBoss': // 乱入ボス: カットインのあと、空から降ってくる
-        cutin = { type: ev.type, t: 3.2, max: 3.2 }; banner = null; shake = 0.4;
+        cutin = { type: ev.type, mode: ev.mode, t: 3.2, max: 3.2 }; banner = null; shake = 0.4;
         Music.stop();
         for (let i = 0; i < 6; i++) setTimeout(() => beep(i % 2 ? 660 : 880, 0.22, 'square', 0.07), i * 260); // サイレン
         navigator.vibrate?.([120, 80, 120, 80, 200]);
         break;
       case 'bossDrop':
-        bossType = ev.type; dropAnim = 0.9; ents.delete('boss');
+        bossType = ev.type; dropAnim = 0.9; ents.delete('boss'); dropLabel = ev.label || null;
         Music.play('normal');
+        if (ev.extra) setTimeout(() => { banner = { text: `⏳ 制限時間 +${Math.round(ev.extra / 60)}分`, sub: '町が地獄に変わっていく…赤い輪の中にいろ！', t: 3, c: '#ff3a6a' }; }, 2800);
         break;
+      case 'judge': // 獄王の裁き
+        if (ev.id === myId) { banner = { text: `⚖ 裁き：${JUDGE[ev.j].name}`, sub: JUDGE[ev.j].sub, t: 2.4, c: '#ff5a1a' }; beep(180, 0.6, 'sawtooth', 0.09, -60); navigator.vibrate?.([60, 40, 60]); }
+        else if (ev.j === 'save') banner = { text: `⚖ ${nameOf(ev.id)}に裁き：仲間を助けよ`, t: 2, c: '#ff5a1a' };
+        break;
+      case 'judgeHit':
+        fx.push({ k: 'ring', x: ev.x, y: ev.y, r: ev.all ? 300 : 120, c: '#ff3a1a', t: 0.6, max: 0.6 }); shake = Math.max(shake, 0.5);
+        if (ev.id === myId || ev.all) { banner = { text: ev.all ? '⚖ 裁きがくだった…（全員にダメージ）' : '⚖ 裁きをやぶった！', t: 1.8, c: '#ff3a1a' }; beep(90, 0.5, 'sawtooth', 0.12, -40); }
+        break;
+      case 'judgeOk': if (ev.id === myId) { banner = { text: '⚖ 裁きをのりこえた', t: 1.4, c: '#ffd23a' }; beep(880, 0.15, 'triangle', 0.06); } break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
@@ -1602,7 +1630,7 @@
       }
       ctx.restore();
     }
-    if (b.type === 'kishin' && b.phase > 1) {
+    if (b.phase > 1) { // 鬼神（変身後）・百鬼王・鬼神・真
       ctx.save(); ctx.translate(pos.x, cy);
       for (let k = 0; k < b.phase; k++) { ctx.strokeStyle = `rgba(255,${40 + k * 30},80,${0.35 + 0.2 * Math.sin(now * 6 + k)})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0, 0, 95 + k * 16 + Math.sin(now * 5 + k) * 4, 0, Math.PI * 2); ctx.stroke(); }
       ctx.restore();
@@ -2036,6 +2064,20 @@
     }
     ctx.globalAlpha = 1;
   }
+  // 獄王の裁き: 裁かれている人の頭の上に、なにをしてはいけないかと残り秒数
+  function drawJudge(p, pos, now) {
+    const j = JUDGE[p.jd.k];
+    if (!j) return;
+    const y = pos.y - 92 - (p.jump || 0) * 70;
+    ctx.save();
+    ctx.globalAlpha = p.jd.w ? 0.5 + 0.5 * Math.sin(now * 16) : 1; // 予告のあいだは点滅
+    ctx.fillStyle = '#3a0006e0'; ctx.strokeStyle = '#ff5a1a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(pos.x - 46, y - 18, 92, 34, 10) : ctx.rect(pos.x - 46, y - 18, 92, 34); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.font = 'bold 15px sans-serif';
+    ctx.fillText(`${j.icon} ${p.jd.w ? '!' : p.jd.t}`, pos.x, y);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
   // 乱入ボスのカットイン: 画面が暗くなり、赤い警告の帯とボスの顔が横から飛びこんでくる
   function drawCutin(dt, now) {
     cutin.t -= dt;
@@ -2063,9 +2105,10 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const tx = W * (-0.2 + slide * 0.55);
     ctx.font = `bold ${Math.round(H * 0.085)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
-    ctx.strokeText('新たなボス鬼が', tx, H * 0.43); ctx.fillStyle = '#fff'; ctx.fillText('新たなボス鬼が', tx, H * 0.43);
-    ctx.font = `bold ${Math.round(H * 0.11)}px sans-serif`;
-    ctx.strokeText('降ってくる！', tx, H * 0.57); ctx.fillStyle = '#ffe14a'; ctx.fillText('降ってくる！', tx, H * 0.57);
+    const [l1, l2] = cutin.mode === 'shin' ? ['鬼神が', '真の姿に目覚める…！'] : cutin.mode === 'final' ? ['すべての鬼をしたがえる', '百鬼王が降ってくる！'] : ['新たなボス鬼が', '降ってくる！'];
+    ctx.strokeText(l1, tx, H * 0.43); ctx.fillStyle = '#fff'; ctx.fillText(l1, tx, H * 0.43);
+    ctx.font = `bold ${Math.round(H * (l2.length > 8 ? 0.085 : 0.11))}px sans-serif`;
+    ctx.strokeText(l2, tx, H * 0.57); ctx.fillStyle = '#ffe14a'; ctx.fillText(l2, tx, H * 0.57);
     ctx.restore();
   }
   function drawCountdown(intro) {
@@ -2187,7 +2230,7 @@
         fx.push({ k: 'ring', x: snap.boss.x, y: snap.boss.y, r: 360, c: BOSS_UI[bossType], t: 0.8, max: 0.8 });
         fx.push({ k: 'boom', x: snap.boss.x, y: snap.boss.y + 30, r: 140, t: 0.6, max: 0.6 });
         beep(55, 0.7, 'sawtooth', 0.12, -20); navigator.vibrate?.(200);
-        banner = { text: `${S.BOSSES[bossType].name}が乱入してきた！`, t: 2.6, c: BOSS_UI[bossType] };
+        banner = { text: dropLabel || `${S.BOSSES[bossType].name}が乱入してきた！`, t: 2.6, c: BOSS_UI[bossType] };
       }
     }
     view = { l: cam.x - cam.vw / 2, r: cam.x + cam.vw / 2, t: cam.y - cam.vh / 2, b: cam.y + cam.vh / 2 };
@@ -2276,7 +2319,7 @@
     for (const p of snap.players) {
       if (p.esc) continue;
       const pos = p.id === myId && myPred ? myPred : lerpEnt('p' + p.id, p.x, p.y, k);
-      list.push({ y: pos.y, f: () => drawPlayer(p, pos, p.id === myId) });
+      list.push({ y: pos.y, f: () => { drawPlayer(p, pos, p.id === myId); if (p.jd) drawJudge(p, pos, now); } });
     }
     list.sort((a, b) => a.y - b.y).forEach(d => d.f());
 

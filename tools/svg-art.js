@@ -115,6 +115,25 @@ const kishinCrown = `
   <path d="M122 36 L134 34 M124 22 L132 20" stroke="#b09a6a" stroke-width="3"/>
   <ellipse cx="128" cy="70" rx="10" ry="7" fill="#ffe14a" ${O4}/><ellipse cx="128" cy="70" rx="2.5" ry="6" fill="#000"/>
   <path d="M60 206 Q40 230 70 236 M196 206 Q216 230 186 236" stroke="#ff6a1a" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+// 獄王: 「王」の冠とひげ
+const gokuouCrown = `
+  <path d="M60 64 L196 64 L188 30 L68 30Z" fill="#1a1a2a" ${O}/>
+  <rect x="56" y="58" width="144" height="12" rx="4" fill="#ffd23a" ${O4}/>
+  <path d="M112 38 L144 38 M128 38 L128 60 M114 49 L142 49 M110 60 L146 60" stroke="#ffd23a" stroke-width="5" stroke-linecap="round"/>
+  <path d="M84 150 Q92 214 128 222 Q164 214 172 150 Q150 172 128 168 Q106 172 84 150Z" fill="#14080a" ${O}/>
+  <path d="M104 178 L110 206 M128 182 L128 214 M152 178 L146 206" stroke="#3a2a2a" stroke-width="3"/>
+  <path d="M22 236 L36 196 L50 236 M206 236 L220 196 L234 236" fill="#ff5a1a" ${O4}/>`;
+const gokuouBack = `<path d="M0 220 Q20 120 128 110 Q236 120 256 220Z" fill="#3a0006" opacity="0.8"/>`;
+// 百鬼王: まわりに浮かぶ鬼の面
+const oniMask = (x, y, c) => `<g transform="translate(${x} ${y})"><ellipse cx="0" cy="0" rx="17" ry="19" fill="${c}" ${O4}/><path d="M-12 -14 L-16 -26 L-6 -16 M12 -14 L16 -26 L6 -16" fill="#f6e6b0" ${O4}/><path d="M-9 -2 L-3 0 M9 -2 L3 0" stroke="${INK}" stroke-width="3"/><circle cx="-6" cy="-3" r="2.5" fill="#ffe14a"/><circle cx="6" cy="-3" r="2.5" fill="#ffe14a"/><path d="M-8 8 L-4 12 L0 8 L4 12 L8 8" stroke="#fff" stroke-width="2.5" fill="none"/></g>`;
+const hyakkiMasks = [[24, 40, '#d02a2a'], [232, 40, '#2a5ad8'], [14, 110, '#e0b030'], [242, 110, '#eef4ff'], [28, 180, '#26b48c'], [228, 180, '#2a2030']].map(([x, y, c]) => oniMask(x, y, c)).join('');
+const hyakkiFront = `
+  <path d="M70 56 L86 20 L100 48 L114 12 L128 44 L142 12 L156 48 L170 20 L186 56Z" fill="#c8a0ff" ${O}/>
+  <circle cx="114" cy="40" r="5" fill="#ff3a6a"/><circle cx="142" cy="40" r="5" fill="#ff3a6a"/>`;
+// 鬼神・真: 黒い炎の輪と金のすじ
+const shinFlames = `${Array.from({ length: 14 }, (_, i) => { const a = i / 14 * Math.PI * 2, x = 128 + Math.cos(a) * 112, y = 112 + Math.sin(a) * 106, a2 = a * 180 / Math.PI + 90; return `<path d="M${x - 13} ${y + 6} Q${x} ${y - 38} ${x + 13} ${y + 6} Q${x} ${y + 15} ${x - 13} ${y + 6}Z" fill="${i % 2 ? '#1a0008' : '#ff1a3a'}" ${O4} transform="rotate(${a2} ${x} ${y})"/>`; }).join('')}`;
+const shinFront = `${kishinCrown}
+  <path d="M86 118 Q100 128 112 120 M144 120 Q156 128 170 118 M70 180 L90 190 M186 180 L166 190" stroke="#ffd23a" stroke-width="4" fill="none" stroke-linecap="round"/>`;
 const BOSS_LOOK = {
   red:   { skin: '#d02a2a', shade: '#7a0a14', mane: '#1a0a14', glow: '#ffb000', pupil: '#1a0000' },
   blue:  { skin: '#2a5ad8', shade: '#142a7a', mane: '#0a0a2a', glow: '#ff3a2a', pupil: '#5a0000' },
@@ -123,6 +142,9 @@ const BOSS_LOOK = {
   white:  { skin: '#eef4ff', shade: '#8aa0c8', mane: '#bcdcff', glow: '#3ac8ff', pupil: '#003a6a', aura: '#a8e0ff', front: whiteIce },
   fuurai: { skin: '#26b48c', shade: '#0e6048', mane: '#1a2a20', glow: '#ffe14a', pupil: '#2a1a00', aura: '#5af0c0', back: drums, front: windSash },
   kishin: { skin: '#8a0a22', shade: '#3a0010', mane: '#14000a', glow: '#ff2a2a', pupil: '#000', aura: '#ff1a4a', back: flameHalo, front: kishinCrown },
+  gokuou: { skin: '#a01818', shade: '#4a0008', mane: '#0a0608', glow: '#ffd23a', pupil: '#3a0000', aura: '#ff5a1a', back: gokuouBack, front: gokuouCrown },
+  hyakki: { skin: '#5a2a8a', shade: '#24103a', mane: '#0a0614', glow: '#5aff8a', pupil: '#002a10', aura: '#8a3aff', back: hyakkiMasks, front: hyakkiFront },
+  shin:   { skin: '#1a0a14', shade: '#000', mane: '#3a0010', glow: '#ff1a3a', pupil: '#ffd23a', aura: '#ff0040', back: shinFlames, front: shinFront },
 };
 
 // ---------- アイテム ----------

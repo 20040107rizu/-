@@ -18,6 +18,7 @@ const DT = 1 / TICK_RATE;
 const MAX_PLAYERS = 4;
 const TIME_LIMIT = +process.env.TIME_LIMIT || 300; // 制限時間（秒）
 const BONUS_RATE = process.env.BONUS_RATE != null ? +process.env.BONUS_RATE : 0.3; // 乱入ボスが来る確率
+const SHIN_RATE = process.env.SHIN_RATE != null ? +process.env.SHIN_RATE : 0.1;    // 鬼神をだれも倒れずに倒したとき、鬼神・真が目覚める確率
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
@@ -351,7 +352,7 @@ class Room {
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
-        seenByPatrol: false, atKill: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
+        seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
         legend: !!S.YOKAI_BY_ID[p.yokai].legend, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
@@ -384,9 +385,23 @@ class Room {
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
     const type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
-    this.boss = this.makeBoss(type, bp);
-    this.firstBoss = this.boss; // 最初に選んだボス（結果・解放・封印・ランキングはこのボスで決める）
-    this.bonus = null;          // 乱入ボス
+    const kind = S.BOSSES[type];
+    if (kind.time && !this.challenge) { this.timeLimit = kind.time; this.timeLeft = kind.time; } // 隠しボスは制限時間が長い
+    this.mainType = type;       // 選んだボス（結果・解放・封印・ランキングはこのボスで決める）
+    this.mainDown = false;
+    this.drop = null;           // これから空から降ってくるボス（乱入・ボスラッシュの次・百鬼王・鬼神・真）
+    this.bonusBoss = null; this.shinBoss = null;
+    if (kind.rush) {
+      // 百鬼王: 7体のボスを体力1/3で順番に倒すと、最後に百鬼王が降ってくる
+      const st = DEMO_AI ? Math.min(kind.rush.length - 1, +process.env.DEMO_RUSH || 0) : 0; // 撮影用: とちゅうのボスから始める
+      this.boss = this.makeBoss(kind.rush[st], bp, kind.rushHp);
+      this.boss.rushStep = st;
+      this.mainBoss = null;
+    } else {
+      this.boss = this.makeBoss(type, bp);
+      this.mainBoss = this.boss;
+    }
+    this.firstBoss = this.boss;
     this.ring = null; // 鬼神の最後の形態: だんだんせまくなる安全な輪
     if (DEMO_AI) this.demoPlace(spawns[0]);
 
@@ -519,6 +534,11 @@ class Room {
       else { mx = Math.cos(a + Math.PI / 2) * 0.6; my = Math.sin(a + Math.PI / 2) * 0.6; } // まわりこむ
     }
     p.input = { mx, my, atk: !!t, strong: !!t && this.time > 1.5, item: false, dash: false, skill: this.time % 6 < 0.1, ult: this.time > 3 };
+    // 獄王の裁きは、自分にくだったときだけ守る（撮影で仕組みが見えるように）
+    if (p.judge && p === this.players.values().next().value) {
+      if (p.judge.k === 'noAtk') Object.assign(p.input, { atk: false, strong: false, skill: false, ult: false });
+      if (p.judge.k === 'noMove') Object.assign(p.input, { mx: 0, my: 0, dash: false });
+    }
   }
 
   // ---- 見回り鬼 ----
@@ -592,32 +612,45 @@ class Room {
   }
 
   // ---- ボス鬼 ----
-  makeBoss(type, pos) {
+  makeBoss(type, pos, hpMul = 1) {
     const kind = S.BOSSES[type], n = this.players.size;
     // 金鬼から先はチームで挑むボス。1人・2人でも体力は3人分（ひとりで倒すのは、ほぼむり）
-    const hp = Math.round((1500 + 1100 * (kind.team ? Math.max(n, 3) : n)) * kind.hp); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
+    const hp = Math.round((1500 + 1100 * (kind.team ? Math.max(n, 3) : n)) * kind.hp * hpMul); // 2人なら赤鬼4255・青鬼6475・黒鬼9620
+    // 百鬼王は鬼神の2段階目、鬼神・真は3段階目の技をはじめから使う
+    const phase = type === 'shin' ? 3 : type === 'hyakki' ? 2 : 1;
     return {
       x: pos.x, y: pos.y, hp, maxHp: hp, type, kind, name: kind.name, face: 0,
       state: 'wander', stateT: 0, path: null, wanderTo: null, target: null, huntBy: null, lostT: 0,
       stunT: 0, chargeDir: 0, hitFlash: 0, atkT: 2,
       blizT: 14, bliz: 0,           // 白鬼: 吹雪
       mode: 'wind', modeT: 12, boltT: 2, // 風雷鬼: 風の型・雷の型
-      phase: 1, sweep: null, sweepT: 0, // 鬼神: 変身の段階・大なぎ払い
+      phase, sweep: null, sweepT: phase > 1 ? 4 : 0, // 鬼神: 変身の段階・大なぎ払い
+      judgeT: 6,                    // 獄王: 次の裁きまで
     };
   }
+  godLike(b) { return b.type === 'kishin' || b.type === 'hyakki' || b.type === 'shin'; } // 鬼神の技を使うボス
 
   killBoss() {
     const b = this.boss;
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
-    if (b === this.firstBoss) {
+    if (b === this.mainBoss) {
+      this.mainDown = true;
       this.bossKillT = this.time;
       this.blizKill = b.bliz > 0; // 吹雪の中でとどめをさした
       // 試練は倒した瞬間の様子で決める（倒したあとに見つかったり倒れたりしても大丈夫）
       this.anyDownAtKill = this.anyDown;
       for (const p of this.players.values()) p.atKill = { seen: p.seenByPatrol, dama: p.dama };
-      this.maybeBonus();
+      // 隠し: 鬼神をだれも倒れずに倒すと、まれに鬼神・真が目覚める（そのときは乱入はなし）
+      if (b.type === 'kishin' && !this.anyDown && Math.random() < SHIN_RATE) this.drop = { type: 'shin', kind: 'shin', wait: 4, t: 3.6 };
+      else if (!b.kind.hidden) this.maybeBonus();
     }
-    this.dropDama(b.x, b.y, 1, b.kind.drop);
+    // 百鬼王のボスラッシュ: 次のボス、7体倒したら百鬼王
+    if (b.rushStep != null) {
+      const k = S.BOSSES.hyakki, i = b.rushStep + 1;
+      this.drop = i < k.rush.length ? { type: k.rush[i], kind: 'rush', wait: 0, t: 2.5, hpMul: k.rushHp, step: i } : { type: 'hyakki', kind: 'final', wait: 3, t: 3.6 };
+    }
+    for (const p of this.players.values()) p.judge = null; // 獄王の裁きもおしまい
+    this.dropDama(b.x, b.y, 1, b.kind.drop * (b.rushStep != null ? 0.4 : 1)); // ラッシュ中のボスの鬼玉は少なめ
     this.telegraphs = [];
     this.ring = null;
   }
@@ -626,24 +659,76 @@ class Room {
   // 残り2分以上でボスを倒すと、30%で新しいボス鬼が空から降ってくる。ひとりなら赤鬼・青鬼・黒鬼、2人以上ならすべての鬼から
   maybeBonus() {
     if (this.timeLeft < 120 || Math.random() >= BONUS_RATE) return;
-    const pool = (this.players.size === 1 ? ['red', 'blue', 'black'] : S.BOSS_ORDER).filter(k => k !== this.firstBoss.type);
+    const pool = (this.players.size === 1 ? ['red', 'blue', 'black'] : S.BOSS_ORDER).filter(k => k !== this.mainType && !S.BOSSES[k].hidden); // 隠しボスは乱入しない
     const type = pool[Math.floor(Math.random() * pool.length)];
-    this.bonus = { type, wait: 5, t: 3.2, boss: null }; // 倒してから5秒たったらカットイン、カットインのあいだ待ってから降らせる
+    this.drop = { type, kind: 'bonus', wait: 5, t: 3.2 }; // 倒してから5秒たったらカットイン、カットインのあいだ待ってから降らせる
   }
-  updateBonus() {
-    const bn = this.bonus;
-    if (!bn || bn.boss) return;
-    if (bn.wait > 0) { if ((bn.wait -= DT) <= 0) this.events.push({ k: 'bonusBoss', type: bn.type }); return; }
-    if ((bn.t -= DT) > 0) return;
+  // 空からボスを降らせる（乱入・ボスラッシュの次のボス・百鬼王・鬼神・真）
+  updateDrop() {
+    const dr = this.drop;
+    if (!dr) return;
+    if (dr.wait > 0) {
+      if ((dr.wait -= DT) <= 0) this.events.push({ k: 'bonusBoss', type: dr.type, mode: dr.kind }); // カットイン
+      return;
+    }
+    if ((dr.t -= DT) > 0) return;
+    this.drop = null;
     // まだ戦っている仲間のだれかの近くに、見えるところへ降らせる
     const ps = this.activePlayers(), t = ps[Math.floor(Math.random() * ps.length)];
-    if (!t) { this.bonus = null; return; }
+    if (!t) return;
     let pos = null;
     for (let k = 0; k < 2000 && !pos; k++) { const q = this.gridB.randomFreePoint(); const d = dist(q, t); if (d > 330 && d < 520 && S.lineOfSight(this.map, q, t)) pos = q; }
     pos = pos || this.gridB.randomFreePoint();
-    this.boss = bn.boss = this.makeBoss(bn.type, pos);
-    Object.assign(this.boss, { state: 'engage', target: t.id, atkT: 2.5 });
-    this.events.push({ k: 'bossDrop', type: bn.type, x: Math.round(pos.x), y: Math.round(pos.y) });
+    const b = this.boss = this.makeBoss(dr.type, pos, dr.hpMul || 1);
+    Object.assign(b, { state: 'engage', target: t.id, atkT: 2.5 });
+    let label = null;
+    if (dr.kind === 'bonus') this.bonusBoss = b;
+    if (dr.kind === 'rush') { b.rushStep = dr.step; label = `百鬼王のしもべ ${b.name}（${dr.step + 1}/${S.BOSSES.hyakki.rush.length}）`; }
+    if (dr.kind === 'final') { this.mainBoss = b; label = '百鬼王が降臨した！'; }
+    if (dr.kind === 'shin') {
+      this.shinBoss = b; label = '鬼神・真が目覚めた！';
+      this.timeLeft += 180; // 目覚めたら制限時間が3分ふえる
+      this.ring = { x: b.x, y: b.y, r: 1700, min: 600 };
+    }
+    this.events.push({ k: 'bossDrop', type: dr.type, x: Math.round(pos.x), y: Math.round(pos.y), label, extra: dr.kind === 'shin' ? 180 : 0 });
+  }
+
+  // ---- 獄王の裁き ----
+  // 12秒ごと（怒ると9秒）に、だれか1人に「攻撃するな」「動くな」「仲間を助けよ」の裁きをくだす。やぶると大ダメージ
+  startJudge(b) {
+    const ps = this.activePlayers().filter(p => !p.judge);
+    if (!ps.length) return;
+    const me0 = this.players.values().next().value;
+    const p = DEMO_AI && process.env.DEMO_JUDGE_ME && ps.includes(me0) ? me0 : ps[Math.floor(Math.random() * ps.length)]; // 撮影用: 自分に裁き
+    const someoneDown = [...this.players.values()].some(q => q.down && !q.escaped);
+    const kinds = someoneDown ? ['noAtk', 'noMove', 'save', 'save'] : ['noAtk', 'noMove'];
+    const k = kinds[Math.floor(Math.random() * kinds.length)];
+    p.judge = { k, t: k === 'save' ? 10 : 7, warn: 1.5, dmg: 42 * b.kind.dmg };
+    this.events.push({ k: 'judge', id: p.id, j: k });
+  }
+  updateJudges() {
+    for (const p of this.players.values()) {
+      const j = p.judge;
+      if (!j) continue;
+      if (p.down || p.escaped) { p.judge = null; continue; }
+      if (j.warn > 0) { j.warn -= DT; continue; } // 予告のあいだは大丈夫
+      const inp = p.input;
+      const broke = j.k === 'noAtk' ? inp.atk || inp.strong || inp.skill || inp.ult
+        : j.k === 'noMove' ? Math.hypot(inp.mx, inp.my) > 0.2 || inp.dash : false;
+      if (broke) { // 裁きをやぶった
+        p.judge = null;
+        this.damagePlayer(p, j.dmg);
+        this.events.push({ k: 'judgeHit', id: p.id, x: Math.round(p.x), y: Math.round(p.y) });
+        continue;
+      }
+      if (j.k === 'save' && ![...this.players.values()].some(q => q.down && !q.escaped)) { p.judge = null; this.events.push({ k: 'judgeOk', id: p.id }); continue; } // 仲間が起きた
+      if ((j.t -= DT) > 0) continue;
+      p.judge = null;
+      if (j.k === 'save') { // 助けられなかった: 全員にダメージ
+        for (const q of this.activePlayers()) this.damagePlayer(q, j.dmg * 0.6);
+        this.events.push({ k: 'judgeHit', id: p.id, x: Math.round(p.x), y: Math.round(p.y), all: true });
+      } else this.events.push({ k: 'judgeOk', id: p.id });
+    }
   }
 
   updateBoss() {
@@ -701,7 +786,7 @@ class Room {
   }
 
   // 金の鎧があるか（金鬼は怒ったあと、鬼神は2段階目から）
-  bossArmor(b) { return (b.type === 'gold' && b.rage) || (b.type === 'kishin' && b.phase >= 2); }
+  bossArmor(b) { return (b.type === 'gold' && b.rage) || (this.godLike(b) && b.phase >= 2); }
 
   // 金鬼から先のボスの、それぞれの仕組み
   bossSpecial(b) {
@@ -711,12 +796,13 @@ class Room {
       if ((b.modeT -= DT) <= 0) { b.mode = b.mode === 'wind' ? 'thunder' : 'wind'; b.modeT = 12; b.boltT = 1; this.events.push({ k: 'mode', m: b.mode }); }
       if (b.mode === 'thunder' && (b.boltT -= DT) <= 0) { b.boltT = b.rage ? 2.2 : 3; this.thunderBolts(b); }
     }
-    if (b.type === 'kishin') {
-      // すべてのボス鬼の技を使う。体力で3段階に変身して、使う技が増える
+    if (b.type === 'gokuou' && (b.judgeT -= DT) <= 0) { b.judgeT = b.rage ? 9 : 12; this.startJudge(b); }
+    if (this.godLike(b)) {
+      // すべてのボス鬼の技を使う。体力で3段階に変身して、使う技が増える（百鬼王・鬼神・真は段階が決まっている）
       //  1段階目: 赤鬼・青鬼・黒鬼の技 ＋ 風雷鬼の突風と雷
       //  2段階目: ＋ 金鬼の鎧・白鬼の吹雪・地獄の大なぎ払い
       //  3段階目: ＋ だんだんせまくなる赤い輪
-      const ph = b.hp > b.maxHp * 0.66 ? 1 : b.hp > b.maxHp * 0.33 ? 2 : 3;
+      const ph = b.type !== 'kishin' ? b.phase : b.hp > b.maxHp * 0.66 ? 1 : b.hp > b.maxHp * 0.33 ? 2 : 3;
       if (ph > b.phase) {
         b.phase = ph; b.stunT = 1.2; // 変身のあいだは少し止まる
         this.events.push({ k: 'phase', n: ph, x: Math.round(b.x), y: Math.round(b.y) });
@@ -782,13 +868,14 @@ class Room {
     const warn = b.kind.warn;
     b.face = Math.atan2(t.y - b.y, t.x - b.x);
     // 風雷鬼（風の型）: 前に向かって大きな突風。当たると吹き飛ばされる
-    if ((b.type === 'fuurai' && b.mode === 'wind' && roll < 0.45) || (b.type === 'kishin' && roll >= 0.3 && roll < 0.5)) {
+    const allMoves = this.godLike(b) || b.type === 'gokuou'; // すべてのボス鬼の技を使うボス
+    if ((b.type === 'fuurai' && b.mode === 'wind' && roll < 0.45) || (allMoves && roll >= 0.3 && roll < 0.5)) {
       this.telegraphs.push({ id: genId(), shape: 'rect', x: b.x, y: b.y, a: b.face, len: 720, w: 220, t: warn + 0.15, max: warn + 0.15, dmg: 24 * b.kind.dmg, knock: 300, c: 'wind' });
       b.state = 'windup'; b.stateT = warn + 0.45;
       return;
     }
     // 鬼神: 乱れ打ち（段階が進むと数が増える）・突風・赤鬼の技を全部使う
-    if (b.type === 'kishin' && roll < 0.3) {
+    if (allMoves && roll < 0.3) {
       const k = 4 + b.phase;
       for (let i = 0; i < k; i++) {
         const a = i / k * Math.PI * 2 + Math.random(), r = i === 0 ? 0 : rand(60, 190);
@@ -797,7 +884,7 @@ class Room {
       b.state = 'windup'; b.stateT = warn + 0.5;
       return;
     }
-    if (b.type === 'kishin') roll = Math.random(); // 残りはたたきつけ・突進・まわりへの攻撃
+    if (allMoves) roll = Math.random(); // 残りはたたきつけ・突進・まわりへの攻撃
     // 怒り状態の青鬼・黒鬼は、まわりにいくつも落とす「乱れ打ち」も使う
     else if (b.rage && b.type !== 'red' && roll < 0.3) {
       const k = b.type === 'black' ? 5 : 3;
@@ -1023,8 +1110,9 @@ class Room {
     for (const p of this.players.values()) this.updatePlayer(p);
     this.updateRevive();
     this.updatePatrols();
-    this.updateBonus();
+    this.updateDrop();
     this.updateBoss();
+    this.updateJudges();
     this.updateTelegraphs();
     this.updateRing();
     this.updateItemsOnField();
@@ -1047,10 +1135,10 @@ class Room {
       count: p.escaped ? team : Math.floor(team / 2),
       gacha: rollGacha(p.escaped ? judged : judged / 2),
       // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
-      seal: S.sealDrop({ stage: this.stage, boss: this.firstBoss.type, bossDown: this.firstBoss.hp <= 0, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
+      seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
-    const b = this.firstBoss, bn = this.bonus && this.bonus.boss;
-    this.lastResult = { t: 'result', players, team, boss: b.type, bossDown: b.hp <= 0, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined };
+    const bn = this.bonusBoss, sh = this.shinBoss;
+    this.lastResult = { t: 'result', players, team, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
     this.broadcast(this.lastResult);
     for (const p of this.players.values()) p.missedResult = !!p.away; // 通信が切れていた人には、つなぎ直したときに送る
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
@@ -1066,7 +1154,7 @@ class Room {
       switch (th.key) {
         case 'dama': value = p.dama; break;
         case 'bossTime':
-          if (n === 1 && this.firstBoss.type === th.boss && this.bossKillT != null) value = this.bossKillT; // ひとりで出撃したときのタイムだけ
+          if (n === 1 && this.mainType === th.boss && this.bossKillT != null) value = this.bossKillT; // ひとりで出撃したときのタイムだけ
           break;
         case 'challenge':
           if (this.challenge) { value = r.count; detail = `${p.escaped ? '脱出' : '鬼玉半分'}・${n}人`; }
@@ -1091,11 +1179,11 @@ class Room {
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
-        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage,
-        bliz: b.bliz > 0 || undefined, mode: b.type === 'fuurai' ? b.mode : undefined, phase: b.type === 'kishin' ? b.phase : undefined, armor: this.bossArmor(b) || undefined,
+        bliz: b.bliz > 0 || undefined, mode: b.type === 'fuurai' ? b.mode : undefined, phase: this.godLike(b) ? b.phase : undefined, armor: this.bossArmor(b) || undefined,
         sweep: b.sweep ? { a: +this.sweepAngle(b.sweep).toFixed(3), w: b.sweep.t < b.sweep.warn ? +(b.sweep.t / b.sweep.warn).toFixed(2) : -1, len: b.sweep.len, dir: b.sweep.dir } : undefined } : null,
       ring: this.ring ? { x: Math.round(this.ring.x), y: Math.round(this.ring.y), r: Math.round(this.ring.r) } : null,
       items: this.items.map(it => ({ id: it.id, x: Math.round(it.x), y: Math.round(it.y), type: it.type })),
@@ -1217,7 +1305,7 @@ wss.on('connection', ws => {
         if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
-        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type]) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
+        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
         break;
       case 'challenge':
         if (room && me && me.host && room.state === 'lobby') { room.challengeOn = !!msg.on && S.themeOf(S.weekIndex()).key === 'challenge'; room.broadcast(room.lobbyInfo()); }
@@ -1294,7 +1382,7 @@ function cleanProfile(p) {
   return {
     f: typeof p.f === 'string' && /^[0-9]{0,400}$/.test(p.f) ? p.f : '',
     s: Array.isArray(p.s) ? p.s.slice(0, 4).map(n) : [],
-    c: n(p.c) & 127, tc: n(p.tc), fv: S.YOKAI_BY_ID[p.fv] ? p.fv : null, wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
+    c: n(p.c) & 511, tc: n(p.tc), fv: S.YOKAI_BY_ID[p.fv] ? p.fv : null, wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
   };
 }
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
