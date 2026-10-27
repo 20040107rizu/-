@@ -533,6 +533,18 @@ class Room {
       else if (d < want - 60) { mx = -Math.cos(a); my = -Math.sin(a); }
       else { mx = Math.cos(a + Math.PI / 2) * 0.6; my = Math.sin(a + Math.PI / 2) * 0.6; } // まわりこむ
     }
+    // 検証用（DEMO_COLLECT=人数）: 前から決めた人数は鬼玉を集める役。ボスが倒れたら全員で集める
+    if (process.env.DEMO_COLLECT && ([...this.players.values()].indexOf(p) < +process.env.DEMO_COLLECT || !b)) {
+      let best = null, bd = Infinity;
+      for (const d of this.dama) { if (d.taken) continue; const dd = dist(d, p) / (d.v > 1 ? 4 : 1); if (dd < bd) { bd = dd; best = d; } } // どデカい鬼玉を優先
+      if (best) {
+        if (!p._goal || p._goal !== best || (p._pathT -= DT) <= 0) { p._goal = best; p._path = this.gridS.path(p.x, p.y, best.x, best.y); p._pathT = 0.5; }
+        const wp = p._path && p._path[0];
+        if (wp && Math.hypot(wp.x - p.x, wp.y - p.y) < 20) p._path.shift();
+        const g = (p._path && p._path[0]) || best, a = Math.atan2(g.y - p.y, g.x - p.x);
+        mx = Math.cos(a); my = Math.sin(a);
+      }
+    }
     p.input = { mx, my, atk: !!t, strong: !!t && this.time > 1.5, item: false, dash: false, skill: this.time % 6 < 0.1, ult: this.time > 3 };
     // 獄王の裁きは、自分にくだったときだけ守る（撮影で仕組みが見えるように）
     if (p.judge && p === this.players.values().next().value) {
