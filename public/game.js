@@ -254,7 +254,7 @@
   let zukanRank = 'all', zukanRole = 'all', zukanSel = null;
   function renderTitles() {
     const prog = S.titleProgress(friends, stats.feats);
-    $('zukanGrid').innerHTML = '';
+    $('zukanGrid').innerHTML = ''; $('zukanGrid').dataset.sig = '';
     $('zukanTitles').innerHTML = prog.filter(x => titleShown(x.title)).map(({ title: t, got, need, done }) => `<div class="title-row${done ? ' done' : ''}${myTitle === t.id ? ' on' : ''}">
         <div class="tinfo">${done ? titleTag(t.id) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
         <div class="tbar"><i style="width:${Math.round((got / need) * 100)}%"></i></div></div>
@@ -295,6 +295,9 @@
     if (zukanRank === 'legend') { renderLegends(); return; }
     const list = S.YOKAI.filter(y => (zukanRank === 'all' || y.rank === zukanRank) && (zukanRole === 'all' || y.role === zukanRole));
     const grid = $('zukanGrid'), keep = grid.scrollTop;
+    const sig = 'z|' + list.map(y => `${y.id}:${friends[y.id] || 0}`).join(',');
+    if (grid.dataset.sig === sig && grid.children.length) { selectZukanCard(); renderZukanInfo(); return; }
+    grid.dataset.sig = sig;
     grid.innerHTML = '';
     for (const y of list) {
       const owned = friends[y.id];
@@ -302,12 +305,14 @@
       d.className = 'yk' + (y.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${faceImg(y, !owned)}`
         + (owned ? `<span class="nm">${y.name}</span>` : `<span class="unk nm">${'？'.repeat([...y.name].length)}</span>`) + `<small class="nm">${y.origin}</small>`;
-      d.onclick = () => { zukanSel = y.id; renderZukan(); };
+      d.dataset.id = y.id;
+      d.onclick = () => { zukanSel = y.id; selectZukanCard(); renderZukanInfo(); };
       grid.appendChild(d);
     }
     grid.scrollTop = keep;
     renderZukanInfo();
   }
+  const selectZukanCard = () => { for (const d of $('zukanGrid').children) d.classList.toggle('sel', d.dataset.id === zukanSel); };
   function renderZukanInfo() {
     const y = S.YOKAI_BY_ID[zukanSel];
     if (!y) { $('zukanInfo').innerHTML = '<div class="pv">妖怪をタップすると、くわしく見られるよ<br><small>まだお友達になっていない妖怪はシルエットで表示されます</small></div>'; return; }
@@ -388,7 +393,7 @@
   function renderLegends() {
     if (!S.YOKAI_BY_ID[zukanSel]?.legend) zukanSel = S.LEGENDS[0].id;
     const grid = $('zukanGrid');
-    grid.innerHTML = '';
+    grid.innerHTML = ''; grid.dataset.sig = '';
     for (const l of S.LEGENDS) {
       const owned = friends[l.id], ready = !owned && S.sealProgress(l, friends, stats.seals).ready, lt = owned ? S.legendTotsu(l, friends) : 0;
       const d = document.createElement('div');
@@ -1066,15 +1071,20 @@
     renderFriendTabs();
     renderYokaiInfo();
     const el = $('friends');
-    const keep = el.scrollTop; // 選び直してもスクロール位置はそのまま
-    el.innerHTML = '';
     const list = friendTab === 'own' ? S.LEGENDS.filter(y => friends[y.id]).concat(S.YOKAI.filter(y => friends[y.id])) : S.YOKAI.filter(y => y.rank === friendTab);
     const legendTaken = lobby && lobby.players.some(p => p.id !== myId && S.YOKAI_BY_ID[p.yokai]?.legend);
+    // 中身が同じなら作り直さずに「えらんでいる」印だけ動かす（絵を170体ぶん作り直すと重い）
+    const sig = friendTab + '|' + legendTaken + '|' + list.map(y => `${y.id}:${countOf(y.id)}:${lvOfId(y.id)}`).join(',');
+    if (el.dataset.sig === sig && el.children.length) { for (const d of el.children) d.classList.toggle('sel', d.dataset.id === selYokai); return; }
+    el.dataset.sig = sig;
+    const keep = el.scrollTop; // 選び直してもスクロール位置はそのまま
+    el.innerHTML = '';
     for (const y of list) {
       const owned = countOf(y.id);
       const blocked = y.legend && legendTaken; // レジェンドはチームで1体まで
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '') + (blocked ? ' blocked' : '');
+      d.dataset.id = y.id;
       d.innerHTML = owned
         ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
