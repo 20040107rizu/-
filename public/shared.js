@@ -33,6 +33,8 @@
   // 凸: 同じ妖怪がガチャでかぶるたびに1つ上がり、HPと攻撃が少しだけ上がる
   const TOTSU_MAX = 5, TOTSU_STEP = 0.03;
   const totsuOf = count => Math.max(0, Math.min(TOTSU_MAX, (count | 0) - 1));
+  // 完凸（6体）よりあふれた分は経験値ストックに変わる（ランクごとの量）
+  const FULL_COUNT = TOTSU_MAX + 1, OVER_EXP = { C: 100, B: 300, A: 1000, S: 3000 };
   // ---- お友達レベル（経験値ストックを使って上げる。Lv1 が今までの強さ、1レベルごとに HP・攻撃 +0.3%） ----
   const LV_MAX = 99, LV_STEP = 0.003;
   // そのレベルになるのに必要な経験値の合計（はじめはすぐ上がり、あとほど重い。Lv50 で約3万、Lv99 で約15万）
@@ -427,5 +429,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

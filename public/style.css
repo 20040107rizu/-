@@ -473,3 +473,6 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
   .exp-badge { padding: 2px 8px; }
   .exp-badge b { font-size: 14px; }
 }
+.ov-chip { display: inline-flex; align-items: center; gap: 2px; margin: 2px 4px; font-weight: bold; color: #7dd8ff; }
+.ov-chip .face { width: 34px; height: 34px; object-fit: contain; border-radius: 50%; }
+.prizes { display: flex; flex-wrap: wrap; justify-content: center; max-width: 80vw; max-height: 34vh; overflow-y: auto; }

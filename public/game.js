@@ -45,6 +45,27 @@
   const titleInfo = id => S.TITLE_BY_ID[id] || S.weeklyTitle(id);
   function checkMyTitle() { if (myTitle && !titlesDone().includes(myTitle)) myTitle = null; }
   checkMyTitle();
+  // お友達を1体ふやす。完凸よりあふれたら経験値ストックに変えて、その量を返す
+  function addFriend(id) {
+    friends[id] = (friends[id] || 0) + 1;
+    return overflowToExp(id);
+  }
+  function convertOverflow() {
+    const out = { exp: 0, n: 0, list: [] };
+    for (const id of Object.keys(friends)) {
+      const k = friends[id] - S.FULL_COUNT, e = overflowToExp(id);
+      if (e) { out.exp += e; out.n += k; out.list.push([id, k]); }
+    }
+    return out;
+  }
+  function overflowToExp(id) {
+    const y = S.YOKAI_BY_ID[id], extra = (friends[id] || 0) - S.FULL_COUNT;
+    if (!y || y.legend || extra <= 0) return 0;
+    friends[id] = S.FULL_COUNT;
+    const exp = extra * (S.OVER_EXP[y.rank] || 0);
+    stats.expStock += exp;
+    return exp;
+  }
   // 持っている数（レジェンドは「1＋凸」として数える。凸は封印の8体で決まる）
   const countOf = id => { const y = S.YOKAI_BY_ID[id]; return y && y.legend ? (friends[id] ? 1 + S.legendTotsu(y, friends) : 0) : friends[id] || 0; };
   const myTotsu = () => S.totsuOf(countOf(selYokai));
@@ -433,7 +454,7 @@
     const before = S.legendTotsu(l, friends);
     sl.frag -= S.SEAL.gacha;
     const id = l.seal[Math.floor(Math.random() * l.seal.length)], y = S.YOKAI_BY_ID[id];
-    friends[id] = (friends[id] || 0) + 1;
+    const over = addFriend(id);
     saveAll(); updateFriendCount(); helloAgain();
     const after = S.legendTotsu(l, friends), t = S.totsuOf(friends[id]);
     beep(660, 0.15, 'triangle', 0.07); setTimeout(() => beep(990, 0.25, 'triangle', 0.08), 140);
@@ -447,7 +468,7 @@
       return;
     }
     renderZukan();
-    $('sealGachaMsg').innerHTML = `${faceImg(y)} <b>${esc(y.name)}</b> が出た！（${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）`;
+    $('sealGachaMsg').innerHTML = `${faceImg(y)} <b>${esc(y.name)}</b> が出た！（${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）${over ? `　あふれた分が 📈 経験値 +${over.toLocaleString('ja-JP')} に変わった` : ''}`;
   }
   function renderLegendInfo(l) {
     const owned = friends[l.id], url = artUrl('yokai/' + l.id);
@@ -585,7 +606,7 @@
     for (const [rk, w] of ball.ranks) { if (x < w) { rank = rk; break; } x -= w; }
     const pool = S.YOKAI.filter(y => y.rank === rank), y = pool[Math.floor(Math.random() * pool.length)];
     const isNew = !friends[y.id];
-    friends[y.id] = (friends[y.id] || 0) + 1;
+    const overExp = addFriend(y.id);
     try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
     saveAll(); updateFriendCount(); renderTicketButton(); helloAgain();
     ticketMode = true;
@@ -596,7 +617,7 @@
       team: 0, ticket: `${ball.name}玉チケット`,
       ball: { key: ball.key, name: ball.name, color: ball.color },
       yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' },
-      isNew, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
+      isNew, overExp, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
     }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
     show('gacha');
   };
@@ -669,10 +690,11 @@
     myTitle = data.title; checkMyTitle(); try { localStorage.setItem('title', myTitle || ''); } catch {}
     favYokai = data.fav && friends[data.fav] ? data.fav : null; try { if (favYokai) localStorage.setItem('fav', favYokai); else localStorage.removeItem('fav'); } catch {}
     if (data.pid) { pid = data.pid; try { localStorage.setItem('pid', pid); } catch {} helloAgain(); }
+    const over = convertOverflow();
     saveAll(); updateFriendCount();
     openSave();
     $('saveMsg').style.color = '#7dff9a';
-    $('saveMsg').textContent = `読み込みました！ お友達 ${n}体`;
+    $('saveMsg').textContent = `読み込みました！ お友達 ${n}体${over.exp ? `（完凸からあふれた${over.n}体を 📈 経験値 +${over.exp.toLocaleString('ja-JP')} に変えました）` : ''}`;
   };
 
   // ---------- 生成AIの絵（public/art/、無ければ図形で描く） ----------
@@ -1180,12 +1202,12 @@
   $('btnChoiceGacha').onclick = () => {
     if (!pending) return;
     const g = pending.gacha, isNew = !friends[g.yokai];
-    friends[g.yokai] = (friends[g.yokai] || 0) + 1;
+    const overExp = addFriend(g.yokai);
     const p = pending; pending = null;
     try { localStorage.removeItem('pendingChoice'); } catch {}
     saveAll(); updateFriendCount(); helloAgain();
     if (choiceInBattle && result) result.myChoice = 'gacha';
-    playGacha({ ...p, isNew }, choiceInBattle);
+    playGacha({ ...p, isNew, overExp }, choiceInBattle);
   };
   $('btnChoiceExp').onclick = () => {
     if (!pending) return;
@@ -1202,6 +1224,23 @@
     const reopen = () => { if (!pending) return; if ($('title').classList.contains('active')) showChoice(false); else setTimeout(reopen, 900); };
     setTimeout(reopen, 1200);
   } else pending = null;
+  // 前からいた「完凸よりあふれたお友達」を、1回だけまとめて経験値に変える
+  {
+    const over = convertOverflow();
+    if (over.exp) {
+      saveAll(); updateFriendCount();
+      const open = () => {
+        if (!$('title').classList.contains('active')) { setTimeout(open, 900); return; }
+        $('rewardWeek').textContent = '📈 経験値ストック';
+        $('rewardTitle').textContent = `経験値 +${over.exp.toLocaleString('ja-JP')}！`;
+        $('rewardSub').textContent = `完凸からあふれていたお友達${over.n}体ぶんを経験値に変えました。図鑑で好きなお友達のレベル上げに使えます`;
+        $('rewardPrizes').innerHTML = over.list.map(([id, k]) => `<span class="ov-chip">${faceImg(S.YOKAI_BY_ID[id])}×${k}</span>`).join('');
+        $('btnRewardOk').onclick = () => show('title');
+        show('rewardScreen');
+      };
+      setTimeout(open, 1500);
+    }
+  }
   // ガチャの演出。p が null なら「ガチャなし」（脱出失敗など）
   function playGacha(p, inBattle) {
     const id = ++gachaRun;
@@ -1219,7 +1258,7 @@
         failed: p.escaped ? null : { from: p.team ?? 0 },
         ball: { key: ball.key, name: ball.name, color: ball.color },
         yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img },
-        isNew: p.isNew, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
+        isNew: p.isNew, overExp: p.overExp, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
       }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
     } else {
       const mine = result && result.players.find(q => q.id === myId);
