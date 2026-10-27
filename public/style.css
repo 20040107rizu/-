@@ -45,7 +45,7 @@ button:disabled { opacity: .4; }
 .yk .cnt { position: absolute; top: 2px; right: 4px; font-size: 10px; opacity: .8; }
 .yk .lvc { position: absolute; top: 16px; right: 4px; font-size: 9px; font-weight: bold; color: #7dd8ff; } /* お友達レベル */
 .lv-tag { color: #7dd8ff; font-weight: bold; }
-.lv-box { margin-top: 6px; padding: 6px 8px; border-radius: 10px; background: #ffffff10; border: 1px solid #7dd8ff66; display: flex; flex-direction: column; gap: 3px; }
+.lv-box { margin-top: 0; padding: 5px 7px; border-radius: 10px; background: #ffffff10; border: 1px solid #7dd8ff66; display: flex; flex-direction: column; gap: 3px; }
 .lv-top { display: flex; align-items: baseline; gap: 8px; }
 .lv-top b { font-size: 18px; color: #7dd8ff; }
 .lv-max { color: #ffd23a; font-weight: bold; }
@@ -329,7 +329,7 @@ button.mid { font-size: 15px; font-weight: bold; padding: 8px 16px; background: 
 #zukan.active { flex-direction: row; align-items: stretch; gap: 12px; padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
 #zukan .ov-head h2 { font-size: 18px; }
 #zukan .lb-preview { flex-direction: column; justify-content: center; text-align: center; }
-#zukan .lb-preview .big-face { width: min(60%, 150px); }
+#zukan .lb-preview .big-face { width: min(60%, 150px, 30vh); }
 #zukan .lb-preview .big-face.sil { filter: brightness(0) invert(.82); opacity: .28; }
 #zukan .lb-preview dl { text-align: left; }
 #zukan .tabs .tab { cursor: pointer; }
@@ -476,3 +476,23 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .ov-chip { display: inline-flex; align-items: center; gap: 2px; margin: 2px 4px; font-weight: bold; color: #7dd8ff; }
 .ov-chip .face { width: 34px; height: 34px; object-fit: contain; border-radius: 50%; }
 .prizes { display: flex; flex-wrap: wrap; justify-content: center; max-width: 80vw; max-height: 34vh; overflow-y: auto; }
+
+/* 図鑑: わざの説明の右にレベル上げ。確認は画面のまんなかに出す */
+.zk-row { display: flex; gap: 8px; align-items: flex-start; text-align: left; }
+.zk-row dl { flex: 1; min-width: 0; }
+.zk-row .lv-box { flex: none; width: 48%; }
+.zk-row .lv-top { gap: 5px; flex-wrap: wrap; }
+.zk-row .lv-top b { font-size: 16px; }
+.zk-row .lv-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.zk-row .lv-btns button { padding: 5px 4px; font-size: 12px; }
+.zk-row .lv-btns .wide { grid-column: span 2; }
+#zukan .lb-preview { overflow-y: auto; justify-content: flex-start; }
+#zukan .lb-preview > :first-child { margin-top: auto; }
+#zukan .lb-preview > :last-child { margin-bottom: auto; }
+.lv-confirm { position: absolute; inset: 0; z-index: 20; background: #0009; display: flex; align-items: center; justify-content: center; }
+.lv-confirm[hidden] { display: none; }
+.lv-confirm .lv-plan { background: linear-gradient(#24405a, #16263a); border: 2px solid #7dd8ff; border-style: solid; border-radius: 16px; padding: 12px 22px; text-align: center; align-items: center; gap: 5px; box-shadow: 0 0 30px #7dd8ff55; max-width: 92vw; }
+.lv-confirm .face { width: 56px; height: 56px; object-fit: contain; }
+.lv-pname { font-weight: bold; }
+.lv-confirm .lv-btns { justify-content: center; }
+.lv-confirm .lv-btns button { min-width: 110px; font-size: 14px; padding: 8px 12px; }

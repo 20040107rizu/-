@@ -336,6 +336,8 @@
   const selectZukanCard = () => { for (const d of $('zukanGrid').children) d.classList.toggle('sel', d.dataset.id === zukanSel); };
   function renderZukanInfo() {
     const y = S.YOKAI_BY_ID[zukanSel];
+    if (lvPlan && lvPlan.id !== zukanSel) lvPlan = null;
+    if ($('lvConfirm') && !lvPlan) $('lvConfirm').hidden = true;
     if (!y) { $('zukanInfo').innerHTML = '<div class="pv">妖怪をタップすると、くわしく見られるよ<br><small>まだお友達になっていない妖怪はシルエットで表示されます</small></div>'; return; }
     const owned = friends[y.id], url = artUrl('yokai/' + y.id);
     const img = url ? `<img class="big-face${owned ? '' : ' sil'}" src="${url}" alt="">` : `<div class="big-face" style="background:${owned ? y.color : '#333'}"></div>`;
@@ -346,8 +348,8 @@
     const at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
     $('zukanInfo').innerHTML = `${img}<div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b>
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>・${y.origin}</div>
-      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd><dt>仲間</dt><dd>${owned}体${owned > 1 ? `（${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}・HP/攻撃 +${Math.round(S.totsuOf(owned) * S.TOTSU_STEP * 100)}%）` : ''}</dd></dl>
-      ${levelPanel(y.id)}</div>`;
+      <div class="zk-row"><dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd><dt>仲間</dt><dd>${owned}体${owned > 1 ? `（${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}・HP/攻撃 +${Math.round(S.totsuOf(owned) * S.TOTSU_STEP * 100)}%）` : ''}</dd></dl>
+      ${levelPanel(y.id)}</div></div>`;
     bindLevelButtons(y.id, renderZukanInfo);
   }
   // ---- お友達レベル: 図鑑で経験値ストックを使って上げる ----
@@ -370,22 +372,29 @@
     const cur = S.expForLv(lv), next = S.expForLv(lv + 1), need = max ? 0 : next - exp;
     const pct = max ? 100 : Math.round(((exp - cur) / (next - cur)) * 100);
     const can = !max && stats.expStock > 0;
-    const plan = lvPlan && lvPlan.exp > exp ? lvPlan.exp : 0;
-    let preview = '';
-    if (plan) {
-      const to = S.lvOf(plan), use = plan - exp, nextTo = S.expForLv(to + 1) - plan;
-      preview = `<div class="lv-plan"><div><b>Lv ${lv} → <span>Lv ${to}</span></b>${to >= S.LV_MAX ? ' <span class="lv-max">MAX</span>' : to === lv ? `<small>（次のレベルまで あと ${nextTo.toLocaleString('ja-JP')}）</small>` : ''}</div>
-        <small>HP・攻撃 +${lvBonus(lv)}% → <b>+${lvBonus(to)}%</b></small>
-        <small>使う経験値 <b>${use.toLocaleString('ja-JP')}</b>（ストックのこり ${(stats.expStock - use).toLocaleString('ja-JP')}）</small>
-        <div class="lv-btns"><button class="small" data-lv="cancel">やめる</button><button class="small go" data-lv="use">✅ 使用する</button></div></div>`;
-    }
-    return `<div class="lv-box"><div class="lv-top"><b>Lv ${lv}</b>${max ? ' <span class="lv-max">MAX</span>' : ''}<small>HP・攻撃 +${lvBonus(lv)}%</small></div>
+    return `<div class="lv-box"><div class="lv-top"><b>Lv ${lv}</b>${max ? '<span class="lv-max">MAX</span>' : ''}<small>HP・攻撃 +${lvBonus(lv)}%</small></div>
       <div class="tbar"><i style="width:${pct}%"></i></div>
-      <small>${max ? 'これ以上は上がりません' : `次のレベルまで ${need.toLocaleString('ja-JP')}`}　📈 経験値ストック ${stats.expStock.toLocaleString('ja-JP')}</small>
-      <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1レベル</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10レベル</button><button class="small alt" data-lv="all"${can ? '' : ' disabled'}>ストックを全部</button></div>${preview}</div>`;
+      <small>${max ? 'これ以上は上がりません' : `次のレベルまで ${need.toLocaleString('ja-JP')}`}</small>
+      <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1Lv</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10Lv</button><button class="small alt wide" data-lv="all"${can ? '' : ' disabled'}>📈 ストックを全部</button></div></div>`;
+  }
+  // 使う前の確認（画面のまんなかに出すので、スクロールしなくても見える）
+  function renderLvConfirm(id) {
+    let box = $('lvConfirm');
+    if (!box) { box = document.createElement('div'); box.id = 'lvConfirm'; box.className = 'lv-confirm'; $('zukan').appendChild(box); }
+    const exp = levels[id] || 0, plan = lvPlan && lvPlan.id === id && lvPlan.exp > exp ? lvPlan.exp : 0;
+    box.hidden = !plan;
+    if (!plan) return;
+    const lv = S.lvOf(exp), to = S.lvOf(plan), use = plan - exp, nextTo = S.expForLv(to + 1) - plan, y = S.YOKAI_BY_ID[id];
+    box.innerHTML = `<div class="lv-plan">${faceImg(y)}<div class="lv-pname">${esc(y.name)}</div>
+      <div><b>Lv ${lv} → <span>Lv ${to}</span></b>${to >= S.LV_MAX ? ' <span class="lv-max">MAX</span>' : to === lv ? `<small>（次のレベルまで あと ${nextTo.toLocaleString('ja-JP')}）</small>` : ''}</div>
+      <small>HP・攻撃 +${lvBonus(lv)}% → <b>+${lvBonus(to)}%</b></small>
+      <small>使う経験値 <b>${use.toLocaleString('ja-JP')}</b>（ストックのこり ${(stats.expStock - use).toLocaleString('ja-JP')}）</small>
+      <div class="lv-btns"><button class="small" data-lv="1"${to >= S.LV_MAX || use >= stats.expStock ? ' disabled' : ''}>＋1Lv</button><button class="small" data-lv="10"${to >= S.LV_MAX || use >= stats.expStock ? ' disabled' : ''}>＋10Lv</button></div>
+      <div class="lv-btns"><button class="small" data-lv="cancel">やめる</button><button class="small go" data-lv="use">✅ 使用する</button></div></div>`;
   }
   function bindLevelButtons(id, rerender) {
-    for (const b of document.querySelectorAll('#zukanInfo .lv-btns button')) b.onclick = () => {
+    renderLvConfirm(id);
+    for (const b of document.querySelectorAll('#zukanInfo .lv-btns button, #lvConfirm button')) b.onclick = () => {
       const exp = levels[id] || 0, lv = S.lvOf(exp), k = b.dataset.lv;
       const top = Math.min(exp + stats.expStock, S.expForLv(S.LV_MAX)); // ストックで届くところまで
       if (k === 'cancel') { lvPlan = null; rerender(); return; }
@@ -407,7 +416,6 @@
       lvPlan = { id, exp: target };
       beep(520, 0.05, 'square', 0.03);
       rerender();
-      document.querySelector('#zukanInfo .lv-plan')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     };
   }
   // ---------- レジェンド（封印をとく） ----------
@@ -471,13 +479,15 @@
     $('sealGachaMsg').innerHTML = `${faceImg(y)} <b>${esc(y.name)}</b> が出た！（${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）${over ? `　あふれた分が 📈 経験値 +${over.toLocaleString('ja-JP')} に変わった` : ''}`;
   }
   function renderLegendInfo(l) {
+    if (lvPlan && lvPlan.id !== l.id) lvPlan = null;
+    if ($('lvConfirm') && !lvPlan) $('lvConfirm').hidden = true;
     const owned = friends[l.id], url = artUrl('yokai/' + l.id);
     const at = Attacks.of(l.id), el = Attacks.ELEMENT[at.el];
     $('zukanInfo').innerHTML = `${url ? `<img class="big-face legend-face${owned ? '' : ' sil'}" src="${url}" alt="">` : ''}
       <div class="pv"><b class="legend-name">L ${esc(l.name)}</b>
       <div>${S.ROLES[l.role].name}・<span style="color:${el.color}">${el.name}属性</span>・封印の地：${S.STAGES[l.stage].name}</div>
-      <dl><dt>必殺技</dt><dd>${esc(l.ultName)}：${esc(l.ultDesc)}</dd><dt>特性</dt><dd>${esc(l.passiveDesc)}</dd></dl>
-      ${owned ? levelPanel(l.id) : ''}<small>${esc(l.story)}</small></div>`;
+      <div class="zk-row"><dl><dt>必殺技</dt><dd>${esc(l.ultName)}：${esc(l.ultDesc)}</dd><dt>特性</dt><dd>${esc(l.passiveDesc)}</dd></dl>
+      ${owned ? levelPanel(l.id) : ''}</div><small>${esc(l.story)}</small></div>`;
     if (owned) bindLevelButtons(l.id, () => renderLegendInfo(l));
   }
   function unseal(l) {
@@ -494,7 +504,7 @@
     show('rewardScreen');
   }
 
-  $('btnZukan').onclick = () => { zukanSel = null; show('zukan'); renderZukan(); };
+  $('btnZukan').onclick = () => { zukanSel = null; lvPlan = null; if ($('lvConfirm')) $('lvConfirm').hidden = true; show('zukan'); renderZukan(); };
   $('btnZukanClose').onclick = () => show('title');
 
   // ---------- 週替わりランキング ----------
