@@ -457,3 +457,7 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .co-rank, .co-fresh { text-align: center; font-size: 13px; }
 .co-fresh b { color: #7dd8ff; font-size: 15px; }
 #choiceScreen .sub { max-width: 90vw; text-align: center; font-size: 12px; }
+.lv-plan { margin-top: 3px; padding: 6px 8px; border-radius: 8px; background: #7dd8ff1c; border: 1px dashed #7dd8ff99; display: flex; flex-direction: column; gap: 3px; }
+.lv-plan b span { color: #7dd8ff; font-size: 17px; }
+.lv-plan small b { color: #ffd23a; }
+.lv-btns .go { background: linear-gradient(#5fd38a, #2f9a58); color: #fff; }

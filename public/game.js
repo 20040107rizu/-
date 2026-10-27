@@ -324,28 +324,53 @@
     bindLevelButtons(y.id, renderZukanInfo);
   }
   // ---- お友達レベル: 図鑑で経験値ストックを使って上げる ----
+  // ボタンで「どこまで上げるか」を決めて、どれだけ使うかを見てから「使用する」で上げる
+  let lvPlan = null; // { id, exp: 上げたあとの経験値 }
+  const lvBonus = lv => Math.round((lv - 1) * S.LV_STEP * 1000) / 10;
   function levelPanel(id) {
+    if (lvPlan && lvPlan.id !== id) lvPlan = null;
     const exp = levels[id] || 0, lv = S.lvOf(exp), max = lv >= S.LV_MAX;
     const cur = S.expForLv(lv), next = S.expForLv(lv + 1), need = max ? 0 : next - exp;
     const pct = max ? 100 : Math.round(((exp - cur) / (next - cur)) * 100);
     const can = !max && stats.expStock > 0;
-    return `<div class="lv-box"><div class="lv-top"><b>Lv ${lv}</b>${max ? ' <span class="lv-max">MAX</span>' : ''}<small>HP・攻撃 +${(Math.round((lv - 1) * S.LV_STEP * 1000) / 10)}%</small></div>
+    const plan = lvPlan && lvPlan.exp > exp ? lvPlan.exp : 0;
+    let preview = '';
+    if (plan) {
+      const to = S.lvOf(plan), use = plan - exp, nextTo = S.expForLv(to + 1) - plan;
+      preview = `<div class="lv-plan"><div><b>Lv ${lv} → <span>Lv ${to}</span></b>${to >= S.LV_MAX ? ' <span class="lv-max">MAX</span>' : to === lv ? `<small>（次のレベルまで あと ${nextTo.toLocaleString('ja-JP')}）</small>` : ''}</div>
+        <small>HP・攻撃 +${lvBonus(lv)}% → <b>+${lvBonus(to)}%</b></small>
+        <small>使う経験値 <b>${use.toLocaleString('ja-JP')}</b>（ストックのこり ${(stats.expStock - use).toLocaleString('ja-JP')}）</small>
+        <div class="lv-btns"><button class="small" data-lv="cancel">やめる</button><button class="small go" data-lv="use">✅ 使用する</button></div></div>`;
+    }
+    return `<div class="lv-box"><div class="lv-top"><b>Lv ${lv}</b>${max ? ' <span class="lv-max">MAX</span>' : ''}<small>HP・攻撃 +${lvBonus(lv)}%</small></div>
       <div class="tbar"><i style="width:${pct}%"></i></div>
       <small>${max ? 'これ以上は上がりません' : `次のレベルまで ${need.toLocaleString('ja-JP')}`}　📈 経験値ストック ${stats.expStock.toLocaleString('ja-JP')}</small>
-      <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1レベル</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10レベル</button><button class="small alt" data-lv="all"${can ? '' : ' disabled'}>ストックを全部使う</button></div></div>`;
+      <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1レベル</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10レベル</button><button class="small alt" data-lv="all"${can ? '' : ' disabled'}>ストックを全部</button></div>${preview}</div>`;
   }
   function bindLevelButtons(id, rerender) {
     for (const b of document.querySelectorAll('#zukanInfo .lv-btns button')) b.onclick = () => {
-      const exp = levels[id] || 0, lv = S.lvOf(exp);
-      const target = b.dataset.lv === 'all' ? Infinity : S.expForLv(Math.min(S.LV_MAX, lv + +b.dataset.lv));
-      const use = Math.min(stats.expStock, Math.max(0, Math.min(target, S.expForLv(S.LV_MAX)) - exp));
-      if (use <= 0) return;
-      levels[id] = exp + use; stats.expStock -= use;
-      saveAll(); helloAgain();
-      const after = S.lvOf(levels[id]);
-      if (after > lv) { beep(660, 0.12, 'triangle', 0.07); setTimeout(() => beep(990, 0.2, 'triangle', 0.08), 120); }
+      const exp = levels[id] || 0, lv = S.lvOf(exp), k = b.dataset.lv;
+      const top = Math.min(exp + stats.expStock, S.expForLv(S.LV_MAX)); // ストックで届くところまで
+      if (k === 'cancel') { lvPlan = null; rerender(); return; }
+      if (k === 'use') {
+        const use = lvPlan && lvPlan.id === id ? Math.min(lvPlan.exp, top) - exp : 0;
+        lvPlan = null;
+        if (use <= 0) { rerender(); return; }
+        levels[id] = exp + use; stats.expStock -= use;
+        saveAll(); helloAgain();
+        if (S.lvOf(levels[id]) > lv) { beep(660, 0.12, 'triangle', 0.07); setTimeout(() => beep(990, 0.2, 'triangle', 0.08), 120); }
+        rerender();
+        if (id === selYokai && ws) send({ t: 'yokai', id, totsu: myTotsu(), lv: myLv(), title: myTitle });
+        return;
+      }
+      // ＋1・＋10 は押すたびに上乗せ（＋10を2回で＋20）
+      const from = lvPlan && lvPlan.id === id ? S.lvOf(lvPlan.exp) : lv;
+      const target = k === 'all' ? top : Math.min(top, S.expForLv(Math.min(S.LV_MAX, from + +k)));
+      if (target <= exp) return;
+      lvPlan = { id, exp: target };
+      beep(520, 0.05, 'square', 0.03);
       rerender();
-      if (id === selYokai && ws) send({ t: 'yokai', id, totsu: myTotsu(), lv: myLv(), title: myTitle });
+      document.querySelector('#zukanInfo .lv-plan')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     };
   }
   // ---------- レジェンド（封印をとく） ----------
