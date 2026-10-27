@@ -461,3 +461,15 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .lv-plan b span { color: #7dd8ff; font-size: 17px; }
 .lv-plan small b { color: #ffd23a; }
 .lv-btns .go { background: linear-gradient(#5fd38a, #2f9a58); color: #fff; }
+.exp-badge { flex: none; display: flex; align-items: baseline; gap: 4px; padding: 2px 10px; border-radius: 99px; background: linear-gradient(#1f4f6e, #143247); border: 2px solid #7dd8ff; box-shadow: 0 0 12px #7dd8ff55; font-size: 11px; font-weight: bold; white-space: nowrap; }
+.exp-badge b { color: #7dd8ff; font-size: 16px; }
+#zukan .ov-head .sub { flex: none; white-space: nowrap; }
+.exp-badge.empty { opacity: .6; box-shadow: none; }
+.exp-badge.pop { animation: expPop .45s ease-out; }
+@keyframes expPop { 40% { transform: scale(1.12); box-shadow: 0 0 22px #7dd8ff; } }
+@media (max-width: 760px) {
+  #zukan .ov-head #zukanCount { display: none; } /* 数はタブにも出ているので、せまい画面では経験値を優先 */
+  #zukan .ov-head { gap: 6px; }
+  .exp-badge { padding: 2px 8px; }
+  .exp-badge b { font-size: 14px; }
+}

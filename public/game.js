@@ -281,6 +281,7 @@
     $('zukanRoles').hidden = zukanRank === 'title' || zukanRank === 'legend';
     const got = S.YOKAI.filter(y => friends[y.id]).length;
     $('zukanCount').textContent = `${got} / ${S.YOKAI.length} 体`;
+    renderExpBadge();
     $('zukanTabs').innerHTML = [['all', 'ぜんぶ'], ['C', 'C'], ['B', 'B'], ['A', 'A'], ['S', 'S']].map(([k, label]) => {
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
@@ -327,7 +328,17 @@
   // ボタンで「どこまで上げるか」を決めて、どれだけ使うかを見てから「使用する」で上げる
   let lvPlan = null; // { id, exp: 上げたあとの経験値 }
   const lvBonus = lv => Math.round((lv - 1) * S.LV_STEP * 1000) / 10;
+  // 図鑑の上に出す経験値ストック（減ったり増えたりしたら少し光らせる）
+  let shownStock = null;
+  function renderExpBadge() {
+    const el = $('zukanExp'), n = stats.expStock || 0;
+    el.innerHTML = `📈 経験値 <b>${n.toLocaleString('ja-JP')}</b>`;
+    el.classList.toggle('empty', !n);
+    if (shownStock != null && shownStock !== n) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+    shownStock = n;
+  }
   function levelPanel(id) {
+    renderExpBadge();
     if (lvPlan && lvPlan.id !== id) lvPlan = null;
     const exp = levels[id] || 0, lv = S.lvOf(exp), max = lv >= S.LV_MAX;
     const cur = S.expForLv(lv), next = S.expForLv(lv + 1), need = max ? 0 : next - exp;
