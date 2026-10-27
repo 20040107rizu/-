@@ -442,9 +442,9 @@ class Room {
   damageOni(src, e, amount) {
     if (e.hp <= 0) return;
     if (e === this.boss && this.bossArmor(e) && src) {
-      // 金の鎧: 正面からは35%しか効かない。背中からは1.3倍
+      // 金の鎧: 正面からは35%しか効かない（鬼神は60%）。背中からは1.3倍
       const off = angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face);
-      if (off < 1.1) { amount *= 0.35; if (Math.random() < 0.25) this.events.push({ k: 'clang', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 60) }); }
+      if (off < 1.1) { amount *= e.type === 'kishin' ? 0.6 : 0.35; if (Math.random() < 0.25) this.events.push({ k: 'clang', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 60) }); }
       else if (off > 2.2) amount *= 1.3;
     }
     e.hp = Math.max(0, e.hp - amount);
@@ -781,7 +781,7 @@ class Room {
       }
       case 'windup':
         b.stateT -= DT;
-        if (b.stateT <= 0) { b.state = 'engage'; b.atkT = rand(1.2, 2.0) * b.kind.atkGap * (b.rage ? 0.75 : 1); }
+        if (b.stateT <= 0) { b.state = 'engage'; b.atkT = rand(1.2, 2.0) * b.kind.atkGap * this.rageGap(b); }
         break;
       case 'charging': {
         b.stateT -= DT;
@@ -790,12 +790,14 @@ class Room {
         S.collide(this.map, b, BOSS_R);
         for (const p of this.activePlayers()) if (!p.chargeHit && dist(p, b) < BOSS_R + PLAYER_R) { this.damagePlayer(p, 45 * b.kind.dmg); p.chargeHit = true; }
         const blocked = Math.hypot(b.x - px, b.y - py) < 600 * DT * 0.5;
-        if (b.stateT <= 0 || blocked) { b.state = 'engage'; b.atkT = rand(1.2, 1.8) * b.kind.atkGap * (b.rage ? 0.75 : 1); if (blocked) this.events.push({ k: 'boom', x: Math.round(b.x), y: Math.round(b.y), r: 60 }); }
+        if (b.stateT <= 0 || blocked) { b.state = 'engage'; b.atkT = rand(1.2, 1.8) * b.kind.atkGap * this.rageGap(b); if (blocked) this.events.push({ k: 'boom', x: Math.round(b.x), y: Math.round(b.y), r: 60 }); }
         break;
       }
     }
   }
 
+  // 怒ると攻撃の間隔が短くなる（鬼神は変身で技が増えるので、怒りでは速くならない）
+  rageGap(b) { return b.rage && b.type !== 'kishin' ? 0.75 : 1; }
   // 金の鎧があるか（金鬼は怒ったあと、鬼神は2段階目から）
   bossArmor(b) { return (b.type === 'gold' && b.rage) || (this.godLike(b) && b.phase >= 2); }
 
@@ -820,7 +822,7 @@ class Room {
         if (ph === 2) { b.sweepT = 3; b.blizT = 10; }
         if (ph === 3) this.ring = { x: b.x, y: b.y, r: 1500, min: 600 }; // 変身した場所を中心に、約35秒でせまくなる（鬼神のまわりに閉じこめられる）
       }
-      if ((b.boltT -= DT) <= 0) { b.boltT = b.phase === 3 ? 5 : 7; this.thunderBolts(b); }
+      if ((b.boltT -= DT) <= 0) { b.boltT = b.phase === 3 && b.type !== 'kishin' ? 5 : 7; this.thunderBolts(b); }
       if (b.phase >= 2) {
         this.blizzard(b, 6, 28);
         if (!b.sweep && (b.sweepT -= DT) <= 0 && b.state !== 'charging') this.startSweep(b);
@@ -852,7 +854,7 @@ class Room {
   updateSweep(b) {
     const sw = b.sweep;
     sw.t += DT;
-    if (sw.t >= sw.warn + sw.spin) { b.sweep = null; b.sweepT = b.phase === 3 ? 13 : 16; return; }
+    if (sw.t >= sw.warn + sw.spin) { b.sweep = null; b.sweepT = b.phase === 3 && b.type !== 'kishin' ? 13 : 16; return; }
     if (sw.t < sw.warn) return;
     const a = this.sweepAngle(sw);
     for (const p of this.activePlayers()) {
@@ -870,7 +872,7 @@ class Room {
     const g = this.ring;
     if (!g) return;
     g.r = Math.max(g.min, g.r - 26 * DT);
-    for (const p of this.activePlayers()) if (dist(p, g) > g.r) { p.ringT = (p.ringT || 0) + DT; if (p.ringT >= 0.5) { p.ringT = 0; this.damagePlayer(p, 9); } }
+    for (const p of this.activePlayers()) if (dist(p, g) > g.r) { p.ringT = (p.ringT || 0) + DT; if (p.ringT >= 0.5) { p.ringT = 0; this.damagePlayer(p, this.boss && this.boss.type === 'kishin' ? 6 : 9); } }
   }
 
   bossAttack(t) {
