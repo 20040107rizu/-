@@ -1324,11 +1324,6 @@ wss.on('connection', ws => {
         break;
       }
       case 'yokai':
-        // レジェンドはチームで1体まで
-        if (room && me && room.state === 'lobby' && isLegend(msg.id) && [...room.players.values()].some(q => q !== me && isLegend(q.yokai))) {
-          send({ t: 'lobbyMsg', msg: 'レジェンドはチームで1体までです。ほかの人がもう連れています' });
-          break;
-        }
         if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
@@ -1339,10 +1334,6 @@ wss.on('connection', ws => {
         break;
       case 'start':
         if (room && me && me.host && room.state === 'lobby' && !draining) {
-          if ([...room.players.values()].filter(p => isLegend(p.yokai)).length > 1) {
-            room.broadcast({ t: 'lobbyMsg', msg: 'レジェンドはチームで1体までです。だれか1人がほかのお友達に変えてね' });
-            break;
-          }
           // チャレンジのしばり（ヒーラー禁止）を守っているか
           const th = S.themeOf(S.weekIndex());
           if (room.challengeOn && th.key === 'challenge' && th.rule === 'noHealer' && [...room.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].role === 'healer')) {
@@ -1401,7 +1392,6 @@ const known = new Map();    // pid → { name, yokai, title, seen, played, prof 
 const presence = new Map(); // ホーム画面の接続 → pid
 const inviteAt = new Map(); // 「誘った人>誘われた人」→ 最後に誘った時刻
 const usableYokai = id => !!S.YOKAI_BY_ID[id];
-const isLegend = id => !!(S.YOKAI_BY_ID[id] && S.YOKAI_BY_ID[id].legend);
 // プロフィール: f=持っている妖怪の数（1けた×176）、s=[遊んだ回数, 脱出, 最高鬼玉, 集めた鬼玉]、c=倒したボス、tc=称号の数、wt=限定称号
 function cleanProfile(p) {
   if (!p || typeof p !== 'object') return null;

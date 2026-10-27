@@ -498,7 +498,7 @@
     beep(523, 0.2, 'triangle', 0.08); setTimeout(() => beep(784, 0.2, 'triangle', 0.08), 150); setTimeout(() => beep(1046, 0.5, 'triangle', 0.09), 300);
     $('rewardWeek').textContent = '🌈 レジェンド';
     $('rewardTitle').textContent = `${l.name}の封印がとけた！`;
-    $('rewardSub').textContent = `${l.name}がお友達になった！ ロビーで連れていけます（チームで1体まで）`;
+    $('rewardSub').textContent = `${l.name}がお友達になった！ ロビーで連れていけます`;
     $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + l.id) || ''}" alt="">`;
     $('btnRewardOk').onclick = () => { show('zukan'); renderZukan(); };
     show('rewardScreen');
@@ -1104,25 +1104,21 @@
     renderYokaiInfo();
     const el = $('friends');
     const list = friendTab === 'own' ? S.LEGENDS.filter(y => friends[y.id]).concat(S.YOKAI.filter(y => friends[y.id])) : S.YOKAI.filter(y => y.rank === friendTab);
-    const legendTaken = lobby && lobby.players.some(p => p.id !== myId && S.YOKAI_BY_ID[p.yokai]?.legend);
     // 中身が同じなら作り直さずに「えらんでいる」印だけ動かす（絵を170体ぶん作り直すと重い）
-    const sig = friendTab + '|' + legendTaken + '|' + list.map(y => `${y.id}:${countOf(y.id)}:${lvOfId(y.id)}`).join(',');
+    const sig = friendTab + '|' + list.map(y => `${y.id}:${countOf(y.id)}:${lvOfId(y.id)}`).join(',');
     if (el.dataset.sig === sig && el.children.length) { for (const d of el.children) d.classList.toggle('sel', d.dataset.id === selYokai); return; }
     el.dataset.sig = sig;
     const keep = el.scrollTop; // 選び直してもスクロール位置はそのまま
     el.innerHTML = '';
     for (const y of list) {
       const owned = countOf(y.id);
-      const blocked = y.legend && legendTaken; // レジェンドはチームで1体まで
       const d = document.createElement('div');
-      d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '') + (blocked ? ' blocked' : '');
+      d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '');
       d.dataset.id = y.id;
       d.innerHTML = owned
         ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
-      if (blocked) d.innerHTML += '<span class="block-tag">チームに1体まで</span>';
       if (owned) d.onclick = () => {
-        if (blocked) { $('lobbyMsg').hidden = false; $('lobbyMsg').textContent = '⚠️ レジェンドはチームで1体まで。ほかの人がもう連れています'; return; }
         selYokai = y.id; saveAll();
         send({ t: 'yokai', id: y.id, totsu: myTotsu(), lv: myLv(), title: myTitle });
         helloAgain();
