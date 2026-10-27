@@ -43,6 +43,14 @@ button:disabled { opacity: .4; }
 .yk .face { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 2px; border: 2px solid #fff; }
 .yk .rk { position: absolute; top: 2px; left: 4px; font-weight: bold; font-size: 12px; text-shadow: 0 1px 2px #000; }
 .yk .cnt { position: absolute; top: 2px; right: 4px; font-size: 10px; opacity: .8; }
+.yk .lvc { position: absolute; top: 16px; right: 4px; font-size: 9px; font-weight: bold; color: #7dd8ff; } /* お友達レベル */
+.lv-tag { color: #7dd8ff; font-weight: bold; }
+.lv-box { margin-top: 6px; padding: 6px 8px; border-radius: 10px; background: #ffffff10; border: 1px solid #7dd8ff66; display: flex; flex-direction: column; gap: 3px; }
+.lv-top { display: flex; align-items: baseline; gap: 8px; }
+.lv-top b { font-size: 18px; color: #7dd8ff; }
+.lv-max { color: #ffd23a; font-weight: bold; }
+.lv-box .tbar i { background: #7dd8ff; }
+.lv-btns { display: flex; gap: 5px; flex-wrap: wrap; }
 
 #resTable { border-collapse: collapse; font-size: 14px; }
 #resTable td, #resTable th { padding: 4px 12px; border-bottom: 1px solid #ffffff22; text-align: center; }
@@ -436,3 +444,16 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .pboss.on.bk-kishin { background: #a0102e; color: #fff; border: 1px solid #ff8aa8; }
 .pboss.on.bk-gokuou { background: #5a0a06; color: #fff; border: 1px solid #ff5a1a; }
 .pboss.on.bk-hyakki { background: #4a1a7a; color: #fff; border: 1px solid #b07aff; }
+
+/* バトルのあと: ガチャか経験値か */
+#choiceScreen.active { justify-content: center; gap: 8px; }
+#choiceTitle b { color: #ffd23a; font-size: 1.25em; }
+.choice-odds { background: #ffffff10; border: 1px solid #ffffff30; border-radius: 12px; padding: 8px 12px; display: flex; flex-direction: column; gap: 5px; max-width: 94vw; }
+.co-balls { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.co-ball { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 99px; background: #00000040; font-size: 13px; }
+.co-ball b { margin-left: 3px; }
+.co-ball.zero { opacity: .35; }
+.co-ball .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px #fff8; }
+.co-rank, .co-fresh { text-align: center; font-size: 13px; }
+.co-fresh b { color: #7dd8ff; font-size: 15px; }
+#choiceScreen .sub { max-width: 90vw; text-align: center; font-size: 12px; }

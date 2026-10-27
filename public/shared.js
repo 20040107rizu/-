@@ -33,11 +33,20 @@
   // 凸: 同じ妖怪がガチャでかぶるたびに1つ上がり、HPと攻撃が少しだけ上がる
   const TOTSU_MAX = 5, TOTSU_STEP = 0.03;
   const totsuOf = count => Math.max(0, Math.min(TOTSU_MAX, (count | 0) - 1));
-  function yokaiStats(id, totsu = 0) {
+  // ---- お友達レベル（経験値ストックを使って上げる。Lv1 が今までの強さ、1レベルごとに HP・攻撃 +0.3%） ----
+  const LV_MAX = 99, LV_STEP = 0.003;
+  // そのレベルになるのに必要な経験値の合計（はじめはすぐ上がり、あとほど重い。Lv50 で約3万、Lv99 で約15万）
+  const expForLv = lv => Math.round(3.6 * Math.pow(Math.max(0, lv - 1), 2.32));
+  function lvOf(exp) {
+    let lv = 1;
+    while (lv < LV_MAX && (exp | 0) >= expForLv(lv + 1)) lv++;
+    return lv;
+  }
+  function yokaiStats(id, totsu = 0, lv = 1) {
     const y = YOKAI_BY_ID[id] || YOKAI[0];
     const r = ROLES[y.role];
     const m = RANKS[y.rank].mul;
-    const k = 1 + TOTSU_STEP * Math.max(0, Math.min(TOTSU_MAX, totsu | 0));
+    const k = 1 + TOTSU_STEP * Math.max(0, Math.min(TOTSU_MAX, totsu | 0)) + LV_STEP * (Math.max(1, Math.min(LV_MAX, lv | 0)) - 1);
     return { ...r, hp: Math.round(r.hp * m * k), atkDmg: r.atkDmg * m * k, strongMul: m * k, speed: r.speed + (m - 1) * 20 };
   }
 
@@ -107,6 +116,9 @@
     [100, 12, 45, 33,  9,  1],
     [150,  4, 22, 50, 19,  5],
     [200,  0, 15, 30, 33, 22],
+    [300,  0,  8, 22, 38, 32],
+    [400,  0,  3, 12, 45, 40],
+    [500,  0,  0,  0, 55, 45], // 500個以上は金か黒が必ず出る
   ];
   function ballOdds(count) {
     let row = BALL_ODDS[0];
@@ -415,5 +427,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

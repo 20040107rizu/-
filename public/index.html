@@ -194,6 +194,17 @@
     <canvas id="cv"></canvas>
   </section>
 
+  <!-- バトルのあと: ガチャを引くか、経験値にするかを選ぶ -->
+  <section id="choiceScreen" class="screen overlay">
+    <h2 id="choiceTitle">集めた鬼玉 <b id="choiceCount">0</b>個</h2>
+    <div id="choiceOdds" class="choice-odds"></div>
+    <div class="row">
+      <button id="btnChoiceGacha" class="big">🎰 ガチャを引く</button>
+      <button id="btnChoiceExp" class="big alt">📈 経験値にする</button>
+    </div>
+    <p class="sub">経験値は「経験値ストック」にたまります。図鑑で好きなお友達に使ってレベルを上げられます（最大Lv99）</p>
+  </section>
+
   <!-- 鬼ガチャ（演出は public/gacha.js） -->
   <section id="gacha" class="screen overlay gacha-screen">
     <div id="gachaStage" class="gacha-stage"></div>

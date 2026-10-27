@@ -32,7 +32,6 @@ const NOTICE_RANGE = 300;        // 攻撃してきた相手に見回り鬼が�
 const ESCAPE_TIME = 1.5;           // 襖の前で攻撃ボタンを長押しする時間
 const ESCAPE_RANGE = 80;
 const DAMA_RESPAWN = 2;            // 鬼玉が1個湧き直す間隔（秒）
-const TEAM_FACTOR = 0.5;           // ガチャの判定: 合計 ÷ (1 + 0.5×(人数-1))。2人なら1.5で割る
 // 開始時の演出（ボス鬼が街に到着する映像）とカウントダウン。この間はゲームを止める
 const INTRO_MOVIE = process.env.NO_INTRO ? 0 : 4.5;
 const COUNTDOWN = process.env.NO_INTRO ? 0 : 5;
@@ -281,13 +280,13 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, title: p.title, away: !!p.away || undefined })),
+      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, title: p.title, away: !!p.away || undefined })),
     };
   }
 
-  addPlayer(ws, name, yokai, pid, totsu, title) {
+  addPlayer(ws, name, yokai, pid, totsu, title, lv) {
     const p = {
-      id: genId(), ws, pid, totsu: cleanTotsu(totsu), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
+      id: genId(), ws, pid, totsu: cleanTotsu(totsu), lv: cleanLv(lv), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
       input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false, ult: false }, prevItem: false,
     };
@@ -344,7 +343,7 @@ class Room {
     for (const p of this.players.values()) {
       const sp = this.farFromAll(this.gridS, spawns, 1400);
       spawns.push(sp);
-      const st = S.yokaiStats(p.yokai, p.totsu);
+      const st = S.yokaiStats(p.yokai, p.totsu, p.lv);
       Object.assign(p, {
         stats: st, x: sp.x, y: sp.y, face: 0,
         hp: st.hp, maxHp: st.hp, atkT: 0, strongT: 0, down: false, reviveProg: 0, escaped: false,
@@ -1137,15 +1136,13 @@ class Room {
 
   finish() {
     this.state = 'result';
-    // ガチャはみんなで集めた鬼玉の合計で引く。人数が多いほど集めやすいので、人数で割り引いて判定する
+    // ガチャ（または経験値）は、みんなで集めた鬼玉の合計そのままで引く
     const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
-    const n = this.players.size;
-    const judged = team / (1 + TEAM_FACTOR * (n - 1));
     const players = [...this.players.values()].map(p => ({
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
-      gacha: rollGacha(p.escaped ? judged : judged / 2),
+      gacha: rollGacha(p.escaped ? team : team / 2),
       // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
@@ -1321,7 +1318,7 @@ wss.on('connection', ws => {
         room = target;
         pid = cleanPid(msg.pid);
         if (pid) touchPlayer(pid, msg.name, msg.yokai);
-        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title);
+        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title, msg.lv);
         send({ t: 'welcome', id: me.id });
         room.broadcast(room.lobbyInfo());
         break;
@@ -1332,7 +1329,7 @@ wss.on('connection', ws => {
           send({ t: 'lobbyMsg', msg: 'レジェンドはチームで1体までです。ほかの人がもう連れています' });
           break;
         }
-        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
+        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
         if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
@@ -1412,10 +1409,11 @@ function cleanProfile(p) {
   return {
     f: typeof p.f === 'string' && /^[0-9]{0,400}$/.test(p.f) ? p.f : '',
     s: Array.isArray(p.s) ? p.s.slice(0, 4).map(n) : [],
-    c: n(p.c) & 511, tc: n(p.tc), fv: S.YOKAI_BY_ID[p.fv] ? p.fv : null, wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
+    c: n(p.c) & 511, tc: n(p.tc), lv: typeof p.lv === 'string' && /^[0-9a-z]{0,400}$/.test(p.lv) ? p.lv : '', fv: S.YOKAI_BY_ID[p.fv] ? p.fv : null, wt: Array.isArray(p.wt) ? p.wt.filter(t => S.weeklyTitle(t)).slice(0, 50) : [],
   };
 }
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
+const cleanLv = v => Math.max(1, Math.min(S.LV_MAX, v | 0));
 const cleanTitle = v => (S.TITLE_BY_ID[v] || S.weeklyTitle(v) ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);
 function touchPlayer(pid, name, yokai, title) {
