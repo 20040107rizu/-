@@ -43,6 +43,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // 公開中のバージョン（画面のファイルの中身から作る）。変わるとアプリに「更新」ボタンが出る
 const crypto = require('crypto');
+const zlib = require('zlib');
 function computeVersion() {
   const h = crypto.createHash('sha1');
   for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'attacks.js', 'shared.js', 'stages.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
@@ -75,18 +76,39 @@ const server = http.createServer((req, res) => {
   }
   const filePath = path.normalize(path.join(PUBLIC_DIR, urlPath === '/' ? 'index.html' : urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end(); }
-  fs.readFile(filePath, (err, data) => {
+  // 通信量を減らす: 文字のファイルは gzip で圧縮し、ETag で「変わっていなければ送らない（304）」
+  //  ?v=版 や ?h=ハッシュ 付きのファイルは中身が変わると URL も変わるので、長くキャッシュしてよい
+  loadFile(filePath, (err, f) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
-    const headers = { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' };
-    // 画面のファイルは毎回新しいか確かめる（古いまま使い回さない）。絵は1日キャッシュ
-    headers['Cache-Control'] = /\.(png|jpg|svg)$/.test(filePath) ? 'public, max-age=86400' : 'no-cache';
+    const versioned = /[?&](v|h)=/.test(req.url) && path.basename(filePath) !== 'index.html';
+    const headers = { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream', ETag: f.etag, Vary: 'Accept-Encoding' };
+    headers['Cache-Control'] = versioned ? 'public, max-age=31536000, immutable' : /\.(png|jpg|svg)$/.test(filePath) ? 'public, max-age=86400' : 'no-cache';
     if (path.basename(filePath) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
+    if (req.headers['if-none-match'] === f.etag) { res.writeHead(304, headers); return res.end(); }
+    const gz = f.gz && /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+    if (gz) headers['Content-Encoding'] = 'gzip';
     res.writeHead(200, headers);
-    // index.html には版の番号を書き込む（読み込むファイルにも付けて、古いファイルが使われないようにする）
-    if (path.basename(filePath) === 'index.html') data = Buffer.from(data.toString('utf8').replace(/__BUILD__/g, VERSION));
-    res.end(data);
+    res.end(gz ? f.gz : f.data);
   });
 });
+// ファイルの中身・圧縮版・ETag を覚えておく（ファイルが書きかわったら読み直す）
+const fileCache = new Map();
+function loadFile(filePath, cb) {
+  fs.stat(filePath, (err, st) => {
+    if (err || !st.isFile()) return cb(err || new Error('not file'));
+    const c = fileCache.get(filePath);
+    if (c && c.mtime === st.mtimeMs) return cb(null, c);
+    fs.readFile(filePath, (err2, data) => {
+      if (err2) return cb(err2);
+      // index.html には版の番号を書き込む（読み込むファイルにも付けて、古いファイルが使われないようにする）
+      if (path.basename(filePath) === 'index.html') data = Buffer.from(data.toString('utf8').replace(/__BUILD__/g, VERSION));
+      const text = /\.(js|css|html|json|svg|txt)$/.test(filePath);
+      const f = { mtime: st.mtimeMs, data, gz: text && data.length > 512 ? zlib.gzipSync(data, { level: 9 }) : null, etag: '"' + crypto.createHash('sha1').update(data).digest('base64').slice(0, 20) + '"' };
+      fileCache.set(filePath, f);
+      cb(null, f);
+    });
+  });
+}
 
 // ---------- ユーティリティ ----------
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1244,7 +1266,8 @@ class Room {
 }
 
 // ---------- WebSocket ----------
-const wss = new WebSocketServer({ server });
+// バトル中の様子（1秒に15回）は圧縮して送る（通信量が約1/4になる）
+const wss = new WebSocketServer({ server, perMessageDeflate: process.env.NO_DEFLATE ? false : { zlibDeflateOptions: { level: 3, memLevel: 7 }, threshold: 256, concurrencyLimit: 4 } });
 
 // 名前: 空白（全角スペースや見えない文字）だけの名前は、名前なしとして扱う
 function cleanName(v) {
