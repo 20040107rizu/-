@@ -325,7 +325,7 @@
     if (zukanRank === 'god') { renderGods(); return; }
     const list = S.YOKAI.filter(y => (zukanRank === 'all' || y.rank === zukanRank) && (zukanRole === 'all' || y.role === zukanRole));
     const grid = $('zukanGrid'), keep = grid.scrollTop;
-    const sig = 'z|' + list.map(y => `${y.id}:${friends[y.id] || 0}`).join(',');
+    const sig = 'z|' + list.map(y => `${y.id}:${friends[y.id] || 0}:${lvOfId(y.id)}`).join(',');
     if (grid.dataset.sig === sig && grid.children.length) { selectZukanCard(); renderZukanInfo(); return; }
     grid.dataset.sig = sig;
     grid.innerHTML = '';
@@ -333,7 +333,7 @@
       const owned = friends[y.id];
       const d = document.createElement('div');
       d.className = 'yk' + (y.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
-      d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${faceImg(y, !owned)}`
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${owned && lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y, !owned)}`
         + (owned ? `<span class="nm">${y.name}</span>` : `<span class="unk nm">${'？'.repeat([...y.name].length)}</span>`) + `<small class="nm">${y.origin}</small>`;
       d.dataset.id = y.id;
       d.onclick = () => { zukanSel = y.id; selectZukanCard(); renderZukanInfo(); };
@@ -415,6 +415,8 @@
         saveAll(); helloAgain();
         if (S.lvOf(levels[id]) > lv) { beep(660, 0.12, 'triangle', 0.07); setTimeout(() => beep(990, 0.2, 'triangle', 0.08), 120); }
         rerender();
+        const card = document.querySelector(`#zukanGrid .yk[data-id="${id}"]`), nlv = S.lvOf(levels[id]);
+        if (card && nlv > 1) { let b = card.querySelector('.lvc'); if (!b) { b = document.createElement('span'); b.className = 'lvc'; card.querySelector('.rk').after(b); } b.textContent = `Lv${nlv}`; }
         if (id === selYokai && ws) send({ t: 'yokai', id, totsu: myTotsu(), lv: myLv(), title: myTitle });
         return;
       }
@@ -437,7 +439,8 @@
       const n = friends[g.id] || 0, t = S.totsuOf(n), can = (stats.gods.tr[g.id] || 0) > 0 && stats.gods.frag >= S.GOD_FRAG && n < S.FULL_COUNT;
       const d = document.createElement('div');
       d.className = 'yk god' + (g.id === zukanSel ? ' sel' : '') + (n ? '' : ' locked');
-      d.innerHTML = `<span class="rk" style="color:${S.RANKS.G.color}">神</span>${can ? '<span class="cnt">✨</span>' : n > 1 ? `<span class="cnt">${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>` : ''}${faceImg(g, !n)}<span class="nm">${g.name}</span><small class="nm">${g.origin}</small>`;
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS.G.color}">神</span>${can ? '<span class="cnt">✨</span>' : n > 1 ? `<span class="cnt">${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>` : ''}${n && lvOfId(g.id) > 1 ? `<span class="lvc">Lv${lvOfId(g.id)}</span>` : ''}${faceImg(g, !n)}<span class="nm">${g.name}</span><small class="nm">${g.origin}</small>`;
+      d.dataset.id = g.id;
       d.onclick = () => { zukanSel = g.id; renderZukan(); };
       grid.appendChild(d);
     }
@@ -490,7 +493,8 @@
       const owned = friends[l.id], ready = !owned && S.sealProgress(l, friends, stats.seals).ready, lt = owned ? S.legendTotsu(l, friends) : 0;
       const d = document.createElement('div');
       d.className = 'yk legend' + (l.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
-      d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : lt ? `<span class="cnt">${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</span>` : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : lt ? `<span class="cnt">${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</span>` : ''}${owned && lvOfId(l.id) > 1 ? `<span class="lvc">Lv${lvOfId(l.id)}</span>` : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
+      d.dataset.id = l.id;
       d.onclick = () => { zukanSel = l.id; renderZukan(); };
       grid.appendChild(d);
     }
