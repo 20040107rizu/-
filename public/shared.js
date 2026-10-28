@@ -12,6 +12,7 @@
     A: { mul: 1.55, color: '#ff4a4a' },
     S: { mul: 2.0,  color: '#ffd84a' },
     L: { mul: 2.4,  color: '#ff7ae8' }, // レジェンド
+    G: { mul: 2.8,  color: '#fff2b0' }, // 神
   };
 
   // ---------- ロール（タイプ） ----------
@@ -26,8 +27,10 @@
   // ---------- 妖怪（お友達）: public/yokai.js ----------
   const YOKAI = typeof module === 'object' && module.exports ? require('./yokai.js') : self.YokaiList;
   const LEGENDS = YOKAI.LEGENDS || [];
-  // 名前や強さを引くときはレジェンドも含める（一覧・ガチャ・図鑑の数は YOKAI だけ）
-  const YOKAI_BY_ID = Object.fromEntries(YOKAI.concat(LEGENDS).map(y => [y.id, y]));
+  const GODS = YOKAI.GODS || [];
+  const GOD_FRAG = 30; // 神の封印をとく・凸するのに使う神の欠片（それぞれ神の試練1回ぶんも使う）
+  // 名前や強さを引くときはレジェンド・神も含める（一覧・ガチャ・図鑑の数は YOKAI だけ）
+  const YOKAI_BY_ID = Object.fromEntries(YOKAI.concat(LEGENDS, GODS).map(y => [y.id, y]));
 
   // 妖怪の実ステータス（ロール基本値 × ランク倍率）
   // 凸: 同じ妖怪がガチャでかぶるたびに1つ上がり、HPと攻撃が少しだけ上がる
@@ -429,5 +432,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

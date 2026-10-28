@@ -206,7 +206,7 @@ function all() {
   const out = [];
   // 妖怪は tools/yokai-gen.js が look 指定から組み合わせて描く
   for (const y of YOKAI) out.push([`yokai/${y.id}`, drawYokai(y), 192]);
-  for (const y of YOKAI.LEGENDS || []) out.push([`yokai/${y.id}`, drawYokai(y), 256]); // レジェンドは大きめ
+  for (const y of (YOKAI.LEGENDS || []).concat(YOKAI.GODS || [])) out.push([`yokai/${y.id}`, drawYokai(y), 256]); // レジェンド・神は大きめ
   out.push(['oni/patrol', oniPatrol(), 256]);
   for (const [type, look] of Object.entries(BOSS_LOOK)) out.push([`oni/boss-${type}`, oniBoss(look), 384]);
   for (const [id, f] of Object.entries(ITEM)) out.push([`item/${id}`, f(), 128]);

@@ -227,5 +227,32 @@
       passive: 'nightDash', passiveDesc: 'ダッシュ中は鬼に見つからない',
       story: 'アメリカの森に出る、馬の顔とコウモリの翼をもつ悪魔。夜空をさけび声とともに飛ぶ。' },
   ].map(l => ({ ...l, rank: 'L', starter: false, legend: true }));
+  // ---- 神（ランクG）。レジェンドを全員集めて隠しボスを全部たおした人だけが知る。神の試練をクリアし、神の欠片で封印をとく ----
+  list.GODS = [
+    { id: 'onigami', name: 'オニガミ', role: F, color: '#a01030', origin: '鬼の世界', look: 't=human skin=c hair=long horns=oni acc=sword eyes=angry scarf=1 fx=fire',
+      el: 'fire', normal: 'spin', strong: 'quake', ult: 'hellsweep', ultName: '地獄の大なぎ払い', ultDesc: '長い光線がまわりを1周して、鬼をまとめてなぎはらう',
+      passive: 'godArmor', passiveDesc: '金の鎧：受けるダメージ -35%', trial: 'オニガミの試練：鬼神・真を、だれも倒れずにたおす',
+      story: '鬼の世界の神。何度もたおされるうちに、妖怪たちの強さを認めて仲間になった。' },
+    { id: 'zeus', name: 'ゼウス', role: R, color: '#3a6ad8', origin: 'ギリシャ', look: 't=human hair=long hat=crown acc=spear eyes=angry fx=spark beard=1',
+      el: 'thunder', normal: 'bolt', strong: 'thunder', ult: 'tenrai', ultName: '天の雷', ultDesc: '町じゅうの鬼に雷が落ちて、大ダメージ＋しびれさせる',
+      passive: 'shock', passiveDesc: '攻撃が当たると、ときどき鬼がしびれる', trial: 'ゼウスの試練：獄王を4分以内にたおす',
+      story: 'オリンポスの神々の王。いかずちを投げて、天も地もおさめる。' },
+    { id: 'odin', name: 'オーディン', role: F, color: '#4a5a8a', origin: '北欧', look: 't=human hair=long hat=helmet acc=spear eyes=one scarf=1 fx=ice',
+      el: 'ice', normal: 'thrust', strong: 'dashSlash', ult: 'gungnir', ultName: 'グングニル', ultDesc: '巨大な槍をまっすぐ投げて、すべてをつらぬく',
+      passive: 'backstab', passiveDesc: 'ボス鬼の背中を攻撃すると、ダメージ +40%', trial: 'オーディンの試練：百鬼王をひとりでたおす',
+      story: '北欧の神々の父。片目とひきかえに、世界のすべての知恵を手に入れた。' },
+    { id: 'ra', name: 'ラー', role: H, color: '#e0a020', origin: 'エジプト', look: 't=bird hat=pharaoh ring=sun acc=staff fx=fire',
+      el: 'light', normal: 'healShot', strong: 'healZone', ult: 'sunboat', ultName: '太陽の船', ultDesc: '仲間全員を大回復＋まわりの鬼を太陽の炎で焼く',
+      passive: 'sunAura', passiveDesc: 'まわりの仲間が少しずつ回復する', trial: 'ラーの試練：隠しボスを、ヒーラーのレジェンドを連れてたおす',
+      story: 'エジプトの太陽の神。毎日、太陽の船に乗って空をわたる。' },
+    { id: 'joka', name: 'ジョカ', role: H, color: '#2aa88a', origin: '中国', look: 't=human hair=long hat=crown tail=thin acc=fan fx=leaf skin=pale',
+      el: 'water', normal: 'healOrb', strong: 'lifeLink', ult: 'mend', ultName: '天のつくろい', ultDesc: '倒れた仲間を全員その場で起こす＋みんなを回復',
+      passive: 'lastStand', passiveDesc: '1回のバトルで1度だけ、倒れるダメージを受けても耐える', trial: 'ジョカの試練：隠しボスを、チーム全員がレジェンドでたおす（2人以上）',
+      story: '天にあいた穴を五色の石でつくろったという、人々の母なる女神。' },
+    { id: 'shiva', name: 'シヴァ', role: T, color: '#3a7ac8', origin: 'インド', look: 't=human skin=c hair=long acc=spear eyes=angry ring=drum fx=fire',
+      el: 'dark', normal: 'slam', strong: 'shieldBash', ult: 'tandava', ultName: '破壊の舞', ultDesc: 'まわりで舞いつづけて、何度も大ダメージ',
+      passive: 'fury', passiveDesc: '体力が減るほど攻撃力が上がる（最大 +50%）', trial: 'シヴァの試練：獄王の裁きを一度も受けずにたおす',
+      story: 'インドの破壊と再生の神。世界の終わりに、はげしい舞をおどる。' },
+  ].map(g => ({ ...g, rank: 'G', starter: false, god: true }));
   return list;
 });

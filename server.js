@@ -321,7 +321,7 @@ class Room {
     this.timeLimit = this.challenge && this.challenge.rule === 'short' ? Math.min(180, TIME_LIMIT) : TIME_LIMIT;
     this.timeLeft = this.timeLimit;
     this.bossKillT = null;
-    this.anyDown = false; this.blizKill = false; // レジェンドの試練用
+    this.anyDown = false; this.blizKill = false; this.shinClean = false; // レジェンドの試練用
     this.introT = INTRO_MOVIE + COUNTDOWN;
     this.events = [];
     this.projectiles = [];
@@ -352,7 +352,7 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!S.YOKAI_BY_ID[p.yokai].legend, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
@@ -447,6 +447,7 @@ class Room {
       if (off < 1.1) { amount *= e.type === 'kishin' ? 0.6 : 0.35; if (Math.random() < 0.25) this.events.push({ k: 'clang', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 60) }); }
       else if (off > 2.2) amount *= 1.3;
     }
+    if (e === this.boss && src && src.passive === 'backstab' && angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face) > 2.0) amount *= 1.4; // オーディン: 背中から
     e.hp = Math.max(0, e.hp - amount);
     e.hitFlash = 0.1;
     if (src) { src.dmgDealt += amount; if (!e.isPatrol) src.bossDmg += amount; }
@@ -479,6 +480,12 @@ class Room {
     if (p.down || p.escaped || p.dashT > 0 || p.invulT > 0) return;
     if (p.shieldT > 0) amount *= 0.3;
     if (p.passive === 'bossGuard') amount *= 0.7; // ウラ: ボス鬼からのダメージ -30%
+    if (p.passive === 'godArmor') amount *= 0.65; // オニガミ: 金の鎧
+    if (p.passive === 'lastStand' && !p.standUsed && p.hp - amount <= 0) { // ジョカ: 1度だけ耐える
+      p.standUsed = true; p.hp = 1; p.invulT = 2;
+      this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 120, c: '#7dffd8' });
+      return;
+    }
     p.hp -= amount;
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.reviveProg = 0; this.anyDown = true; this.events.push({ k: 'down', id: p.id }); }
@@ -644,6 +651,7 @@ class Room {
   killBoss() {
     const b = this.boss;
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
+    if (b.type === 'shin') this.shinClean = !this.anyDown; // 神の試練: だれも倒れずに鬼神・真を倒したか
     if (b === this.mainBoss) {
       this.mainDown = true;
       this.bossKillT = this.time;
@@ -728,7 +736,7 @@ class Room {
         : j.k === 'noMove' ? Math.hypot(inp.mx, inp.my) > 0.2 || inp.dash : false;
       if (broke) { // 裁きをやぶった
         p.judge = null;
-        this.damagePlayer(p, j.dmg);
+        this.damagePlayer(p, j.dmg); p.judgeHits++;
         this.events.push({ k: 'judgeHit', id: p.id, x: Math.round(p.x), y: Math.round(p.y) });
         continue;
       }
@@ -736,7 +744,7 @@ class Room {
       if ((j.t -= DT) > 0) continue;
       p.judge = null;
       if (j.k === 'save') { // 助けられなかった: 全員にダメージ
-        for (const q of this.activePlayers()) this.damagePlayer(q, j.dmg * 0.6);
+        for (const q of this.activePlayers()) { this.damagePlayer(q, j.dmg * 0.6); q.judgeHits++; }
         this.events.push({ k: 'judgeHit', id: p.id, x: Math.round(p.x), y: Math.round(p.y), all: true });
       } else this.events.push({ k: 'judgeOk', id: p.id });
     }
@@ -964,6 +972,10 @@ class Room {
     const st = p.stats;
     for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT']) p[k] = Math.max(0, p[k] - DT);
     if (p.down || p.escaped) return;
+    if (p.passive === 'sunAura' && (p.auraT -= DT) <= 0) { // ラー: まわりの仲間が少しずつ回復
+      p.auraT = 1;
+      for (const q of this.activePlayers()) if (dist(p, q) < 320) this.healPlayer(q, q.maxHp * 0.015);
+    }
     const inp = p.input;
 
     // ダッシュ（押している間）とスタミナ
@@ -1146,6 +1158,7 @@ class Room {
       count: p.escaped ? team : Math.floor(team / 2),
       gacha: rollGacha(p.escaped ? team : team / 2),
       // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
+      god: this.godResult(p),
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
     const bn = this.bonusBoss, sh = this.shinBoss;
@@ -1154,6 +1167,25 @@ class Room {
     for (const p of this.players.values()) p.missedResult = !!p.away; // 通信が切れていた人には、つなぎ直したときに送る
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
     this.recordRanking(players);
+  }
+
+  // 神の欠片と神の試練（隠しボスを倒したときだけ。持っているかどうかは各自の端末で判定する）
+  godResult(p) {
+    const main = this.mainDown && (this.mainType === 'gokuou' || this.mainType === 'hyakki');
+    const shin = this.shinBoss && this.shinBoss.hp <= 0;
+    if (!main && !shin) return undefined;
+    let frag = 0;
+    if (main) frag += this.anyDownAtKill ? 1 : 2;
+    if (shin) frag += this.shinClean ? 2 : 1;
+    const ps = [...this.players.values()], trials = [];
+    const isL = id => !!S.YOKAI_BY_ID[id]?.legend;
+    if (shin && this.shinClean) trials.push('onigami');
+    if (this.mainDown && this.mainType === 'gokuou' && this.bossKillT != null && this.bossKillT <= 240) trials.push('zeus');
+    if (this.mainDown && this.mainType === 'hyakki' && ps.length === 1) trials.push('odin');
+    if (p.yokai === 'nurarihyon' || p.yokai === 'melusine') trials.push('ra');
+    if (ps.length >= 2 && ps.every(q => isL(q.yokai))) trials.push('joka');
+    if (this.mainDown && this.mainType === 'gokuou' && !p.judgeHits) trials.push('shiva');
+    return { frag, trials };
   }
 
   // 週替わりランキングに、このバトルの記録を足す
@@ -1190,7 +1222,7 @@ class Room {
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
-        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage,

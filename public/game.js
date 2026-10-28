@@ -35,6 +35,7 @@
   stats.cleared = stats.cleared || {}; // 倒したことのあるボス鬼 { red: true, ... }
   stats.feats = stats.feats || {};
   stats.expStock = stats.expStock || 0; // 経験値ストック（ガチャのかわりに選ぶとたまる）     // バトルでの手がら（称号用） { kishin: true, solo: true }
+  stats.gods = stats.gods || { frag: 0, tr: {} }; stats.gods.tr = stats.gods.tr || {}; // 神 { frag: 神の欠片, tr: { godId: 使っていない試練クリア数 } }
   stats.seals = stats.seals || {};     // レジェンドの封印 { legendId: { frag: 欠片, trial: レジェンドの試練をクリアした } }
   // 称号（図鑑のコンプリート報酬）。付けている称号は引き継ぎコードにも入る
   let myTitle = localStorage.getItem('title') || null;
@@ -60,7 +61,7 @@
   }
   function overflowToExp(id) {
     const y = S.YOKAI_BY_ID[id], extra = (friends[id] || 0) - S.FULL_COUNT;
-    if (!y || y.legend || extra <= 0) return 0;
+    if (!y || y.legend || y.god || extra <= 0) return 0;
     friends[id] = S.FULL_COUNT;
     const exp = extra * (S.OVER_EXP[y.rank] || 0);
     stats.expStock += exp;
@@ -108,7 +109,8 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock };
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock,
+      ...(S.GODS.some(g => friends[g.id]) || stats.gods.frag ? { gd: S.GODS.map(g => friends[g.id] || 0), gx: [stats.gods.frag, ...S.GODS.map(g => stats.gods.tr[g.id] || 0)], gl: S.GODS.map(g => levels[g.id] || 0) } : {}) };
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -120,12 +122,16 @@
     const f = {};
     S.YOKAI.forEach((y, i) => { const c = Math.floor(+d.f[i] || 0); if (c > 0) f[y.id] = Math.min(c, 999); });
     S.LEGENDS.forEach((l, i) => { if ((d.l || [])[i] > 0) f[l.id] = 1; });
+    S.GODS.forEach((g, i) => { const c = Math.floor(+(d.gd || [])[i] || 0); if (c > 0) f[g.id] = Math.min(c, S.FULL_COUNT); });
+    const gx = Array.isArray(d.gx) ? d.gx.map(x => Math.max(0, Math.min(9999, Math.floor(+x || 0)))) : [];
+    const gods = { frag: gx[0] || 0, tr: Object.fromEntries(S.GODS.map((g, i) => [g.id, gx[i + 1] || 0]).filter(([, n]) => n)) };
     const seals = {};
     S.LEGENDS.forEach((l, i) => { const g = (d.g || [])[i]; if (Array.isArray(g) && (g[0] || g[2])) seals[l.id] = { frag: Math.min(99, Math.floor(+g[0] || 0)), trial: !!g[2] }; }); // g[1] は前の「黒鬼を倒した」（いまは使わない）
     const st = (d.s || []).map(x => Math.max(0, Math.floor(+x || 0)));
     const lvs = {};
     PROF_YOKAI.forEach((y, i) => { const e = Math.floor(+(d.lv || [])[i] || 0); if (e > 0) lvs[y.id] = Math.min(e, S.expForLv(S.LV_MAX)); });
-    return { levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
+    S.GODS.forEach((g, i) => { const e = Math.floor(+(d.gl || [])[i] || 0); if (e > 0) lvs[g.id] = Math.min(e, S.expForLv(S.LV_MAX)); });
+    return { gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
       feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
   }
 
@@ -299,7 +305,8 @@
   function renderZukan() {
     $('zukanTitles').hidden = zukanRank !== 'title';
     $('zukanGrid').hidden = zukanRank === 'title';
-    $('zukanRoles').hidden = zukanRank === 'title' || zukanRank === 'legend';
+    if (zukanRank === 'god' && !godReady()) zukanRank = 'all';
+    $('zukanRoles').hidden = zukanRank === 'title' || zukanRank === 'legend' || zukanRank === 'god';
     const got = S.YOKAI.filter(y => friends[y.id]).length;
     $('zukanCount').textContent = `${got} / ${S.YOKAI.length} 体`;
     renderExpBadge();
@@ -307,6 +314,7 @@
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
     }).join('') + `<button class="tab legend-tab${zukanRank === 'legend' ? ' on' : ''}" data-k="legend">🌈 レジェンド <small>${S.LEGENDS.filter(l => friends[l.id]).length}/${S.LEGENDS.length}</small></button>`
+      + (godReady() ? `<button class="tab god-tab${zukanRank === 'god' ? ' on' : ''}" data-k="god">✨ 神 <small>${S.GODS.filter(g => friends[g.id]).length}/${S.GODS.length}</small></button>` : '')
       + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${titleTotal()}</small></button>`;
     $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
       `<button class="tab${zukanRole === k ? ' on' : ''}" data-k="${k}">${label}</button>`).join('');
@@ -314,6 +322,7 @@
     for (const b of $('zukanRoles').querySelectorAll('button')) b.onclick = () => { zukanRole = b.dataset.k; $('zukanGrid').scrollTop = 0; renderZukan(); };
     if (zukanRank === 'title') { renderTitles(); return; }
     if (zukanRank === 'legend') { renderLegends(); return; }
+    if (zukanRank === 'god') { renderGods(); return; }
     const list = S.YOKAI.filter(y => (zukanRank === 'all' || y.rank === zukanRank) && (zukanRole === 'all' || y.role === zukanRole));
     const grid = $('zukanGrid'), keep = grid.scrollTop;
     const sig = 'z|' + list.map(y => `${y.id}:${friends[y.id] || 0}`).join(',');
@@ -417,6 +426,60 @@
       beep(520, 0.05, 'square', 0.03);
       rerender();
     };
+  }
+  // ---------- 神（隠し）: レジェンドを全員集めて、隠しボスを全部たおした人だけ ----------
+  function godReady() { return S.LEGENDS.every(l => friends[l.id]) && !!stats.feats.gokuou && !!stats.feats.hyakki && !!stats.feats.shin; }
+  function renderGods() {
+    if (!S.YOKAI_BY_ID[zukanSel]?.god) zukanSel = S.GODS[0].id;
+    const grid = $('zukanGrid');
+    grid.innerHTML = ''; grid.dataset.sig = '';
+    for (const g of S.GODS) {
+      const n = friends[g.id] || 0, t = S.totsuOf(n), can = (stats.gods.tr[g.id] || 0) > 0 && stats.gods.frag >= S.GOD_FRAG && n < S.FULL_COUNT;
+      const d = document.createElement('div');
+      d.className = 'yk god' + (g.id === zukanSel ? ' sel' : '') + (n ? '' : ' locked');
+      d.innerHTML = `<span class="rk" style="color:${S.RANKS.G.color}">神</span>${can ? '<span class="cnt">✨</span>' : n > 1 ? `<span class="cnt">${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>` : ''}${faceImg(g, !n)}<span class="nm">${g.name}</span><small class="nm">${g.origin}</small>`;
+      d.onclick = () => { zukanSel = g.id; renderZukan(); };
+      grid.appendChild(d);
+    }
+    const g = S.YOKAI_BY_ID[zukanSel], n = friends[g.id] || 0, tr = stats.gods.tr[g.id] || 0, frag = stats.gods.frag;
+    const max = n >= S.FULL_COUNT, ready = tr > 0 && frag >= S.GOD_FRAG && !max;
+    const box = document.createElement('div');
+    box.className = 'seal-box god-box';
+    box.innerHTML = `<b>${n ? `✨ ${esc(g.name)}　${max ? '凸MAX' : `凸${S.totsuOf(n)}`}` : `🔒 ${esc(g.name)}の封印`}</b>
+      <small>${n ? '凸するたびに、神の試練をもう一度クリアして神の欠片を集める' : '神の試練をクリアして、神の欠片を集めると封印がとける'}</small>
+      <div class="cond${tr ? ' ok' : ''}"><span class="ck">${tr ? '✓' : ''}</span><span class="cl">${esc(g.trial)}</span><span class="pg">${tr ? `クリア${tr}回ぶん` : 'まだ'}</span></div>
+      <div class="cond${frag >= S.GOD_FRAG ? ' ok' : ''}"><span class="ck">${frag >= S.GOD_FRAG ? '✓' : ''}</span><span class="cl">⚡ 神の欠片（隠しボスをたおすともらえる・だれも倒れなければ2個）</span><span class="pg">${Math.min(frag, S.GOD_FRAG)}/${S.GOD_FRAG}</span></div>
+      <div class="tbar"><i style="width:${Math.min(100, Math.round((frag / S.GOD_FRAG) * 100))}%"></i></div>
+      <button id="btnGodUnseal" class="big"${ready ? '' : ' disabled'}>${max ? '凸MAX' : n ? `✨ 凸する（試練1回＋欠片${S.GOD_FRAG}個）` : `✨ 封印をとく（試練1回＋欠片${S.GOD_FRAG}個）`}</button>`;
+    grid.appendChild(box);
+    $('btnGodUnseal').onclick = () => unsealGod(g);
+    renderGodInfo(g);
+  }
+  function renderGodInfo(g) {
+    if (lvPlan && lvPlan.id !== g.id) lvPlan = null;
+    if ($('lvConfirm') && !lvPlan) $('lvConfirm').hidden = true;
+    const n = friends[g.id], url = artUrl('yokai/' + g.id), at = Attacks.of(g.id), el = Attacks.ELEMENT[at.el];
+    $('zukanInfo').innerHTML = `${url ? `<img class="big-face god-face${n ? '' : ' sil'}" src="${url}" alt="">` : ''}
+      <div class="pv"><b class="god-name">神 ${esc(g.name)}</b>
+      <div>${S.ROLES[g.role].name}・<span style="color:${el.color}">${el.name}属性</span>・${esc(g.origin)}</div>
+      <div class="zk-row"><dl><dt>必殺技</dt><dd>${esc(g.ultName)}：${esc(g.ultDesc)}</dd><dt>特性</dt><dd>${esc(g.passiveDesc)}</dd></dl>
+      ${n ? levelPanel(g.id) : ''}</div><small>${esc(g.story)}</small></div>`;
+    if (n) bindLevelButtons(g.id, () => renderGodInfo(g));
+  }
+  function unsealGod(g) {
+    const n = friends[g.id] || 0;
+    if (!godReady() || n >= S.FULL_COUNT || !(stats.gods.tr[g.id] > 0) || stats.gods.frag < S.GOD_FRAG) return;
+    stats.gods.tr[g.id]--; stats.gods.frag -= S.GOD_FRAG;
+    friends[g.id] = n + 1;
+    saveAll(); updateFriendCount(); helloAgain();
+    beep(392, 0.25, 'triangle', 0.08); setTimeout(() => beep(587, 0.25, 'triangle', 0.08), 180); setTimeout(() => beep(784, 0.25, 'triangle', 0.09), 360); setTimeout(() => beep(1175, 0.7, 'triangle', 0.1), 540);
+    const t = S.totsuOf(friends[g.id]);
+    $('rewardWeek').textContent = '✨ 神';
+    $('rewardTitle').textContent = n ? `${g.name}が${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}になった！` : `${g.name}の封印がとけた！`;
+    $('rewardSub').textContent = n ? `HP・攻撃 +${Math.round(t * S.TOTSU_STEP * 100)}%` : `神の${g.name}がお友達になった！ 必殺技「${g.ultName}」が使える`;
+    $('rewardPrizes').innerHTML = `<img class="unseal-img god-img" src="${artUrl('yokai/' + g.id) || ''}" alt="">`;
+    $('btnRewardOk').onclick = () => { show('zukan'); renderZukan(); };
+    show('rewardScreen');
   }
   // ---------- レジェンド（封印をとく） ----------
   function renderLegends() {
@@ -693,7 +756,7 @@
     catch (e) { $('saveMsg').style.color = '#ff8080'; $('saveMsg').textContent = e.message; return; }
     const n = Object.keys(data.friends).length;
     if (!confirm(`お友達${n}体のデータを読み込みます。\nこの端末の今のデータは上書きされます。よろしいですか？`)) return;
-    friends = data.friends; stats = data.stats; stats.seals = data.seals;
+    friends = data.friends; stats = data.stats; stats.seals = data.seals; stats.gods = data.gods;
     levels = data.levels; stats.expStock = data.expStock;
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
@@ -1103,7 +1166,7 @@
     renderFriendTabs();
     renderYokaiInfo();
     const el = $('friends');
-    const list = friendTab === 'own' ? S.LEGENDS.filter(y => friends[y.id]).concat(S.YOKAI.filter(y => friends[y.id])) : S.YOKAI.filter(y => y.rank === friendTab);
+    const list = friendTab === 'own' ? S.GODS.filter(y => friends[y.id]).concat(S.LEGENDS.filter(y => friends[y.id]), S.YOKAI.filter(y => friends[y.id])) : S.YOKAI.filter(y => y.rank === friendTab);
     // 中身が同じなら作り直さずに「えらんでいる」印だけ動かす（絵を170体ぶん作り直すと重い）
     const sig = friendTab + '|' + list.map(y => `${y.id}:${countOf(y.id)}:${lvOfId(y.id)}`).join(',');
     if (el.dataset.sig === sig && el.children.length) { for (const d of el.children) d.classList.toggle('sel', d.dataset.id === selYokai); return; }
@@ -1113,7 +1176,7 @@
     for (const y of list) {
       const owned = countOf(y.id);
       const d = document.createElement('div');
-      d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '');
+      d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '') + (y.god ? ' god' : '');
       d.dataset.id = y.id;
       d.innerHTML = owned
         ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
@@ -1161,6 +1224,14 @@
     }
     result.newTitles = mine ? titlesDone().filter(id => !titlesBefore.includes(id)) : [];
     // レジェンドの封印の欠片
+    // 神の欠片と神の試練（条件を満たした人だけが知る）
+    result.godNote = null;
+    if (mine && mine.god && godReady()) {
+      stats.gods.frag += mine.god.frag;
+      const cleared = mine.god.trials.filter(id => S.YOKAI_BY_ID[id]?.god);
+      for (const id of cleared) stats.gods.tr[id] = (stats.gods.tr[id] || 0) + 1;
+      result.godNote = [`⚡ 神の欠片を${mine.god.frag}個ゲット！（${stats.gods.frag}個）`, ...cleared.map(id => `✨ ${S.YOKAI_BY_ID[id].name}の試練をクリア！`)].join('　');
+    }
     result.sealNote = null;
     if (mine && mine.seal) {
       const sl = (stats.seals[mine.seal.legend] = stats.seals[mine.seal.legend] || { frag: 0 });
@@ -1298,6 +1369,7 @@
     if (result.shin && !result.shin.down) notes.push(esc('目覚めた鬼神・真からは生きのびた…'));
     if (result.bonus) notes.push(esc(result.bonus.down ? `💥 乱入してきた${S.BOSSES[result.bonus.type].name}もたおした！` : `乱入してきた${S.BOSSES[result.bonus.type].name}からは生きのびた…`));
     if (result.sealNote) notes.push(esc(result.sealNote));
+    if (result.godNote) notes.push(esc(result.godNote));
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
     $('resUnlock').hidden = !notes.length;
     $('resUnlock').innerHTML = notes.join('<br>');
@@ -1365,6 +1437,9 @@
         beep(220, 0.5, 'sawtooth', 0.08, 600); setTimeout(() => beep(660, 0.4, 'triangle', 0.07, 900), 120);
         if (ev.kind === 'roar') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 480 * (0.5 + k * 0.25), c: ['#ff4a4a', '#ffb83a', '#fff'][k], t: 0.7 + k * 0.15, max: 0.7 + k * 0.15 });
         if (ev.kind === 'dragon') fx.push({ k: 'dragon', x: ev.x, y: ev.y, a: ev.a, t: 1.0, max: 1.0 });
+        if (ev.kind === 'tenrai') { shake = Math.max(shake, 0.6); for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 500 * (0.5 + k * 0.3), c: ['#fff27a', '#7ab8ff', '#fff'][k], t: 0.5 + k * 0.15, max: 0.5 + k * 0.15 }); }
+        if (ev.kind === 'mend' || ev.kind === 'sunboat') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 260 * (0.5 + k * 0.3), c: ev.kind === 'mend' ? ['#7dffd8', '#bfffe8', '#fff'][k] : ['#ffd23a', '#ff9a2a', '#fff'][k], t: 0.6 + k * 0.15, max: 0.6 + k * 0.15 });
+        if (ev.kind === 'gungnir') shake = Math.max(shake, 0.5);
         break;
       }
       case 'ring': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: ev.r, c: ev.c, t: 0.4, max: 0.4 }); break;
@@ -1884,12 +1959,28 @@
     if (p.jump) ctx.translate(0, -p.jump * 70); // 大ジャンプ中は浮く
     if (p.au || p.su) { ctx.fillStyle = 'rgba(255,200,60,0.22)'; ctx.beginPath(); ctx.arc(0, -10, 38 + Math.sin(performance.now() / 120) * 3, 0, Math.PI * 2); ctx.fill(); }
     if (me) { ctx.strokeStyle = '#ffe36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 27, 0, Math.PI * 2); ctx.stroke(); }
+    if (y.god) { // 神は金と白に光り、光線が回る
+      const t = performance.now() / 1000;
+      ctx.save(); ctx.globalAlpha *= 0.5;
+      const g = ctx.createRadialGradient(0, -14, 8, 0, -14, 56);
+      g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.6, 'rgba(255,214,70,0.45)'); g.addColorStop(1, 'rgba(255,214,70,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -14, 56, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 3;
+      for (let k = 0; k < 8; k++) { const a = t * 0.8 + k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 34, -14 + Math.sin(a) * 34); ctx.lineTo(Math.cos(a) * 54, -14 + Math.sin(a) * 54); ctx.stroke(); }
+      ctx.restore();
+    }
     if (y.legend) { // レジェンドは虹色に光る
       ctx.save(); ctx.globalAlpha *= 0.35;
       ctx.fillStyle = `hsl(${(performance.now() / 8) % 360},90%,60%)`;
       ctx.beginPath(); ctx.arc(0, -14, 44 + Math.sin(performance.now() / 150) * 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
-    if (p.nyoi != null) { // 如意棒のなぎはらい
+    if (p.nyoi != null && p.nk) { // オニガミ: 地獄の大なぎ払い（赤と金の長い光線）
+      ctx.save(); ctx.rotate(p.nyoi); ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = '#ff3a1a'; ctx.lineWidth = 70; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(900, -10); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 30; ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.stroke();
+      ctx.restore();
+    } else if (p.nyoi != null) { // 如意棒のなぎはらい
       ctx.save(); ctx.rotate(p.nyoi); ctx.lineCap = 'round';
       ctx.strokeStyle = '#3a0a0a'; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(520, -10); ctx.stroke();
       ctx.strokeStyle = '#d8241a'; ctx.lineWidth = 18; ctx.stroke();
@@ -1905,7 +1996,7 @@
     if (img) {
       ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(0, 16, 20, 7, 0, 0, Math.PI * 2); ctx.stroke();
-      drawSprite(img, 0, 16, y.legend ? 96 : 80, Math.cos(p.face) < 0);
+      drawSprite(img, 0, 16, y.legend || y.god ? 96 : 80, Math.cos(p.face) < 0);
     } else {
       ctx.fillStyle = y.color;
       ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
@@ -1957,6 +2048,23 @@
         ctx.globalAlpha = Math.min(1, ph * 3) * 0.9;
         ctx.fillStyle = k % 3 ? '#ff9ad8' : '#7af07a';
         ctx.beginPath(); ctx.ellipse(px, py, 6, 3, now * 3 + k, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore(); return;
+    }
+    if (z.shape === 'sun') { // 太陽の船: 太陽の炎がまわりを焼く
+      const g = ctx.createRadialGradient(z.x, z.y, 10, z.x, z.y, z.r);
+      g.addColorStop(0, 'rgba(255,250,200,0.5)'); g.addColorStop(0.6, 'rgba(255,190,40,0.25)'); g.addColorStop(1, 'rgba(255,120,20,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,214,70,0.85)'; ctx.lineWidth = 4;
+      for (let k = 0; k < 12; k++) { const a = now * 1.2 + k * Math.PI / 6; ctx.beginPath(); ctx.moveTo(z.x + Math.cos(a) * z.r * 0.55, z.y + Math.sin(a) * z.r * 0.55); ctx.lineTo(z.x + Math.cos(a) * z.r, z.y + Math.sin(a) * z.r); ctx.stroke(); }
+      ctx.restore(); return;
+    }
+    if (z.shape === 'tandava') { // 破壊の舞: 青黒い炎の輪がまわる
+      ctx.fillStyle = 'rgba(60,40,140,0.18)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill();
+      for (let k = 0; k < 16; k++) {
+        const a = now * 3 + k * Math.PI / 8, rr = z.r * (0.7 + 0.25 * Math.sin(now * 6 + k));
+        ctx.fillStyle = k % 2 ? 'rgba(120,90,255,0.8)' : 'rgba(80,200,255,0.7)';
+        ctx.beginPath(); ctx.ellipse(z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr * 0.8, 14, 26, a, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore(); return;
     }

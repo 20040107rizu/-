@@ -84,6 +84,7 @@
   "yokai/jackalope": "yokai/jackalope.png?h=cdd1c12b",
   "yokai/jerseydevil": "yokai/jerseydevil.png?h=05299966",
   "yokai/jinn": "yokai/jinn.png?h=a9f66bc2",
+  "yokai/joka": "yokai/joka.png?h=20e37a9e",
   "yokai/jormungand": "yokai/jormungand.png?h=9e4ba34f",
   "yokai/jorogumo": "yokai/jorogumo.png?h=020ba4ad",
   "yokai/kabuton": "yokai/kabuton.png?h=ebbf3d7a",
@@ -138,7 +139,9 @@
   "yokai/nurarihyon": "yokai/nurarihyon.png?h=36270754",
   "yokai/nurikabe": "yokai/nurikabe.png?h=f9419b93",
   "yokai/oberon": "yokai/oberon.png?h=5cc7778c",
+  "yokai/odin": "yokai/odin.png?h=afccbc11",
   "yokai/oni_child": "yokai/oni_child.png?h=07168dfc",
+  "yokai/onigami": "yokai/onigami.png?h=328e51d4",
   "yokai/ootengu": "yokai/ootengu.png?h=f9be41b5",
   "yokai/orochi": "yokai/orochi.png?h=7487f783",
   "yokai/phoenix": "yokai/phoenix.png?h=d9a67f13",
@@ -146,6 +149,7 @@
   "yokai/pixiu": "yokai/pixiu.png?h=b0e52341",
   "yokai/pumpkin": "yokai/pumpkin.png?h=fa2c1a59",
   "yokai/quetzal": "yokai/quetzal.png?h=1fc61cf2",
+  "yokai/ra": "yokai/ra.png?h=7f71d656",
   "yokai/raiden": "yokai/raiden.png?h=e3d5f5a0",
   "yokai/raijin": "yokai/raijin.png?h=7940e455",
   "yokai/raiju": "yokai/raiju.png?h=ec35c0a6",
@@ -157,6 +161,7 @@
   "yokai/seiryu": "yokai/seiryu.png?h=757e9ebb",
   "yokai/selkie": "yokai/selkie.png?h=8684b31d",
   "yokai/shisa": "yokai/shisa.png?h=7e6d5323",
+  "yokai/shiva": "yokai/shiva.png?h=90b7c765",
   "yokai/shoki": "yokai/shoki.png?h=5b745e1a",
   "yokai/shuten": "yokai/shuten.png?h=c8388215",
   "yokai/sleipnir": "yokai/sleipnir.png?h=4b0a443e",
@@ -193,5 +198,6 @@
   "yokai/yeti": "yokai/yeti.png?h=146a6432",
   "yokai/yukijo": "yokai/yukijo.png?h=424d50be",
   "yokai/yukinko": "yokai/yukinko.png?h=a97a5529",
-  "yokai/zashiko": "yokai/zashiko.png?h=5a3f6ba6"
+  "yokai/zashiko": "yokai/zashiko.png?h=5a3f6ba6",
+  "yokai/zeus": "yokai/zeus.png?h=cf1b4a24"
 }

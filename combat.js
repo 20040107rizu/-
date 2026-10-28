@@ -21,7 +21,7 @@ function rayLen(map, x, y, a, max) {
 }
 
 // ---------- 当てる ----------
-function dmgMul(p) { return p.atkUpT > 0 ? 1.3 : 1; }
+function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1); } // シヴァ: 体力が減るほど強い
 
 const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
@@ -29,6 +29,10 @@ function hit(room, p, e, amount, el) {
   room.damageOni(p, e, amount);
   if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1)); // 必殺技の効果中はたまらない
   if (el) applyElement(room, p, e, amount, el);
+  if (p && p.passive === 'shock' && e.hp > 0 && Math.random() < 0.12 && !(room.time < (e.stunReadyAt || 0))) { // ゼウス: ときどきしびれさせる
+    e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 1 : 0.4);
+    if (!e.isPatrol) e.stunReadyAt = room.time + 4;
+  }
   return amount;
 }
 function applyElement(room, p, e, amount, el) {
@@ -235,7 +239,7 @@ function ultimate(room, p, aim) {
   const L = S.YOKAI_BY_ID[p.yokai], el = L.el, c = color(el);
   const P = 30 * p.stats.strongMul * dmgMul(p);
   p.ult = 0;
-  p.ultBusyUntil = room.time + ({ parade: 4, nyoi: 10, dragon: 6, forest: 8, dive: 3 }[L.ult] || 0);
+  p.ultBusyUntil = room.time + ({ parade: 4, nyoi: 10, dragon: 6, forest: 8, dive: 3, hellsweep: 2, sunboat: 6, tandava: 6 }[L.ult] || 0);
   room.events.push({ k: 'ult', id: p.id, kind: L.ult, name: L.ultName, x: R(p.x), y: R(p.y), a: +aim.toFixed(2), c });
   switch (L.ult) {
     case 'roar': // 鬼王の咆哮: まわりの鬼をしびれさせて大ダメージ
@@ -266,6 +270,34 @@ function ultimate(room, p, aim) {
     case 'dive': // 夜空の急降下: ボス（いなければ近くの鬼）に5回
       p.diveLeft = 5; p.diveDmg = P * 1.6;
       nextDive(room, p);
+      break;
+    // ---- 神の必殺技 ----
+    case 'hellsweep': // 地獄の大なぎ払い: 長い光線がぐるりと1周（如意棒と同じ動き）
+      p.nyoi = { t: 0, dur: 1.2, a0: aim, len: 900, dmg: P * 4.5, hits: new Set(), sweep: true };
+      break;
+    case 'tenrai': // 天の雷: 町じゅうの鬼に雷＋しびれ
+      for (const e of enemiesInCircle(room, p.x, p.y, 1600)) {
+        hit(room, p, e, P * 3, el);
+        if (e.hp > 0) { e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 2.5 : 1.5); if (!e.isPatrol) e.stunReadyAt = room.time + 5; }
+        room.events.push({ k: 'bolt', x: R(e.x), y: R(e.y), c: '#fff27a', big: true });
+      }
+      break;
+    case 'gungnir': // グングニル: 町をつらぬく巨大な槍
+      beam(room, p, aim, 1400, 100, P * 7, el, { big: true });
+      break;
+    case 'sunboat': // 太陽の船: みんな大回復＋まわりを焼く
+      for (const q of room.activePlayers()) room.healPlayer(q, q.maxHp * 0.6);
+      zone(room, p, p.x, p.y, 320, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.5, every: 0.35, el, c, shape: 'sun' });
+      break;
+    case 'mend': // 天のつくろい: 倒れた仲間を全員起こす＋回復
+      for (const q of room.players.values()) {
+        if (q.escaped) continue;
+        if (q.down) { q.down = false; q.hp = q.maxHp * 0.5; q.reviveProg = 0; q.invulT = 2; room.events.push({ k: 'ring', x: R(q.x), y: R(q.y), r: 140, c: '#7dffd8' }); }
+        else room.healPlayer(q, q.maxHp * 0.3);
+      }
+      break;
+    case 'tandava': // 破壊の舞: まわりで舞いつづけて何度も大ダメージ
+      zone(room, p, p.x, p.y, 290, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.8, every: 0.35, el, c, shape: 'tandava' });
       break;
   }
 }

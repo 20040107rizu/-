@@ -229,6 +229,13 @@ function aura(kit, rank, glowC) {
     const p = (ang, r) => `${(128 + Math.cos(ang) * r).toFixed(1)} ${(134 + Math.sin(ang) * r * 1.05).toFixed(1)}`;
     return `<path d="M${p(a - w, r0)} Q${p(a - w * 0.3, r1 * 0.85)} ${p(a + w * 0.4, r1)} Q${p(a + w * 0.2, r1 * 0.8)} ${p(a + w, r0)}Z" fill="${col}" opacity="${op}"/>`;
   }).join('');
+  if (rank === 'G') { // 神: 白と金の光、するどい光線、二重の光輪
+    const rays = Array.from({ length: 24 }, (_, i) => { const a = (i / 24) * Math.PI * 2, w = i % 2 ? 0.035 : 0.06, r1 = i % 2 ? 104 : 128;
+      const p = (ang, r) => `${(128 + Math.cos(ang) * r).toFixed(1)} ${(128 + Math.sin(ang) * r).toFixed(1)}`;
+      return `<path d="M${p(a - w, 40)} L${p(a, r1)} L${p(a + w, 40)}Z" fill="${i % 2 ? '#ffffff' : '#ffd23a'}" opacity="${i % 2 ? 0.55 : 0.75}"/>`; }).join('');
+    return `<circle cx="128" cy="128" r="127" fill="${kit.grad([[0.2, '#ffffff', 1], [0.5, '#fff2b0', 0.75], [0.8, '#ffd23a', 0.35], [1, '#ffffff', 0]])}"/>${rays}`
+      + `<circle cx="128" cy="128" r="116" fill="none" stroke="#ffd23a" stroke-width="4" opacity="0.95"/><circle cx="128" cy="128" r="106" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="3 7" opacity="0.9"/>`;
+  }
   if (rank === 'L') {
     const rainbow = ['#ff4a4a', '#ff9a2a', '#ffe24a', '#4ae07a', '#3ac8ff', '#6a6aff', '#c85aff'];
     const multi = (n, r0, r1, op) => Array.from({ length: n }, (_, i) => flames(n, r0, r1, rainbow[i % rainbow.length], op).split('/>')[i] + '/>').join('');
@@ -323,13 +330,16 @@ const BODY = {
   human(kit, L, c, rnd) {
     const pale = L.skin === 'pale';
     const skin = L.skin === 'c' ? light(c, 0.1) : pale ? '#eef4f8' : ['#f2dcc8', '#e8c8a8', '#c89068', '#9a6a4a'][Math.floor(rnd() * 4)];
-    const hc = pale ? '#1a1a2a' : lum(c) > 0.75 ? '#1e1626' : ['#1e1626', '#3a2420', dark(c, 0.55), '#e8e4f0'][Math.floor(rnd() * 4)];
+    const hc = L.beard ? '#eceaf4' : pale ? '#1a1a2a' : lum(c) > 0.75 ? '#1e1626' : ['#1e1626', '#3a2420', dark(c, 0.55), '#e8e4f0'][Math.floor(rnd() * 4)];
     const robe = L.skin === 'c' ? dark(c, 0.55) : pale ? '#f2f8ff' : c;
     const trim = pale ? '#8ad8ff' : lum(robe) > 0.6 ? '#2a1a2a' : '#f4ecd8';
     const bodyP = humanoidBody(kit, L, c, rnd, { robe, trim, skin, scarfC: lum(c) > 0.5 ? '#c8242a' : light(c, 0.3), obi: pale ? '#6ab8ff' : undefined });
     const h = humanHead(kit, L, c, rnd, skin, hc);
     h.head.kuma = L.skin === 'c' ? null : (L.eyes === 'angry' || rnd() < 0.4) ? '#d8243a' : null;
-    if (L.role === 'ranger' && L.nose !== 'long') {
+    if (L.beard) { // 白いひげ（ゼウス）
+      h.front += kit.cel('M96 104 Q100 120 108 140 Q118 160 128 172 Q138 160 148 140 Q156 120 160 104 Q146 118 128 118 Q110 118 96 104Z', '#eceaf4', { dx: 4, dy: 3 });
+      h.head.kuma = null;
+    } else if (L.role === 'ranger' && L.nose !== 'long') {
       h.front += kit.cel('M98 104 Q128 98 158 104 L156 116 Q144 126 128 132 Q112 126 100 116Z', '#22202a', { dx: 3, dy: 2, thin: true });
       h.head.noMouth = true; h.head.kuma = null;
     }

@@ -496,3 +496,12 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .lv-pname { font-weight: bold; }
 .lv-confirm .lv-btns { justify-content: center; }
 .lv-confirm .lv-btns button { min-width: 110px; font-size: 14px; padding: 8px 12px; }
+
+/* 神（隠し） */
+.yk.god { background: linear-gradient(#4a3a14, #1e1608); border-color: #ffd23a99; box-shadow: inset 0 0 14px #ffd23a33; }
+.yk.god.sel { border-color: #fff; }
+.god-tab { border-color: #ffd23a !important; background: linear-gradient(#5a4614, #2a1e08) !important; }
+.god-face { filter: drop-shadow(0 0 12px #ffd23a); }
+.god-name { background: linear-gradient(90deg, #fff, #ffd23a, #fff2b0, #ffd23a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.god-box { border-color: #ffd23a !important; }
+.god-img { filter: drop-shadow(0 0 22px #ffd23a); }
