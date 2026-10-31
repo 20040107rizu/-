@@ -577,7 +577,7 @@
   // ---------- 週替わりランキング ----------
   let rankData = null;
   async function loadRanking(week) {
-    const r = await fetch(`ranking?pid=${encodeURIComponent(pid)}${week != null ? `&week=${week}` : ''}`, { cache: 'no-store' }); // 第1回は 0 なので != null で見る
+    const r = await fetch(`ranking?pid=${encodeURIComponent(pid)}${week != null ? `&week=${week}` : ''}`, { cache: 'no-cache' }); // 第1回は 0 なので != null で見る
     if (!r.ok) throw new Error(r.status);
     return r.json();
   }
@@ -855,7 +855,7 @@
     bar.classList.toggle('show', updateReady && !busy);
   }
   function checkVersion() {
-    fetch('version', { cache: 'no-store' }).then(r => r.json()).then(info => {
+    fetch('version', { cache: 'no-cache' }).then(r => r.json()).then(info => {
       if (!loadedVersion) {
         loadedVersion = info.v;
         // 古い版が残っていたら、タイトル画面にいるうちに自動で新しい版にする（1回だけ）

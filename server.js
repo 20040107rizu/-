@@ -61,16 +61,14 @@ function whatsNew() {
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/version') {
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify({ v: VERSION, ...whatsNew() }));
+    return sendJSON(req, res, { v: VERSION, ...whatsNew() });
   }
   // 週替わりランキング: /ranking?pid=...&week=prev（先週）／week=3（第4回。終わった週の結果も見られる）
   if (urlPath === '/ranking') {
     const q = new URL(req.url, 'http://x').searchParams, w = q.get('week'), cur = S.weekIndex();
     const idx = w === 'prev' ? cur - 1 : /^\d{1,4}$/.test(w || '') ? Math.min(cur, +w) : cur;
     Ranking.board(idx, cleanPid(q.get('pid'))).then(b => {
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify(b));
+      sendJSON(req, res, b);
     }, e => { console.error(e); res.writeHead(500); res.end('{}'); });
     return;
   }
@@ -91,6 +89,16 @@ const server = http.createServer((req, res) => {
     res.end(gz ? f.gz : f.data);
   });
 });
+// 1分ごとに見に来る JSON（版の確認・ランキング）: 変わっていなければ 304 で中身を送らない。送るときは圧縮
+function sendJSON(req, res, obj) {
+  const body = Buffer.from(JSON.stringify(obj)), etag = '"' + crypto.createHash('sha1').update(body).digest('base64').slice(0, 20) + '"';
+  const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ETag: etag, Vary: 'Accept-Encoding' };
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
+  const gz = body.length > 512 && /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+  if (gz) headers['Content-Encoding'] = 'gzip';
+  res.writeHead(200, headers);
+  res.end(gz ? zlib.gzipSync(body) : body);
+}
 // ファイルの中身・圧縮版・ETag を覚えておく（ファイルが書きかわったら読み直す）
 const fileCache = new Map();
 function loadFile(filePath, cb) {
@@ -1498,14 +1506,19 @@ function friendList() {
     };
   });
 }
-function sendFriends(ws, list = friendList()) {
+// フレンド一覧は3秒ごとに確かめるが、変わったときだけ送る（変わらなくても1分に1回は送って「◯分前」を新しくする）
+function sendFriends(ws, list = friendList(), force = true) {
   const me = presence.get(ws);
-  if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'friends', list: list.filter(f => f.pid !== me), now: Date.now() }));
+  if (ws.readyState !== 1) return;
+  const mine = list.filter(f => f.pid !== me), key = JSON.stringify(mine), now = Date.now();
+  if (!force && key === ws.lastFriends && now - (ws.lastFriendsT || 0) < 60000) return;
+  ws.lastFriends = key; ws.lastFriendsT = now;
+  ws.send(JSON.stringify({ t: 'friends', list: mine, now }));
 }
 setInterval(() => {
   if (!presence.size) return;
   const list = friendList();
-  for (const ws of presence.keys()) sendFriends(ws, list);
+  for (const ws of presence.keys()) sendFriends(ws, list, false);
 }, 3000);
 
 // ---------- 更新時の入れ替え ----------
