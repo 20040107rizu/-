@@ -38,8 +38,8 @@
   const totsuOf = count => Math.max(0, Math.min(TOTSU_MAX, (count | 0) - 1));
   // 完凸（6体）よりあふれた分は経験値ストックに変わる（ランクごとの量）
   const FULL_COUNT = TOTSU_MAX + 1, OVER_EXP = { C: 100, B: 300, A: 1000, S: 3000 };
-  // ---- お友達レベル（経験値ストックを使って上げる。Lv1 が今までの強さ、1レベルごとに HP・攻撃 +0.3%） ----
-  const LV_MAX = 99, LV_STEP = 0.003;
+  // ---- お友達レベル（経験値ストックを使って上げる。Lv1 が今までの強さ、1レベルごとに HP・攻撃 +0.8%） ----
+  const LV_MAX = 99, LV_STEP = 0.008;
   // そのレベルになるのに必要な経験値の合計（はじめはすぐ上がり、あとほど重い。Lv50 で約3万、Lv99 で約15万）
   const expForLv = lv => Math.round(3.6 * Math.pow(Math.max(0, lv - 1), 2.32));
   function lvOf(exp) {
