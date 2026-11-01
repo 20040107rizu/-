@@ -1156,7 +1156,8 @@ class Room {
       if (!p.down || p.escaped) continue;
       const helpers = this.activePlayers().filter(q => q !== p && dist(p, q) < REVIVE_RANGE);
       const helper = helpers.length > 0;
-      if (helper) p.reviveProg += DT * (helpers.some(q => q.passive === 'reviver') ? 2 : 1); // メリュジーヌ: 起こす速さ2倍 else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
+      if (helper) p.reviveProg += DT * (helpers.some(q => q.passive === 'reviver') ? 2 : 1); // メリュジーヌ: 起こす速さ2倍
+      else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
       if (p.reviveProg >= REVIVE_TIME) {
         p.down = false; p.hp = p.maxHp * 0.4; p.reviveProg = 0; p.invulT = 2;
         for (const q of this.activePlayers()) if (q !== p && dist(p, q) < REVIVE_RANGE) q.revives++; // 起こした人に記録

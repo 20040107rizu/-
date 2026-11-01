@@ -239,7 +239,7 @@ function ultimate(room, p, aim) {
   const L = S.YOKAI_BY_ID[p.yokai], el = L.el, c = color(el);
   const P = 30 * p.stats.strongMul * dmgMul(p);
   p.ult = 0;
-  p.ultBusyUntil = room.time + ({ parade: 4, nyoi: 10, dragon: 6, forest: 8, dive: 3, hellsweep: 2, sunboat: 6, tandava: 6 }[L.ult] || 0);
+  p.ultBusyUntil = room.time + ({ parade: 6, nyoi: 10, dragon: 8, forest: 8, dive: 3, hellsweep: 2, sunboat: 6, tandava: 6 }[L.ult] || 0);
   room.events.push({ k: 'ult', id: p.id, kind: L.ult, name: L.ultName, x: R(p.x), y: R(p.y), a: +aim.toFixed(2), c });
   switch (L.ult) {
     case 'roar': // 鬼王の咆哮: まわりの鬼をしびれさせて大ダメージ
@@ -248,18 +248,20 @@ function ultimate(room, p, aim) {
         e.stunT = Math.max(e.stunT || 0, 3);
         if (!e.isPatrol) e.stunReadyAt = room.time + 5;
       }
+      for (const q of room.activePlayers()) { q.atkUpT = Math.max(q.atkUpT || 0, 6); room.events.push({ k: 'buff', id: q.id }); } // 鬼の王の号令: みんなの攻撃アップ
       break;
-    case 'parade': // 百鬼夜行: 幻の妖怪たちがまわりを攻撃＋みんな大回復
-      zone(room, p, p.x, p.y, 380, 4, { kind: 'dmg', follow: p.id, tickDmg: P * 0.6, every: 0.4, el, c, shape: 'parade' });
+    case 'parade': // 百鬼夜行: 幻の妖怪たちがまわりを攻撃＋みんな大回復＋まわりで倒れている仲間を起こす
+      zone(room, p, p.x, p.y, 380, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.6, every: 0.4, el, c, shape: 'parade' });
       for (const q of room.activePlayers()) room.healPlayer(q, q.maxHp * 0.5);
+      for (const q of room.players.values()) if (q.down && !q.escaped && dist(q, p) <= 380) { q.down = false; q.hp = q.maxHp * 0.3; q.reviveProg = 0; q.invulT = 2; room.events.push({ k: 'revive', id: q.id }); }
       break;
     case 'nyoi': // 如意棒: ぐるりとなぎはらう＋分身2体
-      p.nyoi = { t: 0, dur: 0.8, a0: aim, len: 520, dmg: P * 3, hits: new Set() };
-      for (const side of [-1, 1]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 10, t: 0.3, dmg: P * 0.5, el, c, clone: p.yokai, follow: side });
+      p.nyoi = { t: 0, dur: 0.8, a0: aim, len: 520, dmg: P * 3.9, hits: new Set() };
+      for (const side of [-1, 1]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 10, t: 0.3, dmg: P * 0.8, el, c, clone: p.yokai, follow: side });
       break;
-    case 'dragon': // 竜の泉: 水の竜がまっすぐのみこむ＋回復の泉
+    case 'dragon': // 竜の泉: 水の竜がまっすぐのみこむ＋回復の泉（倒れた仲間を泉に入れると早く起きる）
       beam(room, p, aim, 760, 110, P * 4, el, { big: true });
-      zone(room, p, p.x, p.y, 170, 6, { amt: 7, every: 0.5, c: '#7dd8ff', shape: 'spring' });
+      zone(room, p, p.x, p.y, 170, 8, { amt: 12, every: 0.5, c: '#7dd8ff', shape: 'spring', revive: true });
       break;
     case 'forest': // 森のまどわし: 8秒だれも見つからない＋花の矢の雨
       for (const q of room.activePlayers()) q.invisT = Math.max(q.invisT, 8);
@@ -268,7 +270,7 @@ function ultimate(room, p, aim) {
       zone(room, p, p.x, p.y, 320, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.4, every: 0.3, el, c, shape: 'petals' });
       break;
     case 'dive': // 夜空の急降下: ボス（いなければ近くの鬼）に5回
-      p.diveLeft = 5; p.diveDmg = P * 1.6;
+      p.diveLeft = 6; p.diveDmg = P * 2.6;
       nextDive(room, p);
       break;
     // ---- 神の必殺技 ----
@@ -457,6 +459,7 @@ function updateEffects(room) {
       z.tick = z.every || 0.5;
       if (z.kind === 'dmg' && owner) hitCircle(room, owner, z.x, z.y, z.r, z.tickDmg, z.el);
       else if (z.kind !== 'dmg' && z.kind !== 'mark') for (const q of room.activePlayers()) if (dist(q, z) <= z.r) room.healPlayer(q, z.amt);
+      if (z.revive) for (const q of room.players.values()) if (q.down && !q.escaped && dist(q, z) <= z.r + 20) q.reviveProg += (z.every || 0.5) * 2; // 泉の中だと3倍の速さで起きる
     }
     if (z.life <= 0 && z.endBoom && owner) {
       hitCircle(room, owner, z.x, z.y, z.r, z.endBoom, z.el);
