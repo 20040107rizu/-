@@ -943,13 +943,24 @@
     $('err').textContent = msg;
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tryRejoin(); });
+  // サーバーから届く圧縮メッセージ（deflate-raw）を読めるか（古い端末は圧縮なしで受け取る）
+  const CAN_ZIP = typeof DecompressionStream === 'function' && (() => { try { new DecompressionStream('deflate-raw'); return true; } catch { return false; } })();
+  const unzip = buf => new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
   function openSocket(first) {
     const name = $('name').value.trim() || 'プレイヤー';
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     watcher = first.t === 'watch';
-    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), lv: myLv(), title: myTitle });
-    ws.onmessage = e => onMessage(JSON.parse(e.data));
-    ws.onclose = () => {
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), lv: myLv(), title: myTitle, zip: CAN_ZIP ? 1 : undefined });
+    // 圧縮されたメッセージ（バイナリ）は戻してから読む。順番が入れかわらないように、1つずつ順に処理する
+    let rx = Promise.resolve();
+    ws.onmessage = e => {
+      const d = e.data;
+      rx = rx.then(() => (typeof d === 'string' ? d : unzip(d))).then(t => onMessage(JSON.parse(t))).catch(err => console.error(err));
+    };
+    const sock = ws;
+    ws.onclose = () => rx.then(() => { // 届いていたメッセージ（結果など）を先に読んでから
+      if (ws !== sock) return; // もう新しい接続に切りかわっている
       ws = null;
       // 試合が終わったあと（ガチャ・結果画面）なら、そのまま見られるようにする
       if (result && ($('gacha').classList.contains('active') || $('result').classList.contains('active'))) {
@@ -965,14 +976,14 @@
       show('title');
       $('err').textContent = serverUpdating ? 'サーバーが更新されました。もう一度ルームを作ってね' : '接続が切れました';
       if (serverUpdating) checkVersion();
-    };
+    });
   }
 
   function onMessage(m) {
     switch (m.t) {
       case 'error':
         $('err').textContent = m.msg;
-        ws.onclose = null; ws.close(); ws = null;
+        if (ws) { ws.onclose = null; ws.close(); ws = null; }
         if (m.rejoinFailed) { giveUpRejoin(m.msg); break; }
         if (watcher || $('buddyScreen').classList.contains('active')) { $('buddyMsg').textContent = m.msg; if (watcher) { watcher = false; snap = null; show('buddyScreen'); } }
         break;

@@ -294,10 +294,17 @@ class Room {
     this.watchers = new Set(); // 観戦している人の接続
   }
 
+  // Render は WebSocket の圧縮（permessage-deflate）を通さないので、大きいメッセージはゲーム側で圧縮して送る（約1/4）
   broadcast(msg) {
     const data = JSON.stringify(msg);
-    for (const p of this.players.values()) if (p.ws.readyState === 1) { p.ws.send(data); load.bytes += data.length; }
-    for (const w of this.watchers) if (w.readyState === 1) { w.send(data); load.bytes += data.length; }
+    let zipped = null;
+    const out = ws => {
+      if (ws.readyState !== 1) return;
+      if (ws.zip && data.length > 400) { zipped = zipped || zlib.deflateRawSync(data, { level: 6 }); ws.send(zipped); load.bytes += zipped.length; }
+      else { ws.send(data); load.bytes += data.length; }
+    };
+    for (const p of this.players.values()) out(p.ws);
+    for (const w of this.watchers) out(w);
   }
 
   // 途中から観戦する人（つなぎ直した人）に、今のバトルの様子を送る
@@ -1309,6 +1316,7 @@ wss.on('connection', ws => {
   ws.on('message', raw => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
+    if (msg && msg.zip) ws.zip = true; // この人はゲーム側の圧縮（deflate-raw）を読める
 
     switch (msg.t) {
       case 'hello': { // ホーム画面にいる間つないでおく接続（フレンドの一覧用）
