@@ -63,6 +63,7 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/version') {
     return sendJSON(req, res, { v: VERSION, ...whatsNew() });
   }
+  if (urlPath === '/wsstats') return sendJSON(req, res, wsStats); // 圧縮が使えているかの確認用
   // 週替わりランキング: /ranking?pid=...&week=prev（先週）／week=3（第4回。終わった週の結果も見られる）
   if (urlPath === '/ranking') {
     const q = new URL(req.url, 'http://x').searchParams, w = q.get('week'), cur = S.weekIndex();
@@ -1293,7 +1294,10 @@ setInterval(() => {
   }
 }, +process.env.HEARTBEAT_MS || 30000);
 
+// 圧縮が使えているかの確認用（/wsstats）: 起動してからつながった数
+const wsStats = { deflate: 0, plain: 0 };
 wss.on('connection', ws => {
+  if (/permessage-deflate/.test(ws.extensions || '')) wsStats.deflate++; else wsStats.plain++;
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
   let room = null;
