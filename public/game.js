@@ -239,7 +239,7 @@
       <div><span class="st ${live.status}">${st}</span></div>
       <div>${fav ? '⭐ お気に入り' : 'いまのお友達'}：<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</span></div>
       ${self ? `<small class="fav-hint">右のお友達をタップすると、お気に入りにできます${fav ? '（もう一度タップではずす）' : ''}</small>` : ''}
-      ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　🌈 レジェンド ${legends.length}体` : ''}</dd>
+      ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　L レジェンド ${legends.length}体` : ''}</dd>
         <dt>遊んだ</dt><dd>${pr.s[0] || 0}回（脱出 ${pr.s[1] || 0}回）</dd>
         <dt>鬼玉</dt><dd>最高 ${pr.s[2] || 0}個・合計 ${(pr.s[3] || 0).toLocaleString('ja-JP')}個</dd>
         <dt>称号</dt><dd>${pr.tc || 0}個${(pr.wt || []).length ? `（限定 ${pr.wt.map(titleTag).join(' ')}）` : ''}</dd>
@@ -250,7 +250,7 @@
     if ($('profJoin')) $('profJoin').onclick = () => connect({ t: 'join', code: live.room });
     if ($('profWatch')) $('profWatch').onclick = () => connect({ t: 'watch', code: live.room });
     // 持っている妖怪
-    const tabs = [['all', 'ぜんぶ'], ['L', '🌈'], ['S', 'S'], ['A', 'A'], ['B', 'B'], ['C', 'C']];
+    const tabs = [['all', 'ぜんぶ'], ['L', 'L'], ['S', 'S'], ['A', 'A'], ['B', 'B'], ['C', 'C']];
     $('profTabs').innerHTML = pr ? tabs.map(([k, l]) => {
       const pool = k === 'all' ? S.YOKAI : k === 'L' ? S.LEGENDS : S.YOKAI.filter(q => q.rank === k);
       return `<button class="tab${profTab === k ? ' on' : ''}" data-k="${k}">${l} <small>${pool.filter(q => counts[q.id]).length}/${pool.length}</small></button>`;
@@ -313,7 +313,7 @@
     $('zukanTabs').innerHTML = [['all', 'ぜんぶ'], ['C', 'C'], ['B', 'B'], ['A', 'A'], ['S', 'S']].map(([k, label]) => {
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
-    }).join('') + `<button class="tab legend-tab${zukanRank === 'legend' ? ' on' : ''}" data-k="legend">🌈 レジェンド <small>${S.LEGENDS.filter(l => friends[l.id]).length}/${S.LEGENDS.length}</small></button>`
+    }).join('') + `<button class="tab legend-tab${zukanRank === 'legend' ? ' on' : ''}" data-k="legend"><span style="color:${S.RANKS.L.color}">L</span> レジェンド <small>${S.LEGENDS.filter(l => friends[l.id]).length}/${S.LEGENDS.length}</small></button>`
       + (godReady() ? `<button class="tab god-tab${zukanRank === 'god' ? ' on' : ''}" data-k="god">✨ 神 <small>${S.GODS.filter(g => friends[g.id]).length}/${S.GODS.length}</small></button>` : '')
       + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${titleTotal()}</small></button>`;
     $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
@@ -516,7 +516,7 @@
   function legendTotsuBox(l) {
     const lt = S.legendTotsu(l, friends), frag = (stats.seals[l.id] && stats.seals[l.id].frag) || 0;
     const next = Math.min(S.TOTSU_MAX, lt + 1), short = l.seal.filter(id => S.totsuOf(friends[id] || 0) < next).length;
-    return `<b>🌈 ${esc(l.name)}　${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</b>${lt ? `<small>（HP・攻撃 +${Math.round(lt * S.TOTSU_STEP * 100)}%）</small>` : ''}
+    return `<b>L ${esc(l.name)}　${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</b>${lt ? `<small>（HP・攻撃 +${Math.round(lt * S.TOTSU_STEP * 100)}%）</small>` : ''}
       <br><small>封印の8体が全員そろって凸すると、${esc(l.name)}も凸します${lt < S.TOTSU_MAX ? `（凸${next}まで：あと${short}体）` : ''}</small>
       <div class="mem">${l.seal.map(id => { const y = S.YOKAI_BY_ID[id], t = S.totsuOf(friends[id] || 0); return `<span class="got${t >= next && lt < S.TOTSU_MAX ? ' ok' : ''}">${y.name} ${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>`; }).join('')}</div>
       <div class="cond"><span class="cl">🔮 封印の欠片（${S.STAGES[l.stage].name}でボスを倒すともらえる）</span><span class="pg">${frag}個</span></div>
@@ -534,7 +534,7 @@
     const after = S.legendTotsu(l, friends), t = S.totsuOf(friends[id]);
     beep(660, 0.15, 'triangle', 0.07); setTimeout(() => beep(990, 0.25, 'triangle', 0.08), 140);
     if (after > before) { // レジェンドが凸した！
-      $('rewardWeek').textContent = '🌈 レジェンド';
+      $('rewardWeek').textContent = 'L レジェンド';
       $('rewardTitle').textContent = `${l.name}が${after >= S.TOTSU_MAX ? '凸MAX' : `凸${after}`}になった！`;
       $('rewardSub').textContent = `封印の8体が全員そろった！ HP・攻撃 +${Math.round(after * S.TOTSU_STEP * 100)}%`;
       $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + l.id) || ''}" alt="">`;
@@ -563,7 +563,7 @@
     stats.seals[l.id].frag -= S.SEAL.fragments; // 封印をとくのに欠片を使う（残りは封印ガチャに使える）
     saveAll(); updateFriendCount(); helloAgain();
     beep(523, 0.2, 'triangle', 0.08); setTimeout(() => beep(784, 0.2, 'triangle', 0.08), 150); setTimeout(() => beep(1046, 0.5, 'triangle', 0.09), 300);
-    $('rewardWeek').textContent = '🌈 レジェンド';
+    $('rewardWeek').textContent = 'L レジェンド';
     $('rewardTitle').textContent = `${l.name}の封印がとけた！`;
     $('rewardSub').textContent = `${l.name}がお友達になった！ ロビーで連れていけます`;
     $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + l.id) || ''}" alt="">`;
@@ -732,7 +732,7 @@
   const urlRoom = new URLSearchParams(location.search).get('room');
   if (urlRoom) $('code').value = urlRoom.toUpperCase();
   function updateFriendCount() {
-    $('friendCount').textContent = `お友達 ${S.YOKAI.filter(y => friends[y.id]).length} / ${S.YOKAI.length}` + (S.LEGENDS.some(l => friends[l.id]) ? `　🌈 ${S.LEGENDS.filter(l => friends[l.id]).length}` : '');
+    $('friendCount').textContent = `お友達 ${S.YOKAI.filter(y => friends[y.id]).length} / ${S.YOKAI.length}` + (S.LEGENDS.some(l => friends[l.id]) ? `　L ${S.LEGENDS.filter(l => friends[l.id]).length}` : '');
   }
   updateFriendCount();
 
@@ -1255,7 +1255,7 @@
       const firstTrial = mine.seal.trial && !sl.trial;
       if (mine.seal.trial) sl.trial = true;
       result.sealNote = [mine.seal.frag ? `🔮 封印の欠片を${mine.seal.frag}個ゲット！（${l.name}の封印 ${Math.min(sl.frag, S.SEAL.fragments)}/${S.SEAL.fragments}）` : '',
-        firstTrial ? `🌈 ${l.name}の試練をクリア！` : ''].filter(Boolean).join('　');
+        firstTrial ? `L ${l.name}の試練をクリア！` : ''].filter(Boolean).join('　');
     }
     if (mine && mine.gacha) {
       // ガチャか経験値かを選ぶ。選ぶ前にアプリを閉じても、次に開いたときにまた選べるように残しておく
