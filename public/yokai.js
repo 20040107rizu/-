@@ -231,7 +231,7 @@
   list.GODS = [
     { id: 'onigami', name: 'オニガミ', role: F, color: '#a01030', origin: '鬼の世界', look: 't=human skin=c hair=long horns=oni acc=sword eyes=angry scarf=1 fx=fire',
       el: 'fire', normal: 'spin', strong: 'quake', ult: 'hellsweep', ultName: '地獄の大なぎ払い', ultDesc: '長い光線がまわりを1周して、鬼をまとめてなぎはらう',
-      passive: 'godArmor', passiveDesc: '金の鎧：受けるダメージ -35%', trial: 'オニガミの試練：鬼神・真を、だれも倒れずにたおす',
+      passive: 'godArmor', passiveDesc: '金の鎧：受けるダメージ -35%', trial: 'オニガミの試練：鬼神・真との戦いで、自分が一度も倒れずにたおす',
       story: '鬼の世界の神。何度もたおされるうちに、妖怪たちの強さを認めて仲間になった。' },
     { id: 'zeus', name: 'ゼウス', role: R, color: '#3a6ad8', origin: 'ギリシャ', look: 't=human hair=long hat=crown acc=spear eyes=angry fx=spark beard=1',
       el: 'thunder', normal: 'bolt', strong: 'thunder', ult: 'tenrai', ultName: '天の雷', ultDesc: '町じゅうの鬼に雷が落ちて、大ダメージ＋しびれさせる',
@@ -247,7 +247,7 @@
       story: 'エジプトの太陽の神。毎日、太陽の船に乗って空をわたる。' },
     { id: 'joka', name: 'ジョカ', role: H, color: '#2aa88a', origin: '中国', look: 't=human hair=long hat=crown tail=thin acc=fan fx=leaf skin=pale',
       el: 'water', normal: 'healOrb', strong: 'lifeLink', ult: 'mend', ultName: '天のつくろい', ultDesc: '倒れた仲間を全員その場で起こす＋みんなを回復',
-      passive: 'lastStand', passiveDesc: '1回のバトルで1度だけ、倒れるダメージを受けても耐える', trial: 'ジョカの試練：隠しボスを、チーム全員がレジェンドでたおす（2人以上）',
+      passive: 'lastStand', passiveDesc: '1回のバトルで1度だけ、倒れるダメージを受けても耐える', trial: 'ジョカの試練：1回のバトルで倒れた仲間を3回起こして、隠しボスをたおす',
       story: '天にあいた穴を五色の石でつくろったという、人々の母なる女神。' },
     { id: 'shiva', name: 'シヴァ', role: T, color: '#3a7ac8', origin: 'インド', look: 't=human skin=c hair=long acc=spear eyes=angry ring=drum fx=fire',
       el: 'dark', normal: 'slam', strong: 'shieldBash', ult: 'tandava', ultName: '破壊の舞', ultDesc: 'まわりで舞いつづけて、何度も大ダメージ',

@@ -390,7 +390,7 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
@@ -526,7 +526,7 @@ class Room {
     }
     p.hp -= amount;
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
-    if (p.hp <= 0) { p.hp = 0; p.down = true; p.reviveProg = 0; this.anyDown = true; this.events.push({ k: 'down', id: p.id }); }
+    if (p.hp <= 0) { p.hp = 0; p.down = true; p.downs = (p.downs || 0) + 1; p.reviveProg = 0; this.anyDown = true; this.events.push({ k: 'down', id: p.id }); }
   }
 
   healPlayer(p, amount) {
@@ -744,6 +744,7 @@ class Room {
     if (dr.kind === 'final') { this.mainBoss = b; label = '百鬼王が降臨した！'; }
     if (dr.kind === 'shin') {
       this.shinBoss = b; label = '鬼神・真が目覚めた！';
+      for (const q of this.players.values()) q.shinDowns = q.down ? -1 : (q.downs || 0); // 神の試練: 鬼神・真との戦いで倒れたか
       this.timeLeft += 180; // 目覚めたら制限時間が3分ふえる
       this.ring = { x: b.x, y: b.y, r: 1700, min: 600 };
     }
@@ -1216,12 +1217,11 @@ class Room {
     if (main) frag += this.anyDownAtKill ? 1 : 2;
     if (shin) frag += this.shinClean ? 2 : 1;
     const ps = [...this.players.values()], trials = [];
-    const isL = id => !!S.YOKAI_BY_ID[id]?.legend;
-    if (shin && this.shinClean) trials.push('onigami');
+    if (shin && p.shinDowns != null && p.shinDowns === (p.downs || 0) && !p.down) trials.push('onigami'); // 鬼神・真との戦いで自分が一度も倒れなかった
     if (this.mainDown && this.mainType === 'gokuou' && this.bossKillT != null && this.bossKillT <= 240) trials.push('zeus');
     if (this.mainDown && this.mainType === 'hyakki' && ps.length === 1) trials.push('odin');
     if (p.yokai === 'nurarihyon' || p.yokai === 'melusine') trials.push('ra');
-    if (ps.length >= 2 && ps.every(q => isL(q.yokai))) trials.push('joka');
+    if (p.revives >= 3) trials.push('joka'); // 倒れた仲間を3回起こした
     if (this.mainDown && this.mainType === 'gokuou' && !p.judgeHits) trials.push('shiva');
     return { frag, trials };
   }
