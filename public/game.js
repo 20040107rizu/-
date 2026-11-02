@@ -1280,6 +1280,7 @@
     return { balls: S.BALLS.map((b, i) => ({ b, p: odds[i] / sum })), rank, fresh };
   }
   const pct = v => (v >= 0.995 ? '100' : v < 0.005 && v > 0 ? '1未満' : Math.round(v * 100)) + '%';
+  const expOf = count => Math.round(count * S.EXP_MUL); // 経験値にすると、鬼玉の数の2.5倍
   function showChoice(inBattle) {
     choiceInBattle = inBattle;
     const o = gachaOdds(pending.count);
@@ -1288,7 +1289,7 @@
     $('choiceOdds').innerHTML = `<div class="co-balls">${o.balls.map(({ b, p }) => `<div class="co-ball${p ? '' : ' zero'}"><span class="dot" style="background:${b.color}"></span>${b.name}玉<b>${pct(p)}</b></div>`).join('')}</div>
       <div class="co-rank">ランク別：${['C', 'B', 'A', 'S'].map(r => `<span style="color:${S.RANKS[r].color}">${r} ${pct(o.rank[r])}</span>`).join('　')}</div>
       <div class="co-fresh">まだ持っていない妖怪が出る確率：<b>${pct(o.fresh)}</b></div>`;
-    $('btnChoiceExp').textContent = `📈 経験値にする（＋${pending.count.toLocaleString('ja-JP')}）`;
+    $('btnChoiceExp').textContent = `📈 経験値にする（＋${expOf(pending.count).toLocaleString('ja-JP')}）`;
     show('choiceScreen', inBattle);
   }
   $('btnChoiceGacha').onclick = () => {
@@ -1303,8 +1304,8 @@
   };
   $('btnChoiceExp').onclick = () => {
     if (!pending) return;
-    stats.expStock += pending.count;
-    const n = pending.count; pending = null;
+    const n = expOf(pending.count); pending = null;
+    stats.expStock += n;
     try { localStorage.removeItem('pendingChoice'); } catch {}
     saveAll();
     beep(523, 0.12, 'triangle', 0.07); setTimeout(() => beep(784, 0.18, 'triangle', 0.07), 110);
@@ -1393,7 +1394,7 @@
         const y = S.YOKAI_BY_ID[p.yokai];
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
         return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
-          : result.myChoice === 'exp' ? `📈 経験値 +${(p.count ?? 0).toLocaleString('ja-JP')}`
+          : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
           : `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}${p.escaped ? '' : ` <small>（鬼玉${p.count ?? '半分'}個で）</small>`}`}</td></tr>`;
       }).join('');
     if (watcher) {
