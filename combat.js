@@ -26,6 +26,7 @@ function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1
 const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
   if (!e || e.hp <= 0) return 0;
+  if (room.elemMul) amount *= room.elemMul(e, el); // 九尾鬼（光っている尾の属性は効かない）・ぬえ鬼（姿ごとの弱点）
   room.damageOni(p, e, amount);
   if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1)); // 必殺技の効果中はたまらない
   if (el) applyElement(room, p, e, amount, el);

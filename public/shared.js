@@ -182,7 +182,7 @@
     return { conds, ready: conds.every(c => c.got >= c.need) };
   }
   // 封印の欠片: 青鬼は3回に1個、黒鬼は必ず1個、金鬼・白鬼は2個、風雷鬼・鬼神は3個
-  const SEAL_FRAG = { blue: 1 / 3, black: 1, gold: 2, white: 2, fuurai: 3, kishin: 3, gokuou: 3, hyakki: 3 };
+  const SEAL_FRAG = { blue: 1 / 3, black: 1, gold: 2, white: 2, fuurai: 3, kishin: 3, gokuou: 3, hyakki: 3, yakubyo: 3, kage: 3, nue: 3, twin: 3, kyubi: 3, toki: 3, gasha: 3, amanojaku: 3 };
   // バトルの結果から、もらえる欠片と試練を決める（サーバーで使う）。r は trialDone と同じ
   function sealDrop(r, rnd = Math.random) {
     if (!r.bossDown) return null;
@@ -264,13 +264,25 @@
     white:  { name: '白鬼',   color: '#e8f2ff', hp: 4.1, dmg: 2.4, atkGap: 0.5,  warn: 0.8,  drop: 230, need: 'gold',  team: true },
     fuurai: { name: '風雷鬼', color: '#38c8a0', hp: 4.4, dmg: 2.5, atkGap: 0.48, warn: 0.78, drop: 260, need: 'white', team: true },
     kishin: { name: '鬼神',   color: '#a01030', hp: 5.0, dmg: 2.7, atkGap: 0.45, warn: 0.75, drop: 300, need: 'fuurai', team: true },
+    // 鬼神のあとの8体（gimmick: それぞれ特別な仕組みを持つ。乱入ボスには出てこない）
+    yakubyo:   { name: '疫病鬼',     color: '#7a9a3a', hp: 6.0, dmg: 3.0, atkGap: 0.43, warn: 0.75, drop: 320, need: 'kishin',  team: true, gimmick: true },
+    kage:      { name: '影鬼',       color: '#3a1a5a', hp: 6.0, dmg: 3.0, atkGap: 0.43, warn: 0.75, drop: 330, need: 'yakubyo', team: true, gimmick: true },
+    nue:       { name: 'ぬえ鬼',     color: '#3a3048', hp: 6.5, dmg: 3.0, atkGap: 0.42, warn: 0.74, drop: 340, need: 'kage',    team: true, gimmick: true },
+    twin:      { name: '双子鬼',     color: '#26b48c', hp: 3.3, dmg: 2.8, atkGap: 0.5,  warn: 0.75, drop: 360, need: 'nue',     team: true, gimmick: true, twinName: '風神鬼' }, // 体力は1体ぶん（2体いる）
+    twin2:     { name: '雷神鬼',     color: '#e8b828', hp: 3.3, dmg: 2.8, atkGap: 0.5,  warn: 0.75, drop: 0,   team: true, hidden: true, secret: true }, // 双子鬼の片われ（選べない）
+    kyubi:     { name: '九尾鬼',     color: '#f0d8a0', hp: 6.4, dmg: 3.0, atkGap: 0.42, warn: 0.73, drop: 370, need: 'twin',    team: true, gimmick: true },
+    toki:      { name: '刻鬼',       color: '#3a6a8a', hp: 6.6, dmg: 3.0, atkGap: 0.42, warn: 0.73, drop: 380, need: 'kyubi',   team: true, gimmick: true, time: 360 },
+    gasha:     { name: 'がしゃどくろ王', color: '#f2ead2', hp: 7.6, dmg: 3.2, atkGap: 0.48, warn: 0.8, drop: 400, need: 'toki',    team: true, gimmick: true },
+    amanojaku: { name: '天邪鬼',     color: '#b03a8a', hp: 6.8, dmg: 3.2, atkGap: 0.4, warn: 0.72, drop: 420, need: 'gasha',   team: true, gimmick: true },
     // 隠しボス（hidden: 前のボスを倒した人にしか、ボス選びに出てこない。time: このボスだけの制限時間）
     gokuou: { name: '獄王',   color: '#8a0a0a', hp: 6.0, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 350, need: 'kishin', team: true, hidden: true, time: 360 },
     hyakki: { name: '百鬼王', color: '#5a1a8a', hp: 5.5, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 400, need: 'gokuou', team: true, hidden: true, time: 480,
               rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
     shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
   };
-  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki'];
+  // BOSS_ORDER はセーブ（倒したボスのビット）の並び。新しいボスは必ず末尾に足す。ボス選びの並びは BOSS_LIST
+  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku'];
+  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {
@@ -434,5 +446,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

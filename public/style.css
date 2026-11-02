@@ -514,3 +514,20 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .co-legend .face { width: 54px; height: 54px; object-fit: contain; }
 .co-legend small { font-size: 10px; opacity: .8; }
 #btnSealBack { align-self: center; }
+/* 鬼神のあとの8体 */
+.boss-card.bk-yakubyo { background: linear-gradient(#5a7a2a, #1a2a08); }
+.boss-card.bk-kage { background: linear-gradient(#3a1a5a, #0a0414); }
+.boss-card.bk-nue { background: linear-gradient(#2a2838, #050508); border-color: #8aff3a66; }
+.boss-card.bk-twin { background: linear-gradient(90deg, #1e9a78, #c8961a); }
+.boss-card.bk-kyubi { background: linear-gradient(#c8a070, #5a2a3a); }
+.boss-card.bk-toki { background: linear-gradient(#2a5a7a, #0a1a2a); }
+.boss-card.bk-gasha { background: linear-gradient(#8a8270, #2a2418); }
+.boss-card.bk-amanojaku { background: linear-gradient(#a02a7a, #2a0a2a); }
+.pboss.on.bk-yakubyo { background: #5a7a2a; color: #fff; }
+.pboss.on.bk-kage { background: #3a1a5a; color: #fff; border: 1px solid #c85aff; }
+.pboss.on.bk-nue { background: #2a2838; color: #fff; border: 1px solid #8aff3a; }
+.pboss.on.bk-twin { background: linear-gradient(90deg, #1e9a78, #c8961a); color: #fff; }
+.pboss.on.bk-kyubi { background: #b07a5a; color: #fff; }
+.pboss.on.bk-toki { background: #2a5a7a; color: #fff; }
+.pboss.on.bk-gasha { background: #8a8270; color: #fff; }
+.pboss.on.bk-amanojaku { background: #a02a7a; color: #fff; }

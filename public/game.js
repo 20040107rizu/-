@@ -234,7 +234,7 @@
     const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
     const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
-    const bosses = S.BOSS_ORDER.map((k, i) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join('');
+    const bosses = S.BOSS_LIST.map(k => [k, S.BOSS_ORDER.indexOf(k)]).map(([k, i]) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join(''); // 並びは BOSS_LIST、ビットは BOSS_ORDER の位置
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
       <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
       <div><span class="st ${live.status}">${st}</span></div>
@@ -801,7 +801,8 @@
     if (!img) return null;
     return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(img, 'repeat'));
   }
-  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff', gold: '#ffd23a', white: '#bfe6ff', fuurai: '#5af0c0', kishin: '#ff3a6a', gokuou: '#ff5a1a', hyakki: '#b07aff', shin: '#ff1a3a' };
+  const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff', gold: '#ffd23a', white: '#bfe6ff', fuurai: '#5af0c0', kishin: '#ff3a6a', gokuou: '#ff5a1a', hyakki: '#b07aff', shin: '#ff1a3a',
+    yakubyo: '#b8e04a', kage: '#c85aff', nue: '#8aff3a', twin: '#5af0c0', twin2: '#ffe14a', kyubi: '#ff8ac8', toki: '#7ab8ff', gasha: '#fff2c0', amanojaku: '#ff5ad8' };
   let view = { l: 0, r: 0, t: 0, b: 0 }; // 今画面に見えている範囲（ワールド座標）
   const inView = (x, y, m = 0) => x > view.l - m && x < view.r + m && y > view.t - m && y < view.b + m;
   let spectateId = null;
@@ -1128,7 +1129,7 @@
     const isHost = me && me.host;
     // ホストが挑戦できない鬼が選ばれていたら、挑戦できるいちばん強い鬼に戻す
     if (isHost && !S.bossUnlocked(lobby.boss, stats.cleared)) {
-      const ok = S.BOSS_ORDER.filter(k => S.bossUnlocked(k, stats.cleared));
+      const ok = S.BOSS_LIST.filter(k => S.bossUnlocked(k, stats.cleared));
       send({ t: 'boss', type: ok[ok.length - 1] });
     }
     renderBossPick(isHost);
@@ -1137,7 +1138,7 @@
   }
 
   function renderBossPick(isHost) {
-    $('bossPick').innerHTML = S.BOSS_ORDER.filter(k => !S.BOSSES[k].hidden || S.bossUnlocked(k, stats.cleared) || lobby.boss === k).map(k => {
+    $('bossPick').innerHTML = S.BOSS_LIST.filter(k => !S.BOSSES[k].hidden || S.bossUnlocked(k, stats.cleared) || lobby.boss === k).map(k => {
       const b = S.BOSSES[k], open = S.bossUnlocked(k, stats.cleared), sel = lobby.boss === k;
       const lock = isHost && !open;
       const sub = lock ? `🔒 ${S.BOSSES[b.need].name}のあと` : `鬼玉 ${b.drop}個`; // 倒すと落とす鬼玉の数
@@ -1410,7 +1411,7 @@
     $('resTitle').textContent += `（みんなの鬼玉 ${result.team ?? 0}個）`;
     const notes = [];
     if (result.newClear) {
-      const next = S.BOSS_ORDER.find(k => S.BOSSES[k].need === result.boss);
+      const next = S.BOSS_LIST.find(k => S.BOSSES[k].need === result.boss && !S.BOSSES[k].hidden);
       notes.push(esc(next ? `🔓 ${S.BOSSES[result.boss].name}をはじめてたおした！ ${S.BOSSES[next].name}に挑戦できるようになった！`
         : `🏆 ${S.BOSSES[result.boss].name}をはじめてたおした！ すべてのボス鬼を制覇！`));
     }
@@ -1557,6 +1558,28 @@
         if (ev.id === myId || ev.all) { banner = { text: ev.all ? '⚖ 裁きがくだった…（全員にダメージ）' : '⚖ 裁きをやぶった！', t: 1.8, c: '#ff3a1a' }; beep(90, 0.5, 'sawtooth', 0.12, -40); }
         break;
       case 'judgeOk': if (ev.id === myId) { banner = { text: '⚖ 裁きをのりこえた', t: 1.4, c: '#ffd23a' }; beep(880, 0.15, 'triangle', 0.06); } break;
+      case 'gimmick': {
+        const G = {
+          cloud: ['☠️ 呪いの霧！', '当たると呪われる。仲間にうつるぞ', '#b8e04a'], shade: ['👤 影があらわれた！', '自分の影を自分で倒すとボーナス', '#c85aff'],
+          ownShade: ev.id === myId ? ['👤 自分の影をたおした！', '攻撃アップ＋回復', '#c85aff'] : null, shadeUlt: [`👤 影の「${ev.name}」！`, '', '#c85aff'],
+          form: ev.form ? [`🌑 ぬえ鬼が${NUE_FORM[ev.form][0]}の姿に変わった`, `${NUE_FORM[ev.form][1]}の攻撃がよく効く`, '#8aff3a'] : null, combo: ['🌪⚡ 合体技「雷の竜巻」！', '2体からはなれろ！', '#ffe14a'],
+          decoy: ['🦊 九尾鬼の分身の術！', '本物は1体だけ', '#ff8ac8'], tail: ev.el ? [`🦊 ${Attacks.ELEMENT[ev.el].name}の尾が光った`, `${Attacks.ELEMENT[ev.el].name}属性の攻撃は効かない`, Attacks.ELEMENT[ev.el].color] : null,
+          steal: ['⏳ 時間を10秒うばわれた！', '', '#7ab8ff'], rewindStart: ['⏳ 刻鬼が時を戻そうとしている！', '8秒以内に大ダメージで止めろ', '#7ab8ff'],
+          rewind: ['⏳ 時を巻き戻した！', '体力が元に戻ってしまった', '#7ab8ff'], rewindFail: ['⏳ 巻き戻しを止めた！', '', '#ffe14a'],
+          clap: ['🦴 がしゃどくろ王の手が落ちてくる！', '', '#fff2c0'], reverse: ['🔄 さかさまの呪い！', '5秒間、移動が逆になる', '#ff5ad8'],
+          mimic: [`🔄 まねっこ！「${ev.name}」を撃ち返してきた`, '', '#ff5ad8'],
+        }[ev.g];
+        if (G) banner = { text: G[0], sub: G[1], t: 2, c: G[2] };
+        break;
+      }
+      case 'twinDown': banner = { text: `${ev.name}が倒れた！`, sub: `${Math.round(ev.t)}秒以内にもう1体を倒せ！`, t: 2.2, c: '#ffe14a' }; break;
+      case 'twinRevive': banner = { text: `${ev.name}が起き上がった…`, sub: '2体同時に倒さないと復活する', t: 2, c: '#ff4a3a' }; break;
+      case 'weak': banner = { text: '🦴 腕が弱点になった！', sub: '5秒間ダメージ2倍', t: 1.8, c: '#ffe14a' }; break;
+      case 'curse': if (ev.id === myId) banner = { text: '☠️ 呪われた！', sub: '回復してもらうと消える', t: 1.6, c: '#c85aff' }; break;
+      case 'curseOff': if (ev.id === myId) banner = { text: '呪いが消えた！', t: 1.2, c: '#7dff9a' }; break;
+      case 'charm': if (ev.id === myId) banner = { text: '💗 魅了された！', sub: '仲間にふれてもらうと目がさめる', t: 1.6, c: '#ff8ac8' }; break;
+      case 'charmFree': if (ev.id === myId) banner = { text: '目がさめた！', t: 1.2, c: '#7dff9a' }; break;
+      case 'poof': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 110, c: '#ff8ac8', t: 0.5, max: 0.5 }); break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
@@ -1924,7 +1947,9 @@
     const wob = Math.sin(now * 5) * 3;
     if (b.st !== 'wander' && !b.stun) { ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 30; }
     const img = art('oni/boss-' + (b.type || 'red'));
-    if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 180, Math.cos(b.face) < 0, b.flash); }
+    const size = b.big ? 330 : 180; // がしゃどくろ王は巨大
+    if (b.down) { ctx.save(); ctx.globalAlpha *= 0.55; ctx.translate(pos.x, pos.y); ctx.rotate(-1.2); ctx.translate(-pos.x, -pos.y); } // 双子鬼: 倒れている
+    if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50 * size / 180, 15 * size / 180, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, size, Math.cos(b.face) < 0, b.flash); }
     else drawOni(pos.x, pos.y + wob, 46, S.BOSSES[b.type || 'red'].color, b.face, b.flash, [-1, 1]);
     ctx.shadowBlur = 0;
     if (b.stun) {
@@ -1935,8 +1960,39 @@
       }
       ctx.fillStyle = '#ffe14a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ビリビリ…', pos.x, pos.y - 80);
     }
+    if (b.down) {
+      ctx.restore();
+      ctx.textAlign = 'center'; ctx.font = 'bold 26px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      const txt = `${Math.ceil(b.down)}`; ctx.strokeText(txt, pos.x, pos.y - 70); ctx.fillStyle = '#ffe14a'; ctx.fillText(txt, pos.x, pos.y - 70);
+      ctx.font = 'bold 13px sans-serif'; ctx.strokeText('いまのうちにもう1体！', pos.x, pos.y - 48); ctx.fillStyle = '#fff'; ctx.fillText('いまのうちにもう1体！', pos.x, pos.y - 48);
+      return;
+    }
     if (b.bliz) { ctx.restore(); return; }
-    bar(pos.x - 50, pos.y - (img ? 132 : 72), 100, 6, b.hp / b.maxHp, '#ff8a3d');
+    const top = pos.y - (img ? 132 * size / 180 : 72);
+    if (b.type !== 'kyubi') bar(pos.x - 50, top, 100, 6, b.hp / b.maxHp, '#ff8a3d'); // 九尾鬼は体力のバーで本物がばれないように出さない
+    // ボスのようす（姿・効かない属性・弱点・巻き戻し）
+    const tag = b.form ? `${NUE_FORM[b.form][0]}の姿：${NUE_FORM[b.form][1]}に弱い` : b.immune ? `${Attacks.ELEMENT[b.immune].name}属性が効かない` : b.weak ? '弱点！ ダメージ2倍' : b.rew != null ? `時を戻すまで ${Math.ceil(b.rew)}秒（大ダメージで止めろ）` : b.name || '';
+    if (tag) {
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      ctx.strokeText(tag, pos.x, top - 8); ctx.fillStyle = b.immune ? Attacks.ELEMENT[b.immune].color : b.weak ? '#ffe14a' : b.rew != null ? '#7ab8ff' : '#fff'; ctx.fillText(tag, pos.x, top - 8);
+    }
+  }
+  const NUE_FORM = { monkey: ['猿', '炎'], tiger: ['虎', '雷'], snake: ['蛇', '氷'] };
+  // 影鬼の影（みんなの妖怪のコピー）と、九尾鬼の分身
+  function drawShade(e, pos, now) {
+    const y = S.YOKAI_BY_ID[e.yokai], img = art('yokai/' + e.yokai);
+    ctx.save();
+    ctx.shadowColor = '#c85aff'; ctx.shadowBlur = 16; ctx.filter = e.flash ? 'brightness(2)' : 'brightness(0)';
+    if (img) drawSprite(img, pos.x, pos.y + 16, y.legend || y.god ? 96 : 80, false); else { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(pos.x, pos.y, 18, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    const owner = snap.players.find(p => p.id === e.of);
+    ctx.textAlign = 'center'; ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#d8a8ff'; ctx.fillText(`${owner ? owner.name : ''}の影`, pos.x, pos.y - 66);
+    bar(pos.x - 22, pos.y - 62, 44, 4, e.hp / e.maxHp, '#c85aff');
+  }
+  function drawDecoy(e, pos, now) {
+    const img = art('oni/boss-kyubi');
+    const wob = Math.sin(now * 5 + e.id) * 3;
+    if (img) { ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 180, Math.cos(e.face) < 0); }
   }
   // 金鬼から先のボスのまわりの光
   function bossAura(b, pos, now) {
@@ -2021,6 +2077,8 @@
     ctx.globalAlpha = p.down ? 0.5 : p.invis ? (me ? 0.35 : 0.15) : p.dodge ? 0.55 : 1;
     ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 16, 18 * (1 - (p.jump || 0) * 0.5), 6, 0, 0, Math.PI * 2); ctx.fill();
     if (p.jump) ctx.translate(0, -p.jump * 70); // 大ジャンプ中は浮く
+    const icon = p.charm ? '💗' : p.rev ? '🔄' : p.curse ? '☠️' : '';
+    if (icon) { ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(icon, 26, -50); }
     if (p.au || p.su) { ctx.fillStyle = 'rgba(255,200,60,0.22)'; ctx.beginPath(); ctx.arc(0, -10, 38 + Math.sin(performance.now() / 120) * 3, 0, Math.PI * 2); ctx.fill(); }
     if (me) { ctx.strokeStyle = '#ffe36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 27, 0, Math.PI * 2); ctx.stroke(); }
     if (y.god) { // 神は金と白に光り、光線が回る
@@ -2165,7 +2223,10 @@
     ctx.restore();
   }
 
-  const TELE_C = { bolt: ['255,225,60', 'rgba(255,240,120,0.95)'], wind: ['70,240,190', 'rgba(120,255,210,0.95)'] };
+  const TELE_C = { bolt: ['255,225,60', 'rgba(255,240,120,0.95)'], wind: ['70,240,190', 'rgba(120,255,210,0.95)'],
+    curse: ['160,220,60', 'rgba(200,90,255,0.95)'], charm: ['255,120,200', 'rgba(255,160,220,0.95)'], clock: ['120,180,255', 'rgba(170,210,255,0.95)'],
+    hand: ['240,230,200', 'rgba(255,250,230,0.95)'], mimic: ['255,90,216', 'rgba(255,160,240,0.95)'], shade: ['150,80,220', 'rgba(200,140,255,0.95)'] };
+  const TELE_ICON = { curse: '☠️', charm: '💗', hand: '🖐', mimic: '🔄', shade: '👤' };
   function drawTelegraph(t) {
     ctx.save();
     ctx.translate(t.x, t.y);
@@ -2180,6 +2241,7 @@
       ctx.beginPath(); ctx.arc(0, 0, t.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = `rgba(${rgb},0.45)`; ctx.beginPath(); ctx.arc(0, 0, t.r * t.p, 0, Math.PI * 2); ctx.fill();
       if (t.c === 'bolt') { ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⚡', 0, 0); ctx.textBaseline = 'alphabetic'; }
+      if (TELE_ICON[t.c]) { ctx.font = `bold ${Math.min(60, t.r * 0.4)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(TELE_ICON[t.c], 0, 0); ctx.textBaseline = 'alphabetic'; }
     }
     ctx.restore();
   }
@@ -2213,6 +2275,7 @@
     ctx.textBaseline = 'alphabetic';
     for (const e of snap.patrols) dot(e.x, e.y, 3, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#b08cff');
     if (snap.ring) { ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ox + snap.ring.x * sx, oy + snap.ring.y * sx, snap.ring.r * sx, 0, Math.PI * 2); ctx.stroke(); }
+    if (snap.boss2) dot(snap.boss2.x, snap.boss2.y, 6, BOSS_UI.twin2);
     if (snap.boss && !snap.boss.bliz) {
       dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + snap.boss.x * sx, oy + snap.boss.y * sx, 6, 0, Math.PI * 2); ctx.stroke();
@@ -2289,9 +2352,31 @@
     ctx.textBaseline = 'alphabetic';
   }
 
+  // ぬえ鬼: 町が真っ暗。自分のまわりしか見えず、ときどき鳴き声の方向だけ分かる
+  function drawNueDark(me, now) {
+    const scale = H / 640, r0 = 95 * scale, r1 = 230 * scale;
+    const g = ctx.createRadialGradient(W / 2, H / 2, r0, W / 2, H / 2, r1);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.97)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const b = snap.boss, mp = myPred || me;
+    if (b && mp && now % 5 < 1.6) {
+      const a = Math.atan2(b.y - mp.y, b.x - mp.x), d = Math.hypot(b.x - mp.x, b.y - mp.y);
+      if (d > 260) {
+        const ex = W / 2 + Math.cos(a) * (W / 2 - 70), ey = H / 2 + Math.sin(a) * (H / 2 - 50);
+        ctx.save(); ctx.translate(ex, ey); ctx.fillStyle = '#8aff3a'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('🔊 ヒョーー…', 0, -14); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(4, -9); ctx.lineTo(4, 9); ctx.fill(); ctx.restore();
+      }
+    }
+  }
   function drawHUD(me, now) {
     Stages.drawTint(ctx, W, H, stage);
-    drawMinimap(me, now);
+    const dark = snap.boss && snap.boss.type === 'nue';
+    if (dark) drawNueDark(me, now);
+    if (dark) { // ぬえ鬼: ミニマップが使えない
+      const mw = Math.min(W * 0.21, 200), mh = mw * map.h / map.w;
+      ctx.fillStyle = '#000'; ctx.fillRect(10, 10, mw, mh); ctx.strokeStyle = '#fff4'; ctx.strokeRect(10, 10, mw, mh);
+      ctx.fillStyle = '#fff6'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('？？？', 10 + mw / 2, 10 + mh / 2); ctx.textBaseline = 'alphabetic';
+    } else drawMinimap(me, now);
     drawSpotterArrows(now);
     drawAllyMarkers(now);
 
@@ -2368,6 +2453,9 @@
         ctx.fillText(msg, W / 2, 70);
       }
       if (me.invis) { ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#b08cff'; ctx.fillText('👻 ジミーフィールド中', W / 2, 92); }
+      // 新しいボスの状態異常
+      const stx = me.charm ? ['💗 魅了されている！ 仲間にふれてもらうと目がさめる', '#ff8ac8'] : me.rev ? ['🔄 さかさまの呪い：移動が逆になっている', '#ff5ad8'] : me.curse ? ['☠️ 呪い：体力がへる。回復してもらうと消える', '#c85aff'] : null;
+      if (stx) { ctx.textAlign = 'center'; ctx.font = 'bold 15px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(stx[0], W / 2, H - 70); ctx.fillStyle = stx[1]; ctx.fillText(stx[0], W / 2, H - 70); }
     }
 
     // スティック
@@ -2548,9 +2636,9 @@
     // 自キャラは入力で先に動かし、サーバー位置へ寄せる
     if (me) {
       if (!myPred) myPred = { x: me.x, y: me.y };
-      if (!me.down && !me.dash && !me.esc && playing() && intro <= 0) {
+      if (!me.down && !me.dash && !me.esc && !me.charm && playing() && intro <= 0) {
         const st = S.yokaiStats(me.yokai);
-        let mx = input.mx, my = input.my; const m = Math.hypot(mx, my);
+        let mx = me.rev ? -input.mx : input.mx, my = me.rev ? -input.my : input.my; const m = Math.hypot(mx, my); // さかさまの呪いのときは逆
         if (m > 1) { mx /= m; my /= m; }
         const run = input.dash && m > 0.15 && (me.inf || me.fly || (!me.exh && me.stam > 0));
         const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1) * (S.YOKAI_BY_ID[me.yokai]?.passive === 'backstab' ? 1.3 : 1);
@@ -2688,6 +2776,9 @@
         if (bossDrop > -1500) { const dp = { x: pos.x, y: pos.y + bossDrop }; list.push({ y: 1e9, f: () => drawBoss(snap.boss, dp, now) }); }
       } else list.push({ y: pos.y, f: () => drawBoss(snap.boss, pos, now) });
     }
+    if (snap.boss2) { const pos = lerpEnt('boss2', snap.boss2.x, snap.boss2.y, snap.boss2.st === 'charging' ? 0.6 : k); list.push({ y: pos.y, f: () => drawBoss(snap.boss2, pos, now) }); }
+    for (const e of snap.shades || []) { const pos = lerpEnt('s' + e.id, e.x, e.y, k); list.push({ y: pos.y, f: () => drawShade(e, pos, now) }); }
+    for (const e of snap.decoys || []) { const pos = lerpEnt('d' + e.id, e.x, e.y, k); list.push({ y: pos.y, f: () => drawDecoy(e, pos, now) }); }
     for (const p of snap.players) {
       if (p.esc) continue;
       const pos = p.id === myId && myPred ? myPred : lerpEnt('p' + p.id, p.x, p.y, k);

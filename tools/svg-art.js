@@ -134,6 +134,29 @@ const hyakkiFront = `
 const shinFlames = `${Array.from({ length: 14 }, (_, i) => { const a = i / 14 * Math.PI * 2, x = 128 + Math.cos(a) * 112, y = 112 + Math.sin(a) * 106, a2 = a * 180 / Math.PI + 90; return `<path d="M${x - 13} ${y + 6} Q${x} ${y - 38} ${x + 13} ${y + 6} Q${x} ${y + 15} ${x - 13} ${y + 6}Z" fill="${i % 2 ? '#1a0008' : '#ff1a3a'}" ${O4} transform="rotate(${a2} ${x} ${y})"/>`; }).join('')}`;
 const shinFront = `${kishinCrown}
   <path d="M86 118 Q100 128 112 120 M144 120 Q156 128 170 118 M70 180 L90 190 M186 180 L166 190" stroke="#ffd23a" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+// 鬼神のあとの8体の飾り
+const ring8 = (n, r, cy, f) => Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2; return f(128 + Math.cos(a) * r, cy + Math.sin(a) * r * 0.95, a, i); }).join('');
+const yakubyoBack = ring8(10, 108, 112, (x, y, a, i) => `<circle cx="${x}" cy="${y}" r="${10 + (i % 3) * 5}" fill="${i % 2 ? '#b8e04a' : '#c85aff'}" opacity="0.8" ${O4}/>`);
+const yakubyoFront = `<path d="M86 150 Q128 170 170 150" stroke="#c85aff" stroke-width="6" fill="none"/><circle cx="70" cy="60" r="7" fill="#b8e04a" ${O4}/><circle cx="190" cy="54" r="5" fill="#c85aff" ${O4}/>`;
+const kageBack = ring8(6, 108, 112, (x, y) => `<ellipse cx="${x}" cy="${y}" rx="18" ry="24" fill="#000" opacity="0.9"/><circle cx="${x - 5}" cy="${y - 6}" r="3" fill="#c85aff"/><circle cx="${x + 5}" cy="${y - 6}" r="3" fill="#c85aff"/>`);
+const nueBack = `<path d="M200 220 Q262 180 242 120 Q232 80 250 50" stroke="${INK}" stroke-width="22" fill="none" stroke-linecap="round"/><path d="M200 220 Q262 180 242 120 Q232 80 250 50" stroke="#5a8a3a" stroke-width="12" fill="none" stroke-linecap="round"/><circle cx="250" cy="48" r="13" fill="#5a8a3a" ${O4}/>` + ring8(6, 112, 110, (x, y) => `<ellipse cx="${x}" cy="${y}" rx="26" ry="14" fill="#14141e" opacity="0.85"/>`);
+const nueFront = `<path d="M84 150 L100 162 L84 172 M172 150 L156 162 L172 172 M96 186 L112 196 M160 186 L144 196" stroke="#c89a3a" stroke-width="7" stroke-linecap="round"/>`;
+const windBack = ring8(6, 112, 112, (x, y) => `<path d="M${x - 18} ${y} Q${x} ${y - 20} ${x + 18} ${y} Q${x} ${y - 8} ${x - 10} ${y + 2}" stroke="#d8fff0" stroke-width="6" fill="none" stroke-linecap="round"/>`);
+const thunderBack = ring8(8, 112, 112, (x, y) => `<path d="M${x - 6} ${y - 18} L${x + 6} ${y - 2} L${x - 2} ${y} L${x + 6} ${y + 18} L${x - 8} ${y + 2} L${x} ${y}Z" fill="#fff27a" ${O4}/>`);
+const kyubiBack = Array.from({ length: 9 }, (_, i) => { const a = (-170 + i * 20) * Math.PI / 180, x = 128 + Math.cos(a) * 118, y = 150 + Math.sin(a) * 118; return `<path d="M128 150 Q${(128 + x) / 2 + 8} ${(150 + y) / 2 - 16} ${x} ${y}" stroke="${INK}" stroke-width="30" fill="none" stroke-linecap="round"/><path d="M128 150 Q${(128 + x) / 2 + 8} ${(150 + y) / 2 - 16} ${x} ${y}" stroke="#fff0d0" stroke-width="20" fill="none" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="8" fill="#ff8ac8"/>`; }).join('');
+const tokiBack = `<circle cx="128" cy="112" r="112" fill="#f4ecd8" ${O4}/><circle cx="128" cy="112" r="96" fill="none" stroke="#c8a060" stroke-width="4"/>` + ring8(12, 104, 112, (x, y, a, i) => `<text x="${x}" y="${y + 6}" font-size="16" font-weight="bold" text-anchor="middle" fill="${INK}" font-family="sans-serif">${[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2][i]}</text>`);
+const tokiFront = `<path d="M128 112 L128 20 M128 112 L196 140" stroke="#c8242a" stroke-width="7" stroke-linecap="round"/>`;
+const amanoBack = ring8(8, 110, 112, (x, y, a, i) => `<g transform="rotate(${a * 57.3 + 90} ${x} ${y})"><path d="M${x - 14} ${y + 10} L${x} ${y - 22} L${x + 14} ${y + 10}Z" fill="${i % 2 ? '#c8f4ff' : '#ffd8f4'}" ${O4}/></g>`);
+const amanoFront = `<path d="M98 30 L84 -2 L110 22Z M158 30 L172 -2 L146 22Z" fill="#5affe0" ${O4}/>`;
+// がしゃどくろ王: 巨大なガイコツ（鬼の形ではない）
+const gashaSkull = () => svg(`
+  <ellipse cx="128" cy="110" rx="100" ry="92" fill="#f2ead2" ${O}/>
+  <path d="M60 150 Q128 250 196 150 L190 210 Q128 240 66 210Z" fill="#e6dcbc" ${O}/>
+  <ellipse cx="88" cy="110" rx="30" ry="34" fill="#1a0a14"/><ellipse cx="168" cy="110" rx="30" ry="34" fill="#1a0a14"/>
+  <circle cx="88" cy="114" r="11" fill="#ff2a2a"/><circle cx="168" cy="114" r="11" fill="#ff2a2a"/>
+  <path d="M128 140 L116 166 L140 166Z" fill="#1a0a14"/>
+  <path d="M80 196 L80 222 M100 200 L100 228 M120 202 L120 230 M140 202 L140 230 M160 200 L160 228 M180 196 L180 222" stroke="${INK}" stroke-width="6"/>
+  <path d="M70 40 Q100 60 90 90 M190 40 Q160 60 170 90" stroke="#c8bc98" stroke-width="5" fill="none"/>`);
 const BOSS_LOOK = {
   red:   { skin: '#d02a2a', shade: '#7a0a14', mane: '#1a0a14', glow: '#ffb000', pupil: '#1a0000' },
   blue:  { skin: '#2a5ad8', shade: '#142a7a', mane: '#0a0a2a', glow: '#ff3a2a', pupil: '#5a0000' },
@@ -145,6 +168,14 @@ const BOSS_LOOK = {
   gokuou: { skin: '#a01818', shade: '#4a0008', mane: '#0a0608', glow: '#ffd23a', pupil: '#3a0000', aura: '#ff5a1a', back: gokuouBack, front: gokuouCrown },
   hyakki: { skin: '#5a2a8a', shade: '#24103a', mane: '#0a0614', glow: '#5aff8a', pupil: '#002a10', aura: '#8a3aff', back: hyakkiMasks, front: hyakkiFront },
   shin:   { skin: '#1a0a14', shade: '#000', mane: '#3a0010', glow: '#ff1a3a', pupil: '#ffd23a', aura: '#ff0040', back: shinFlames, front: shinFront },
+  yakubyo:   { skin: '#7a9a3a', shade: '#3a4a10', mane: '#2a1a2a', glow: '#e05aff', pupil: '#2a002a', aura: '#9ac83a', back: yakubyoBack, front: yakubyoFront },
+  kage:      { skin: '#140a1e', shade: '#000', mane: '#3a1a5a', glow: '#c85aff', pupil: '#fff', aura: '#5a2a8a', back: kageBack },
+  nue:       { skin: '#3a3048', shade: '#140a20', mane: '#c89a3a', glow: '#8aff3a', pupil: '#0a2a00', aura: '#3a5a2a', back: nueBack, front: nueFront },
+  twin:      { skin: '#26b48c', shade: '#0e6048', mane: '#1a2a20', glow: '#ffffff', pupil: '#003a2a', aura: '#5af0c0', back: windBack },
+  twin2:     { skin: '#e8b828', shade: '#8a6010', mane: '#2a1a00', glow: '#3ac8ff', pupil: '#00142a', aura: '#ffe14a', back: thunderBack },
+  kyubi:     { skin: '#f0d8a0', shade: '#a07a3a', mane: '#fff4e0', glow: '#ff3a8a', pupil: '#3a0010', aura: '#ffb0e0', back: kyubiBack },
+  toki:      { skin: '#3a6a8a', shade: '#14304a', mane: '#0a1420', glow: '#ffd23a', pupil: '#3a2a00', aura: '#7ab8ff', back: tokiBack, front: tokiFront },
+  amanojaku: { skin: '#b03a8a', shade: '#5a1048', mane: '#2a0a2a', glow: '#5affe0', pupil: '#002a2a', aura: '#ff5ad8', back: amanoBack, front: amanoFront },
 };
 
 // ---------- アイテム ----------
@@ -209,6 +240,7 @@ function all() {
   for (const y of (YOKAI.LEGENDS || []).concat(YOKAI.GODS || [])) out.push([`yokai/${y.id}`, drawYokai(y), 256]); // レジェンド・神は大きめ
   out.push(['oni/patrol', oniPatrol(), 256]);
   for (const [type, look] of Object.entries(BOSS_LOOK)) out.push([`oni/boss-${type}`, oniBoss(look), 384]);
+  out.push(['oni/boss-gasha', gashaSkull(), 384]);
   for (const [id, f] of Object.entries(ITEM)) out.push([`item/${id}`, f(), 128]);
   out.push(['scene/ground', tiles.ground(), 256]);
   out.push(['scene/roof', tiles.roof(), 256]);
