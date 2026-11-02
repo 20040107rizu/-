@@ -234,7 +234,7 @@
     const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
     const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
-    const bosses = S.BOSS_LIST.map(k => [k, S.BOSS_ORDER.indexOf(k)]).map(([k, i]) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join(''); // 並びは BOSS_LIST、ビットは BOSS_ORDER の位置
+    const bosses = S.BOSS_LIST.map(k => [k, S.BOSS_ORDER.indexOf(k)]).map(([k, i]) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].gimmick && !(pr && pr.c & (1 << i)) && !S.bossUnlocked(k, stats.cleared) ? '？？' : S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join(''); // 並びは BOSS_LIST、ビットは BOSS_ORDER の位置
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
       <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
       <div><span class="st ${live.status}">${st}</span></div>
@@ -1141,7 +1141,7 @@
     $('bossPick').innerHTML = S.BOSS_LIST.filter(k => !S.BOSSES[k].hidden || S.bossUnlocked(k, stats.cleared) || lobby.boss === k).map(k => {
       const b = S.BOSSES[k], open = S.bossUnlocked(k, stats.cleared), sel = lobby.boss === k;
       const lock = isHost && !open;
-      const sub = lock ? `🔒 ${S.BOSSES[b.need].name}のあと` : `鬼玉 ${b.drop}個`; // 倒すと落とす鬼玉の数
+      const sub = lock ? `🔒 ${S.bossUnlocked(b.need, stats.cleared) ? S.BOSSES[b.need].name : '？？'}のあと` : `鬼玉 ${b.drop}個`; // 倒すと落とす鬼玉の数（前のボスがまだ見えないときは名前をかくす）
       return `<button class="boss-card bk-${k}${sel ? ' on' : ''}${lock ? ' lock' : ''}" data-k="${k}" ${isHost && open ? '' : 'disabled'}>
         <span class="bname">${lock ? '？？' : b.name}</span><small>${sub}</small>${b.team ? '<small>👥 チーム向け</small>' : ''}</button>`;
     }).join('');
