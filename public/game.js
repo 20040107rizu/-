@@ -2623,6 +2623,12 @@
     for (const t of snap.turrets || []) {
       const cimg = t.clone && art('yokai/' + t.clone);
       if (cimg) { ctx.globalAlpha = 0.6 + Math.sin(now * 12) * 0.15; drawSprite(cimg, t.x, t.y + 16, 70, false); ctx.globalAlpha = 1; continue; } // ソンゴクウの分身
+      const mimg = t.mn && art('oni/patrol');
+      if (mimg) { // オニガミの手下になった見回り鬼（金色に光る）
+        ctx.save(); ctx.shadowColor = '#ffd23a'; ctx.shadowBlur = 14; drawSprite(mimg, t.x, t.y + 16, 64, false); ctx.restore();
+        ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd23a'; ctx.fillText('手下', t.x, t.y - 44);
+        continue;
+      }
       ctx.fillStyle = '#3a2a4a'; ctx.strokeStyle = t.c; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(t.x, t.y, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = t.c; ctx.beginPath(); ctx.arc(t.x, t.y - 4, 7 + Math.sin(now * 10) * 2, 0, Math.PI * 2); ctx.fill();

@@ -491,6 +491,7 @@ class Room {
       if (off < 1.1) { amount *= e.type === 'kishin' ? 0.6 : 0.35; if (Math.random() < 0.25) this.events.push({ k: 'clang', x: Math.round(e.x + rand(-20, 20)), y: Math.round(e.y - 60) }); }
       else if (off > 2.2) amount *= 1.3;
     }
+    if (src && src.passive === 'godArmor') amount *= 1.3; // オニガミ: 鬼殺しの力（鬼へのダメージ +30%）
     if (e === this.boss && src && src.passive === 'backstab' && angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face) > 2.0) amount *= 1.4; // オーディン: 背中から
     e.hp = Math.max(0, e.hp - amount);
     e.hitFlash = 0.1;
@@ -631,6 +632,10 @@ class Room {
   killPatrol(e, src) {
     this.events.push({ k: 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
     if (src && src.passive === 'nightDash' && src.legend) src.ult = Math.min(Combat.ULT_MAX, src.ult + 25); // ジャージーデビル: 鬼を狩るほど必殺技がたまる
+    if (src && src.passive === 'godArmor' && this.turrets.filter(t => t.minion && t.owner === src.id).length < 3) { // オニガミ: 倒した見回り鬼が10秒手下になる（3体まで）
+      this.turrets.push({ id: this.newId(), owner: src.id, x: e.x, y: e.y, life: 10, t: 0.5, dmg: 30 * src.stats.strongMul * 0.15, el: 'fire', c: '#ffd23a', minion: true, follow: [1.2, -1.2, 2.6][this.turrets.filter(t => t.minion && t.owner === src.id).length] });
+      this.events.push({ k: 'ring', x: Math.round(e.x), y: Math.round(e.y), r: 70, c: '#ffd23a' });
+    }
     this.calmPatrol(e); // 伝達はここで途切れる
     this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
     e.respawnT = 25;
@@ -1303,7 +1308,7 @@ class Room {
       traps: this.traps.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y) })),
       bombs: this.bombs.map(bm => ({ id: bm.id, x: Math.round(bm.x), y: Math.round(bm.y), t: +bm.t.toFixed(1) })),
       proj: this.projectiles.map(pr => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), r: pr.r, c: pr.c, punch: pr.punch, spin: pr.spin, lob: pr.lob, bomb: pr.bomb, a: +Math.atan2(pr.vy, pr.vx).toFixed(2) })),
-      turrets: this.turrets.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), c: t.c, clone: t.clone })),
+      turrets: this.turrets.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), c: t.c, clone: t.clone, mn: t.minion ? 1 : undefined })),
       tele: this.telegraphs.map(tg => ({ id: tg.id, shape: tg.shape, x: Math.round(tg.x), y: Math.round(tg.y), r: tg.r, a: tg.a, len: tg.len, w: tg.w, c: tg.c, p: +(1 - tg.t / tg.max).toFixed(2) })),
       zones: this.zones.map(z => ({ id: z.id, x: Math.round(z.x), y: Math.round(z.y), r: z.r, kind: z.kind || 'heal', c: z.c, shape: z.shape, life: +z.life.toFixed(1) })),
       ev: this.events,

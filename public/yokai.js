@@ -231,7 +231,7 @@
   list.GODS = [
     { id: 'onigami', name: 'オニガミ', role: F, color: '#a01030', origin: '鬼の世界', look: 't=human skin=c hair=long horns=oni acc=sword eyes=angry scarf=1 fx=fire',
       el: 'fire', normal: 'spin', strong: 'quake', ult: 'hellsweep', ultName: '地獄の大なぎ払い', ultDesc: '長い光線がまわりを1周して、鬼をまとめてなぎはらう',
-      passive: 'godArmor', passiveDesc: '金の鎧：受けるダメージ -35%／鬼の神：見回り鬼はオニガミをこわがって逃げていく', trial: 'オニガミの試練：鬼神・真との戦いで、自分が一度も倒れずにたおす',
+      passive: 'godArmor', passiveDesc: '金の鎧：受けるダメージ -35%／鬼の神：鬼へのダメージ +30%。見回り鬼はオニガミをこわがって逃げ、倒した見回り鬼は10秒間手下になって一緒に戦う（3体まで）', trial: 'オニガミの試練：鬼神・真との戦いで、自分が一度も倒れずにたおす',
       story: '鬼の世界の神。何度もたおされるうちに、妖怪たちの強さを認めて仲間になった。' },
     { id: 'zeus', name: 'ゼウス', role: R, color: '#3a6ad8', origin: 'ギリシャ', look: 't=human hair=long hat=crown acc=spear eyes=angry fx=spark beard=1',
       el: 'thunder', normal: 'bolt', strong: 'thunder', ult: 'tenrai', ultName: '天の雷', ultDesc: '町じゅうの鬼に雷が落ちて、大ダメージ＋しびれさせる',
