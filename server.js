@@ -633,6 +633,15 @@ class Room {
     if (b && b.hp > 0 && b.state !== 'engage') { b.state = 'hunt'; b.target = target.id; b.huntBy = e.id; b.path = null; }
   }
 
+  // オニガミの手下（見回り鬼）: 3体まで、15秒
+  minionCount(god) { return this.turrets.filter(t => t.minion && t.owner === god.id).length; }
+  makeMinion(god, e) {
+    const n = this.minionCount(god);
+    if (n >= 3) return false;
+    this.turrets.push({ id: this.newId(), owner: god.id, x: e.x, y: e.y, life: 15, t: 0.5, dmg: 30 * god.stats.strongMul * 0.15, el: 'fire', c: '#ffd23a', minion: true, follow: [1.2, -1.2, 2.6][n] });
+    this.events.push({ k: 'ring', x: Math.round(e.x), y: Math.round(e.y), r: 70, c: '#ffd23a' });
+    return true;
+  }
   uraNear(e, r = 400) { for (const p of this.activePlayers()) if (p.passive === 'bossGuard' && dist(p, e) < r) return true; return false; }
   calmPatrol(e) {
     e.state = 'patrol'; e.target = null; e.path = null; e.wanderTo = null;
@@ -643,10 +652,7 @@ class Room {
   killPatrol(e, src) {
     this.events.push({ k: 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
     if (src && src.passive === 'nightDash' && src.legend) src.ult = Math.min(Combat.ULT_MAX, src.ult + 25); // ジャージーデビル: 鬼を狩るほど必殺技がたまる
-    if (src && src.passive === 'godArmor' && this.turrets.filter(t => t.minion && t.owner === src.id).length < 3) { // オニガミ: 倒した見回り鬼が10秒手下になる（3体まで）
-      this.turrets.push({ id: this.newId(), owner: src.id, x: e.x, y: e.y, life: 10, t: 0.5, dmg: 30 * src.stats.strongMul * 0.15, el: 'fire', c: '#ffd23a', minion: true, follow: [1.2, -1.2, 2.6][this.turrets.filter(t => t.minion && t.owner === src.id).length] });
-      this.events.push({ k: 'ring', x: Math.round(e.x), y: Math.round(e.y), r: 70, c: '#ffd23a' });
-    }
+    if (src && src.passive === 'godArmor') this.makeMinion(src, e); // オニガミ: 倒した見回り鬼も手下になる
     this.calmPatrol(e); // 伝達はここで途切れる
     this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
     e.respawnT = 25;
@@ -678,9 +684,16 @@ class Room {
         }
         continue;
       }
+      // オニガミ（鬼の神）の近くに来た見回り鬼は、その場でひれふして手下になる（鬼玉は落とさない）。手下が3体いるときは逃げていく
+      const near = this.activePlayers().find(p => p.passive === 'godArmor' && dist(p, e) < 220);
+      if (near && this.makeMinion(near, e)) {
+        if (e.state === 'alert') this.calmPatrol(e);
+        e.hp = 0; e.respawnT = 25;
+        this.events.push({ k: 'gimmick', g: 'kneel', id: near.id });
+        continue;
+      }
       if (e.state === 'patrol') {
         if (!e.wanderTo || dist(e, e.wanderTo) < 30) { e.wanderTo = this.gridS.randomFreePoint(); e.path = null; }
-        // オニガミ（鬼の神）が近くにいると、こわがって反対へ逃げていく
         const god = this.activePlayers().find(p => p.passive === 'godArmor' && dist(p, e) < 260);
         if (god && !e.fleeing) { const a = Math.atan2(e.y - god.y, e.x - god.x); e.wanderTo = { x: clamp(e.x + Math.cos(a) * 500, 40, this.map.w - 40), y: clamp(e.y + Math.sin(a) * 500, 40, this.map.h - 40) }; e.path = null; e.fleeing = true; }
         if (!god) e.fleeing = false;
