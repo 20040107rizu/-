@@ -531,3 +531,10 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .pboss.on.bk-toki { background: #2a5a7a; color: #fff; }
 .pboss.on.bk-gasha { background: #8a8270; color: #fff; }
 .pboss.on.bk-amanojaku { background: #a02a7a; color: #fff; }
+
+/* 縦持ちで回して見せているとき: 切り欠き（ノッチ）は左、ホームバーは右にくるので、上下のすき間はなくす */
+html.rot .screen.active, html.rot #title.active { padding-top: 8px !important; padding-bottom: 8px !important; padding-left: max(16px, env(safe-area-inset-top)) !important; padding-right: max(16px, env(safe-area-inset-bottom)) !important; }
+html.rot .net-msg, html.rot .update-bar, html.rot .invited-card { top: 8px; }
+html.rot .invite-panel { top: 56px; left: max(16px, env(safe-area-inset-top)); }
+html.rot .build-info { right: max(6px, env(safe-area-inset-bottom)); }
+html.rot .gacha-next { right: max(16px, env(safe-area-inset-bottom)); bottom: 14px; }
