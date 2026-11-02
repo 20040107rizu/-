@@ -21,7 +21,7 @@ function rayLen(map, x, y, a, max) {
 }
 
 // ---------- 当てる ----------
-function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1); } // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
+function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1) * (p.raT > 0 ? 1.15 : 1); } // ＋ラーの太陽の光 // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
 
 const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
@@ -258,7 +258,7 @@ function ultimate(room, p, aim) {
       break;
     case 'nyoi': // 如意棒: ぐるりとなぎはらう＋分身2体
       p.nyoi = { t: 0, dur: 0.8, a0: aim, len: 520, dmg: P * 3.9, hits: new Set() };
-      for (const side of [-1, 1]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 10, t: 0.3, dmg: P * 0.8, el, c, clone: p.yokai, follow: side });
+      for (const side of [-1, 1]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 10, t: 0.3, dmg: P * 0.65, el, c, clone: p.yokai, follow: side });
       break;
     case 'dragon': // 竜の泉: 水の竜がまっすぐのみこむ＋回復の泉（倒れた仲間を泉に入れると早く起きる）
       beam(room, p, aim, 760, 110, P * 4, el, { big: true });

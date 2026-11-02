@@ -2553,7 +2553,7 @@
         let mx = input.mx, my = input.my; const m = Math.hypot(mx, my);
         if (m > 1) { mx /= m; my /= m; }
         const run = input.dash && m > 0.15 && (me.inf || me.fly || (!me.exh && me.stam > 0));
-        const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1);
+        const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1) * (S.YOKAI_BY_ID[me.yokai]?.passive === 'backstab' ? 1.3 : 1);
         myPred.x += mx * spd * dt; myPred.y += my * spd * dt;
         if (!me.fly) S.collide(map, myPred, 18); // 空を飛んでいるときは建物を越えられる
       }

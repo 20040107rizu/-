@@ -390,7 +390,7 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
@@ -398,7 +398,7 @@ class Room {
     // ソンゴクウ: いつも分身が1体ついてきて一緒に攻撃する
     for (const p of this.players.values()) if (p.passive === 'stamina') {
       const el = S.YOKAI_BY_ID[p.yokai].el;
-      this.turrets.push({ id: this.newId(), owner: p.id, x: p.x, y: p.y, life: 1e9, t: 1, dmg: 30 * p.stats.strongMul * 0.2, el, c: '#ffcc33', clone: p.yokai, follow: 1.5 });
+      this.turrets.push({ id: this.newId(), owner: p.id, x: p.x, y: p.y, life: 1e9, t: 1, dmg: 30 * p.stats.strongMul * 0.12, el, c: '#ffcc33', clone: p.yokai, follow: 1.5 });
     }
     this.ultGainTeam = [...this.players.values()].some(p => p.passive === 'sneak') ? 1.3 : 1; // ヌラリヒョンがいると、みんなの必殺技ゲージがたまりやすい
     const spawn = spawns[0];
@@ -526,6 +526,7 @@ class Room {
     if (p.passive === 'nightDash' && p.dashing) return; // ジャージーデビル: 飛んでいるあいだは当たらない
     if (p.passive === 'bossGuard') amount *= p.hp < p.maxHp / 2 ? 0.49 : 0.7; // ウラ: ボス鬼からのダメージ -30%（体力が半分を切ると、さらに -30%）
     if (p.passive === 'godArmor') amount *= 0.65; // オニガミ: 金の鎧
+    if (p.eye && amount >= 20) { p.eye = false; p.invulT = Math.max(p.invulT, 0.5); this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 90, c: '#c8a0ff' }); return; } // シヴァの第三の目で防いだ
     if (p.passive === 'lastStand' && !p.standUsed && p.hp - amount <= 0) { // ジョカ: 1度だけ耐える
       p.standUsed = true; p.hp = 1; p.invulT = 2;
       this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 120, c: '#7dffd8' });
@@ -533,6 +534,10 @@ class Room {
     }
     p.hp -= amount;
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
+    if (p.hp <= 0 && this.activePlayers().some(q => q !== p && q.passive === 'lastStand')) { // ジョカの五色の石: 倒れた場所に回復の石。5秒で自動で起きる
+      p.autoRevT = 5;
+      this.zones.push({ id: this.newId(), owner: p.id, x: p.x, y: p.y, r: 110, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#7dffd8' });
+    }
     if (p.hp <= 0) { p.hp = 0; p.down = true; p.downs = (p.downs || 0) + 1; p.reviveProg = 0; this.anyDown = true; this.events.push({ k: 'down', id: p.id }); }
   }
 
@@ -634,6 +639,7 @@ class Room {
   canSee(e, p, range, halfAngle) {
     if (!this.visibleTo(p)) return false;
     if (p.passive === 'nightDash' && p.dashing) return false; // ジャージーデビル: ダッシュ中は見つからない
+    if (p.passive === 'godArmor' && e.isPatrol) return false;   // オニガミ: 見回り鬼は鬼の神を見ても報告しない（こわくて逃げる）
     if (p.passive === 'sneak') range *= e.isPatrol ? 0.5 : 0.6; // ヌラリヒョン: 見回り鬼の見える距離が半分、ボス鬼からも見つかりにくい
     const d = dist(e, p);
     if (d > range) return false;
@@ -656,7 +662,11 @@ class Room {
       }
       if (e.state === 'patrol') {
         if (!e.wanderTo || dist(e, e.wanderTo) < 30) { e.wanderTo = this.gridS.randomFreePoint(); e.path = null; }
-        moveAlong(this, e, this.gridS, e.wanderTo.x, e.wanderTo.y, 105, PATROL_R);
+        // オニガミ（鬼の神）が近くにいると、こわがって反対へ逃げていく
+        const god = this.activePlayers().find(p => p.passive === 'godArmor' && dist(p, e) < 260);
+        if (god && !e.fleeing) { const a = Math.atan2(e.y - god.y, e.x - god.x); e.wanderTo = { x: clamp(e.x + Math.cos(a) * 500, 40, this.map.w - 40), y: clamp(e.y + Math.sin(a) * 500, 40, this.map.h - 40) }; e.path = null; e.fleeing = true; }
+        if (!god) e.fleeing = false;
+        moveAlong(this, e, this.gridS, e.wanderTo.x, e.wanderTo.y, god ? 170 : 105, PATROL_R);
         for (const p of this.activePlayers()) {
           if (this.canSee(e, p, 300, 0.65)) { this.alertPatrol(e, p); break; }
         }
@@ -1019,11 +1029,15 @@ class Room {
 
   updatePlayer(p) {
     const st = p.stats;
-    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT', 'dragonT']) p[k] = Math.max(0, (p[k] || 0) - DT);
+    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT', 'dragonT', 'raT']) p[k] = Math.max(0, (p[k] || 0) - DT);
     if (p.down || p.escaped) return;
     if (p.passive === 'sunAura' && (p.auraT -= DT) <= 0) { // ラー: まわりの仲間が少しずつ回復
       p.auraT = 1;
-      for (const q of this.activePlayers()) if (dist(p, q) < 320) this.healPlayer(q, q.maxHp * 0.015);
+      for (const q of this.activePlayers()) if (dist(p, q) < 320) { this.healPlayer(q, q.maxHp * 0.015); q.raT = 1.3; } // ＋太陽の光: 攻撃力 +15%
+    }
+    if (p.passive === 'fury' && (p.eyeT = (p.eyeT || 0) - DT) <= 0) { // シヴァの第三の目: 8秒ごとに、近くの仲間が次の大きな攻撃を1回防ぐ
+      p.eyeT = 8;
+      for (const q of this.activePlayers()) if (dist(p, q) < 280 && !q.eye) { q.eye = true; this.events.push({ k: 'ring', x: Math.round(q.x), y: Math.round(q.y), r: 60, c: '#c8a0ff' }); }
     }
     const inp = p.input;
 
@@ -1033,7 +1047,7 @@ class Room {
     if (inp.dash && moving && p.staminaT > 0) dashing = true;
     else if (inp.dash && moving && !p.exhausted && p.stamina > 0) {
       dashing = true;
-      if (p.passive !== 'stamina') p.stamina = Math.max(0, p.stamina - 35 * DT); // ソンゴクウ: きんと雲なのでスタミナが減らない
+      if (p.passive !== 'stamina' && p.passive !== 'backstab') p.stamina = Math.max(0, p.stamina - 35 * DT); // ソンゴクウ（きんと雲）・オーディン（スレイプニル）はスタミナが減らない
       if (p.stamina <= 0) p.exhausted = true;
     }
     if (!dashing) {
@@ -1043,7 +1057,7 @@ class Room {
     p.dashing = dashing;
     // 空を飛んで建物を越えられる: ソンゴクウ（きんと雲）とジャージーデビルのダッシュ中、メリュジーヌの竜の姿
     const wasFly = p.fly;
-    p.fly = (dashing && (p.passive === 'stamina' || p.passive === 'nightDash')) || p.dragonT > 0;
+    p.fly = (dashing && (p.passive === 'stamina' || p.passive === 'nightDash' || p.passive === 'shock')) || p.dragonT > 0; // ＋ゼウスの雷雲
 
     if (Combat.preMove(this, p)) {
       // 大ジャンプ中など
@@ -1057,7 +1071,7 @@ class Room {
       let mx = inp.mx, my = inp.my;
       const m = Math.hypot(mx, my);
       if (m > 1) { mx /= m; my /= m; }
-      const spd = st.speed * (dashing ? DASH_MUL : 1) * (p.spdUpT > 0 ? 1.15 : 1);
+      const spd = st.speed * (dashing ? DASH_MUL : 1) * (p.spdUpT > 0 ? 1.15 : 1) * (p.passive === 'backstab' ? 1.3 : 1); // オーディン: 8本足の馬で速い
       p.x += mx * spd * DT; p.y += my * spd * DT;
       if (m > 0.15) p.face = Math.atan2(my, mx);
     }
@@ -1169,11 +1183,12 @@ class Room {
   updateRevive() {
     for (const p of this.players.values()) {
       if (!p.down || p.escaped) continue;
+      const auto = p.autoRevT > 0 && (p.autoRevT -= DT) <= 0; // ジョカの石で起きる
       const helpers = this.activePlayers().filter(q => q !== p && dist(p, q) < REVIVE_RANGE);
       const helper = helpers.length > 0;
       if (helper) p.reviveProg += DT * (helpers.some(q => q.passive === 'reviver') ? 2 : 1); // メリュジーヌ: 起こす速さ2倍
       else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
-      if (p.reviveProg >= REVIVE_TIME) {
+      if (auto || p.reviveProg >= REVIVE_TIME) {
         p.down = false; p.hp = p.maxHp * 0.4; p.reviveProg = 0; p.invulT = 2;
         if (this.activePlayers().some(q => q.passive === 'reviver' && dist(p, q) < REVIVE_RANGE * 1.5)) { p.invulT = 5; p.atkUpT = Math.max(p.atkUpT || 0, 5); } // メリュジーヌの加護: 5秒無敵＋攻撃アップ
         for (const q of this.activePlayers()) if (q !== p && dist(p, q) < REVIVE_RANGE) q.revives++; // 起こした人に記録

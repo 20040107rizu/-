@@ -12,7 +12,7 @@
     A: { mul: 1.55, color: '#ff4a4a' },
     S: { mul: 2.0,  color: '#ffd84a' },
     L: { mul: 2.4,  color: '#ff7ae8' }, // レジェンド
-    G: { mul: 2.8,  color: '#fff2b0' }, // 神
+    G: { mul: 3.0,  color: '#fff2b0' }, // 神
   };
 
   // ---------- ロール（タイプ） ----------
