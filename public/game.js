@@ -4,6 +4,7 @@
   const S = window.Shared;
 
   const $ = id => document.getElementById(id);
+  let rotated = false; // スマホを縦に持っていて、画面を90度回して見せているか
   const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
@@ -1573,13 +1574,23 @@
   // window.innerWidth/innerHeight が古い値のことがあり、ずれると絵が引き伸ばされるので毎フレーム確かめる
   function resize() {
     const r = cv.getBoundingClientRect();
-    const w = Math.round(r.width) || window.innerWidth, h = Math.round(r.height) || window.innerHeight;
+    // 回して表示しているときは見た目の幅と高さが入れかわるので、回す前の大きさ（clientWidth/Height）を使う
+    const w = Math.round(rotated ? cv.clientWidth : r.width) || window.innerWidth, h = Math.round(rotated ? cv.clientHeight : r.height) || window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (w === W && h === H && dpr === DPR) return;
     W = w; H = h; DPR = dpr;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   }
+  // スマホを縦に持っているときは、画面全体を90度回して横向きで見せる（体を横にすれば遊べる。横にすれば普通の横画面に戻る）
+  function applyRotate() {
+    const portrait = window.innerHeight > window.innerWidth;
+    rotated = portrait && matchMedia('(pointer: coarse)').matches && Math.min(window.innerWidth, window.innerHeight) <= 900;
+    const root = document.documentElement;
+    root.classList.toggle('rot', rotated);
+    if (rotated) { root.style.setProperty('--rot-w', window.innerHeight + 'px'); root.style.setProperty('--rot-h', window.innerWidth + 'px'); }
+  }
   function fixViewport() {
+    applyRotate();
     const landscape = matchMedia('(orientation: landscape)').matches || (screen.orientation && /landscape/.test(screen.orientation.type)) || Math.abs(window.orientation || 0) === 90;
     if (landscape && window.innerWidth < window.innerHeight) {
       const m = document.querySelector('meta[name=viewport]');
@@ -1595,6 +1606,7 @@
   // 下にすき間が残ることがある。本体の画面サイズを使って画面いっぱいに広げる
   function fillScreen(landscape) {
     const root = document.documentElement.style;
+    if (rotated) { root.setProperty('--app-w', window.innerHeight + 'px'); root.setProperty('--app-h', window.innerWidth + 'px'); return; }
     if (!(isIOS && standalone)) { root.removeProperty('--app-w'); root.removeProperty('--app-h'); return; }
     const land = landscape || window.innerWidth > window.innerHeight;
     const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height);
@@ -1642,6 +1654,8 @@
   // タップ位置を、キャンバスに描いている座標（W×H）に直す
   function toCanvas(e) {
     const r = cv.getBoundingClientRect();
+    // 回して表示しているとき: 画面の下向きがゲームの右向き、画面の左向きがゲームの下向き
+    if (rotated) return { x: ((e.clientY - r.top) * W) / (r.height || W), y: ((r.right - e.clientX) * H) / (r.width || H) };
     return { x: ((e.clientX - r.left) * W) / (r.width || W), y: ((e.clientY - r.top) * H) / (r.height || H) };
   }
   function pointerDown(e) {
@@ -1680,7 +1694,7 @@
   }
   // ---- 指のスティック ----
   // どの指かを番号（identifier）でおぼえて追いかける。指を大きく動かしても、その指をはなすまではスティックのまま
-  const touchPt = t => { const r = cv.getBoundingClientRect(); return { x: ((t.clientX - r.left) * W) / (r.width || W), y: ((t.clientY - r.top) * H) / (r.height || H) }; };
+  const touchPt = toCanvas;
   const onButton = pt => Object.values(buttons()).some(b => Math.hypot(pt.x - b.x, pt.y - b.y) < b.r * 1.2);
   // passive: false で preventDefault して「このタッチはゲームが使う」と伝える（iPhone が長押しやスクロールだと思ってタッチを打ち切らないように）
   cv.addEventListener('touchstart', e => {
