@@ -9,7 +9,9 @@
   // 通常攻撃: range は自動で狙う距離、cd は間隔（秒）、dmg はタイプの攻撃力に掛ける倍率
   const NORMAL = {
     slash:      { label: '斬撃',       range: 85,  cd: 0.35, dmg: 1.0 },
+    javelin: { label: '槍投げ', range: 400, cd: 0.5, dmg: 1.25 }, // オーディン専用
     thrust:     { label: '突き',       range: 130, cd: 0.45, dmg: 1.25 },
+    javelin:    { label: '槍投げ',     range: 400, cd: 0.5,  dmg: 1.25 }, // オーディン専用（つらぬく）
     combo:      { label: '三連撃',     range: 80,  cd: 0.26, dmg: 0.5 },  // 3回目が2倍
     spin:       { label: '回転斬り',   range: 95,  cd: 0.5,  dmg: 1.2 },
     wave:       { label: '衝撃波',     range: 160, cd: 0.7,  dmg: 1.1 },

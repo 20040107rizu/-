@@ -1975,6 +1975,7 @@
     if (b.bliz) { ctx.restore(); return; }
     const top = pos.y - (img ? 132 * size / 180 : 72);
     if (b.type !== 'kyubi') bar(pos.x - 50, top, 100, 6, b.hp / b.maxHp, '#ff8a3d'); // 九尾鬼は体力のバーで本物がばれないように出さない
+    if (b.rune) { ctx.textAlign = 'center'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#7ad8ff'; ctx.shadowColor = '#3ac8ff'; ctx.shadowBlur = 8; ctx.fillText('ᚱ'.repeat(b.rune), pos.x + 70, top + 8); ctx.shadowBlur = 0; } // オーディンのルーン
     // ボスのようす（姿・効かない属性・弱点・巻き戻し）
     const tag = b.form ? `${NUE_FORM[b.form][0]}の姿：${NUE_FORM[b.form][1]}に弱い` : b.immune ? `${Attacks.ELEMENT[b.immune].name}属性が効かない` : b.weak ? '弱点！ ダメージ2倍' : b.rew != null ? `時を戻すまで ${Math.ceil(b.rew)}秒（大ダメージで止めろ）` : b.name || '';
     if (tag) {
@@ -2646,7 +2647,7 @@
         let mx = me.rev ? -input.mx : input.mx, my = me.rev ? -input.my : input.my; const m = Math.hypot(mx, my); // さかさまの呪いのときは逆
         if (m > 1) { mx /= m; my /= m; }
         const run = input.dash && m > 0.15 && (me.inf || me.fly || (!me.exh && me.stam > 0));
-        const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1) * (S.YOKAI_BY_ID[me.yokai]?.passive === 'backstab' ? 1.3 : 1);
+        const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1);
         myPred.x += mx * spd * dt; myPred.y += my * spd * dt;
         if (!me.fly) S.collide(map, myPred, 18); // 空を飛んでいるときは建物を越えられる
       }

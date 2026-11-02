@@ -30,6 +30,11 @@ function hit(room, p, e, amount, el) {
   room.damageOni(p, e, amount);
   if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1)); // 必殺技の効果中はたまらない
   if (el) applyElement(room, p, e, amount, el);
+  if (p && p.passive === 'backstab' && e.hp > 0) { // オーディン: ルーンの呪い（4秒で当てたダメージの40%、3つまで重なる）
+    const runes = (e.dots || []).filter(d => d.rune);
+    if (runes.length >= 3) { const old = runes.reduce((a, b) => (a.t < b.t ? a : b)); e.dots = e.dots.filter(d => d !== old); }
+    (e.dots = e.dots || []).push({ dps: amount * 0.1, t: 4, owner: p.id, rune: true });
+  }
   if (p && p.passive === 'shock' && e.hp > 0 && Math.random() < 0.12 && !(room.time < (e.stunReadyAt || 0))) { // ゼウス: ときどきしびれさせる
     e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 1 : 0.4);
     if (!e.isPatrol) e.stunReadyAt = room.time + 4;
@@ -119,6 +124,9 @@ function normal(room, p, aim, target) {
   const front = (k = 0.6) => ({ x: p.x + Math.cos(aim) * K.range * k, y: p.y + Math.sin(aim) * K.range * k });
   switch (at.normal) {
     case 'slash': { const f = front(); hitCircle(room, p, f.x, f.y, K.range * 0.55, base, el); room.events.push({ k: 'slash', x: R(f.x), y: R(f.y), a: +aim.toFixed(2), c }); break; }
+    case 'javelin': // 槍投げ: まっすぐ飛んで、当たった鬼をつらぬく
+      beam(room, p, aim, K.range, 26, base, el);
+      break;
     case 'thrust': {
       for (const e of room.enemies()) if (inBand(e, p, aim, K.range, 44 + room.enemyR(e))) hit(room, p, e, base, el);
       room.events.push({ k: 'beam', x: R(p.x), y: R(p.y), x2: R(p.x + Math.cos(aim) * K.range), y2: R(p.y + Math.sin(aim) * K.range), w: 10, c });

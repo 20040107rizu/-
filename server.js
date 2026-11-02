@@ -498,7 +498,7 @@ class Room {
       else if (off > 2.2) amount *= 1.3;
     }
     if (src && src.passive === 'godArmor') amount *= 1.3; // オニガミ: 鬼殺しの力（鬼へのダメージ +30%）
-    if (e === this.boss && src && src.passive === 'backstab' && angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face) > 2.0) amount *= 1.4; // オーディン: 背中から
+    if (src && src.passive === 'backstab' && (e === this.boss || e === this.boss2)) { const off = angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face); amount *= off > 2.0 ? 1.6 : off > 1.1 ? 1.2 : 1; } // オーディン: 背中から +60%、横から +20%
     e.hp = Math.max(0, e.hp - amount);
     e.hitFlash = 0.1;
     if (src) { src.dmgDealt += amount; if (!e.isPatrol) src.bossDmg += amount; }
@@ -908,7 +908,7 @@ class Room {
       sweep: b.sweep ? { a: +this.sweepAngle(b.sweep).toFixed(3), w: b.sweep.t < b.sweep.warn ? +(b.sweep.t / b.sweep.warn).toFixed(2) : -1, len: b.sweep.len, dir: b.sweep.dir } : undefined,
       // 鬼神のあとの8体
       name: b.name !== b.kind.name ? b.name : undefined, form: b.form, immune: b.immune, weak: b.weakT > 0 || undefined, down: b.downT > 0 ? +b.downT.toFixed(1) : undefined,
-      rew: b.rew ? +b.rew.t.toFixed(1) : undefined, big: b.big || undefined };
+      rew: b.rew ? +b.rew.t.toFixed(1) : undefined, big: b.big || undefined, rune: (b.dots || []).filter(d => d.rune).length || undefined };
   }
   // ======== 鬼神のあとの8体の仕組み ========
   gimmickSetup(b) {
@@ -1314,7 +1314,7 @@ class Room {
     if (inp.dash && moving && p.staminaT > 0) dashing = true;
     else if (inp.dash && moving && !p.exhausted && p.stamina > 0) {
       dashing = true;
-      if (p.passive !== 'stamina' && p.passive !== 'backstab') p.stamina = Math.max(0, p.stamina - 35 * DT); // ソンゴクウ（きんと雲）・オーディン（スレイプニル）はスタミナが減らない
+      if (p.passive !== 'stamina') p.stamina = Math.max(0, p.stamina - 35 * DT); // ソンゴクウ（きんと雲）はスタミナが減らない
       if (p.stamina <= 0) p.exhausted = true;
     }
     if (!dashing) {
@@ -1338,7 +1338,7 @@ class Room {
       let mx = inp.mx, my = inp.my;
       const m = Math.hypot(mx, my);
       if (m > 1) { mx /= m; my /= m; }
-      const spd = st.speed * (dashing ? DASH_MUL : 1) * (p.spdUpT > 0 ? 1.15 : 1) * (p.passive === 'backstab' ? 1.3 : 1); // オーディン: 8本足の馬で速い
+      const spd = st.speed * (dashing ? DASH_MUL : 1) * (p.spdUpT > 0 ? 1.15 : 1);
       p.x += mx * spd * DT; p.y += my * spd * DT;
       if (m > 0.15) p.face = Math.atan2(my, mx);
     }
