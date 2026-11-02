@@ -1105,7 +1105,7 @@ class Room {
     for (const d of this.dama) {
       if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < 32) {
         d.taken = true; p.dama += d.v;
-        if (p.passive === 'orbHeal') this.healPlayer(p, 5 * Math.min(d.v, 8)); // クルピラ: 鬼玉で少し回復
+        if (p.passive === 'orbHeal') this.healPlayer(p, 3 * Math.min(d.v, 8)); // クルピラ: 鬼玉で少し回復（1個3・どデカい鬼玉24まで）
         this.events.push({ k: 'dg', id: d.id, by: p.id, v: d.v });
       }
     }
