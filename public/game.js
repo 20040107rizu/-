@@ -1611,7 +1611,11 @@
     rotated = portrait && matchMedia('(pointer: coarse)').matches && Math.min(window.innerWidth, window.innerHeight) <= 900;
     const root = document.documentElement;
     root.classList.toggle('rot', rotated);
-    if (rotated) { root.style.setProperty('--rot-w', window.innerHeight + 'px'); root.style.setProperty('--rot-h', window.innerWidth + 'px'); }
+    if (rotated) {
+      // iPhone のホーム画面アプリは、innerHeight が画面の下まで届かないことがあるので、本体の画面サイズで広げる
+      const full = isIOS && standalone, long = full ? Math.max(screen.width, screen.height, window.innerHeight) : window.innerHeight, short = full ? Math.max(Math.min(screen.width, screen.height), window.innerWidth) : window.innerWidth;
+      root.style.setProperty('--rot-w', long + 'px'); root.style.setProperty('--rot-h', short + 'px');
+    }
   }
   function fixViewport() {
     applyRotate();
@@ -1630,7 +1634,7 @@
   // 下にすき間が残ることがある。本体の画面サイズを使って画面いっぱいに広げる
   function fillScreen(landscape) {
     const root = document.documentElement.style;
-    if (rotated) { root.setProperty('--app-w', window.innerHeight + 'px'); root.setProperty('--app-h', window.innerWidth + 'px'); return; }
+    if (rotated) { root.setProperty('--app-w', document.documentElement.style.getPropertyValue('--rot-w')); root.setProperty('--app-h', document.documentElement.style.getPropertyValue('--rot-h')); return; }
     if (!(isIOS && standalone)) { root.removeProperty('--app-w'); root.removeProperty('--app-h'); return; }
     const land = landscape || window.innerWidth > window.innerHeight;
     const long = Math.max(screen.width, screen.height), short = Math.min(screen.width, screen.height);
