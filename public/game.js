@@ -1290,7 +1290,40 @@
       <div class="co-rank">ランク別：${['C', 'B', 'A', 'S'].map(r => `<span style="color:${S.RANKS[r].color}">${r} ${pct(o.rank[r])}</span>`).join('　')}</div>
       <div class="co-fresh">まだ持っていない妖怪が出る確率：<b>${pct(o.fresh)}</b></div>`;
     $('btnChoiceExp').textContent = `📈 経験値にする（＋${expOf(pending.count).toLocaleString('ja-JP')}）`;
+    $('btnChoiceSeal').hidden = pending.count < S.SEAL_PICK;
+    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = false;
     show('choiceScreen', inBattle);
+  }
+  // 鬼玉が700個以上なら「好きなレジェンドの封印ガチャ」も選べる: まずレジェンドを選ぶ
+  $('btnChoiceSeal').onclick = () => {
+    if (!pending || pending.count < S.SEAL_PICK) return;
+    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = true;
+    $('choiceOdds').innerHTML = `<div class="co-rank">どのレジェンドの封印ガチャを引く？（封印の8体のどれかが出る）</div>
+      <div class="co-legends">${S.LEGENDS.map(l => { const got = l.seal.filter(id => friends[id]).length;
+        return `<button class="co-legend" data-id="${l.id}">${faceImg(l, !friends[l.id])}<b>${l.name}</b><small>${friends[l.id] ? `凸${S.legendTotsu(l, friends)}` : `封印の8体 ${got}/8`}</small></button>`; }).join('')}</div>
+      <button id="btnSealBack" class="small">もどる</button>`;
+    for (const b of document.querySelectorAll('#choiceOdds .co-legend')) b.onclick = () => pickSeal(S.YOKAI_BY_ID[b.dataset.id]);
+    $('btnSealBack').onclick = () => showChoice(choiceInBattle);
+  };
+  function pickSeal(l) {
+    if (!pending || pending.count < S.SEAL_PICK) return;
+    pending = null;
+    try { localStorage.removeItem('pendingChoice'); } catch {}
+    const before = friends[l.id] ? S.legendTotsu(l, friends) : 0;
+    const id = l.seal[Math.floor(Math.random() * l.seal.length)], y = S.YOKAI_BY_ID[id], isNew = !friends[id];
+    const over = addFriend(id);
+    saveAll(); updateFriendCount(); helloAgain();
+    const after = friends[l.id] ? S.legendTotsu(l, friends) : 0, t = S.totsuOf(friends[id]);
+    beep(660, 0.15, 'triangle', 0.07); setTimeout(() => beep(990, 0.25, 'triangle', 0.08), 140);
+    const line = `${y.name}が出た！（${isNew ? 'はじめてのお友達' : t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）${over ? `　あふれた分が 📈 経験値 +${over.toLocaleString('ja-JP')} に変わった` : ''}`;
+    $('rewardWeek').textContent = `L ${l.name}の封印ガチャ`;
+    $('rewardTitle').textContent = after > before ? `${l.name}が${after >= S.TOTSU_MAX ? '凸MAX' : `凸${after}`}になった！` : `${y.name}が出た！`;
+    $('rewardSub').textContent = after > before ? line + '　封印の8体が全員そろった！' : line;
+    $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + y.id) || ''}" alt="">`;
+    const inBattle = choiceInBattle;
+    if (inBattle && result) { result.myChoice = 'seal'; result.expNote = `L ${l.name}の封印ガチャ：${line}`; }
+    $('btnRewardOk').onclick = () => { if (inBattle && result) { renderResult(); show('result', true); menuMusic(); } else show('title'); };
+    show('rewardScreen', inBattle);
   }
   $('btnChoiceGacha').onclick = () => {
     if (!pending) return;
@@ -1395,6 +1428,7 @@
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
         return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
           : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
+          : result.myChoice === 'seal' ? 'L 封印ガチャ'
           : `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}${p.escaped ? '' : ` <small>（鬼玉${p.count ?? '半分'}個で）</small>`}`}</td></tr>`;
       }).join('');
     if (watcher) {

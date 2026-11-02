@@ -505,3 +505,9 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .god-name { background: linear-gradient(90deg, #fff, #ffd23a, #fff2b0, #ffd23a); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .god-box { border-color: #ffd23a !important; }
 .god-img { filter: drop-shadow(0 0 22px #ffd23a); }
+.seal-btn { background: linear-gradient(#c85aff, #7a2ab8) !important; }
+.co-legends { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.co-legend { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 92px; padding: 4px; border-radius: 10px; background: linear-gradient(#3a2456, #1a1030); border: 1px solid #c85aff88; color: #fff; font-size: 12px; }
+.co-legend .face { width: 54px; height: 54px; object-fit: contain; }
+.co-legend small { font-size: 10px; opacity: .8; }
+#btnSealBack { align-self: center; }
