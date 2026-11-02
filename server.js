@@ -18,7 +18,7 @@ const DT = 1 / TICK_RATE;
 const MAX_PLAYERS = 4;
 const TIME_LIMIT = +process.env.TIME_LIMIT || 300; // 制限時間（秒）
 const BONUS_RATE = process.env.BONUS_RATE != null ? +process.env.BONUS_RATE : 0.3; // 乱入ボスが来る確率
-const SHIN_RATE = process.env.SHIN_RATE != null ? +process.env.SHIN_RATE : 0.1;    // 鬼神を倒したとき、鬼神・真が目覚める確率
+const SHIN_RATE = process.env.SHIN_RATE != null ? +process.env.SHIN_RATE : 0.3;    // 鬼神を倒したとき、鬼神・真が目覚める確率
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
