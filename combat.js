@@ -21,13 +21,13 @@ function rayLen(map, x, y, a, max) {
 }
 
 // ---------- 当てる ----------
-function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1); } // シヴァ: 体力が減るほど強い
+function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1); } // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
 
 const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
   if (!e || e.hp <= 0) return 0;
   room.damageOni(p, e, amount);
-  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1)); // 必殺技の効果中はたまらない
+  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1)); // 必殺技の効果中はたまらない
   if (el) applyElement(room, p, e, amount, el);
   if (p && p.passive === 'shock' && e.hp > 0 && Math.random() < 0.12 && !(room.time < (e.stunReadyAt || 0))) { // ゼウス: ときどきしびれさせる
     e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 1 : 0.4);
@@ -114,6 +114,7 @@ function normal(room, p, aim, target) {
   const st = p.stats, base = st.atkDmg * K.dmg * dmgMul(p), m = st.strongMul, c = color(el);
   p.atkT = K.cd;
   p.face = aim;
+  if (p.dragonT > 0) { beam(room, p, aim, 460, 46, base * 1.6, 'water'); return; } // メリュジーヌの竜の姿: 水のブレス
   const front = (k = 0.6) => ({ x: p.x + Math.cos(aim) * K.range * k, y: p.y + Math.sin(aim) * K.range * k });
   switch (at.normal) {
     case 'slash': { const f = front(); hitCircle(room, p, f.x, f.y, K.range * 0.55, base, el); room.events.push({ k: 'slash', x: R(f.x), y: R(f.y), a: +aim.toFixed(2), c }); break; }
@@ -262,6 +263,7 @@ function ultimate(room, p, aim) {
     case 'dragon': // 竜の泉: 水の竜がまっすぐのみこむ＋回復の泉（倒れた仲間を泉に入れると早く起きる）
       beam(room, p, aim, 760, 110, P * 4, el, { big: true });
       zone(room, p, p.x, p.y, 170, 8, { amt: 12, every: 0.5, c: '#7dd8ff', shape: 'spring', revive: true });
+      p.dragonT = 8; // 8秒間、竜の姿になって空を飛ぶ
       break;
     case 'forest': // 森のまどわし: 8秒だれも見つからない＋花の矢の雨
       for (const q of room.activePlayers()) q.invisT = Math.max(q.invisT, 8);
@@ -472,7 +474,7 @@ function updateEffects(room) {
     t.life -= DT; t.t -= DT;
     const owner = room.players.get(t.owner);
     if (t.follow && owner) { const a = owner.face + t.follow * 2.2; t.x = owner.x + Math.cos(a) * 55; t.y = owner.y + Math.sin(a) * 55; }
-    if (t.t <= 0 && owner) {
+    if (t.t <= 0 && owner && !owner.down && !owner.escaped) {
       const e = nearest(room, t, 450);
       if (e) { t.t = 0.5; shoot(room, { id: t.owner, x: t.x, y: t.y }, Math.atan2(e.y - t.y, e.x - t.x), 700, t.dmg, 0.7, 8, t.el); }
     }

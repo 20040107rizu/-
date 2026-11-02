@@ -390,11 +390,17 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
     }
+    // ソンゴクウ: いつも分身が1体ついてきて一緒に攻撃する
+    for (const p of this.players.values()) if (p.passive === 'stamina') {
+      const el = S.YOKAI_BY_ID[p.yokai].el;
+      this.turrets.push({ id: this.newId(), owner: p.id, x: p.x, y: p.y, life: 1e9, t: 1, dmg: 30 * p.stats.strongMul * 0.2, el, c: '#ffcc33', clone: p.yokai, follow: 1.5 });
+    }
+    this.ultGainTeam = [...this.players.values()].some(p => p.passive === 'sneak') ? 1.3 : 1; // ヌラリヒョンがいると、みんなの必殺技ゲージがたまりやすい
     const spawn = spawns[0];
 
     // 襖（出発地点から遠いところ）
@@ -498,7 +504,7 @@ class Room {
     }
     if (e.hp <= 0) {
       if (e.isPatrol && src) src.kills++;
-      if (e.isPatrol) this.killPatrol(e);
+      if (e.isPatrol) this.killPatrol(e, src);
       else this.killBoss();
     }
   }
@@ -517,7 +523,8 @@ class Room {
   damagePlayer(p, amount) {
     if (p.down || p.escaped || p.dashT > 0 || p.invulT > 0) return;
     if (p.shieldT > 0) amount *= 0.3;
-    if (p.passive === 'bossGuard') amount *= 0.7; // ウラ: ボス鬼からのダメージ -30%
+    if (p.passive === 'nightDash' && p.dashing) return; // ジャージーデビル: 飛んでいるあいだは当たらない
+    if (p.passive === 'bossGuard') amount *= p.hp < p.maxHp / 2 ? 0.49 : 0.7; // ウラ: ボス鬼からのダメージ -30%（体力が半分を切ると、さらに -30%）
     if (p.passive === 'godArmor') amount *= 0.65; // オニガミ: 金の鎧
     if (p.passive === 'lastStand' && !p.standUsed && p.hp - amount <= 0) { // ジョカ: 1度だけ耐える
       p.standUsed = true; p.hp = 1; p.invulT = 2;
@@ -603,19 +610,22 @@ class Room {
     target.spotted = true;
     target.seenByPatrol = true;
     this.events.push({ k: 'whistle', id: e.id, target: target.id });
-    // ボス鬼に報告
+    // ボス鬼に報告（ウラの近くの見回り鬼は、鬼の王がこわくて報告できない）
     const b = this.boss;
+    if (this.uraNear(e)) return;
     if (b && b.hp > 0 && b.state !== 'engage') { b.state = 'hunt'; b.target = target.id; b.huntBy = e.id; b.path = null; }
   }
 
+  uraNear(e, r = 400) { for (const p of this.activePlayers()) if (p.passive === 'bossGuard' && dist(p, e) < r) return true; return false; }
   calmPatrol(e) {
     e.state = 'patrol'; e.target = null; e.path = null; e.wanderTo = null;
     const b = this.boss;
     if (b && b.huntBy === e.id) { b.huntBy = null; if (b.state === 'hunt') { b.state = 'wander'; b.target = null; b.path = null; } }
   }
 
-  killPatrol(e) {
+  killPatrol(e, src) {
     this.events.push({ k: 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
+    if (src && src.passive === 'nightDash' && src.legend) src.ult = Math.min(Combat.ULT_MAX, src.ult + 25); // ジャージーデビル: 鬼を狩るほど必殺技がたまる
     this.calmPatrol(e); // 伝達はここで途切れる
     this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
     e.respawnT = 25;
@@ -624,7 +634,7 @@ class Room {
   canSee(e, p, range, halfAngle) {
     if (!this.visibleTo(p)) return false;
     if (p.passive === 'nightDash' && p.dashing) return false; // ジャージーデビル: ダッシュ中は見つからない
-    if (p.passive === 'sneak' && e.isPatrol) range *= 0.5;    // ヌラリヒョン: 見回り鬼の見える距離が半分
+    if (p.passive === 'sneak') range *= e.isPatrol ? 0.5 : 0.6; // ヌラリヒョン: 見回り鬼の見える距離が半分、ボス鬼からも見つかりにくい
     const d = dist(e, p);
     if (d > range) return false;
     if (d > 70 && angleDiff(Math.atan2(p.y - e.y, p.x - e.x), e.face) > halfAngle) return false;
@@ -662,7 +672,7 @@ class Room {
         else if ((e.lostT += DT) > 5) this.calmPatrol(e);
         // ボスへの報告を続ける
         const b = this.boss;
-        if (b && b.hp > 0 && b.state === 'wander') { b.state = 'hunt'; b.target = t.id; b.huntBy = e.id; }
+        if (b && b.hp > 0 && b.state === 'wander' && !this.uraNear(e)) { b.state = 'hunt'; b.target = t.id; b.huntBy = e.id; }
       }
     }
   }
@@ -844,7 +854,7 @@ class Room {
   }
 
   // 怒ると攻撃の間隔が短くなる（鬼神は変身で技が増えるので、怒りでは速くならない）
-  rageGap(b) { return b.rage && b.type !== 'kishin' ? 0.75 : 1; }
+  rageGap(b) { return (b.rage && b.type !== 'kishin' ? 0.75 : 1) * (this.uraNear(b, 320) ? 1.3 : 1); } // ウラの近くでは攻撃がおそくなる
   // 金の鎧があるか（金鬼は怒ったあと、鬼神は2段階目から）
   bossArmor(b) { return (b.type === 'gold' && b.rage) || (this.godLike(b) && b.phase >= 2); }
 
@@ -1009,7 +1019,7 @@ class Room {
 
   updatePlayer(p) {
     const st = p.stats;
-    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT']) p[k] = Math.max(0, p[k] - DT);
+    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT', 'dragonT']) p[k] = Math.max(0, (p[k] || 0) - DT);
     if (p.down || p.escaped) return;
     if (p.passive === 'sunAura' && (p.auraT -= DT) <= 0) { // ラー: まわりの仲間が少しずつ回復
       p.auraT = 1;
@@ -1023,7 +1033,7 @@ class Room {
     if (inp.dash && moving && p.staminaT > 0) dashing = true;
     else if (inp.dash && moving && !p.exhausted && p.stamina > 0) {
       dashing = true;
-      p.stamina = Math.max(0, p.stamina - (p.passive === 'stamina' ? 21 : 35) * DT); // ソンゴクウ: 減りにくい
+      if (p.passive !== 'stamina') p.stamina = Math.max(0, p.stamina - 35 * DT); // ソンゴクウ: きんと雲なのでスタミナが減らない
       if (p.stamina <= 0) p.exhausted = true;
     }
     if (!dashing) {
@@ -1031,6 +1041,9 @@ class Room {
       if (p.exhausted && p.stamina >= 30) p.exhausted = false;
     }
     p.dashing = dashing;
+    // 空を飛んで建物を越えられる: ソンゴクウ（きんと雲）とジャージーデビルのダッシュ中、メリュジーヌの竜の姿
+    const wasFly = p.fly;
+    p.fly = (dashing && (p.passive === 'stamina' || p.passive === 'nightDash')) || p.dragonT > 0;
 
     if (Combat.preMove(this, p)) {
       // 大ジャンプ中など
@@ -1048,7 +1061,9 @@ class Room {
       p.x += mx * spd * DT; p.y += my * spd * DT;
       if (m > 0.15) p.face = Math.atan2(my, mx);
     }
-    S.collide(this.map, p, PLAYER_R);
+    if (p.fly) { p.x = clamp(p.x, PLAYER_R, this.map.w - PLAYER_R); p.y = clamp(p.y, PLAYER_R, this.map.h - PLAYER_R); }
+    else S.collide(this.map, p, PLAYER_R); // 建物の上でおりたら、いちばん近い道へ
+    if (wasFly && !p.fly) p.invulT = Math.max(p.invulT, 0.3);
 
     const at = A.of(p.yokai);
     const target = this.nearestEnemy(p, A.NORMAL[at.normal].range + 150);
@@ -1059,7 +1074,7 @@ class Room {
     if (inp.strong && p.strongT <= 0 && !busy) Combat.strong(this, p, aim, target);
     if (inp.skill && p.skillT <= 0 && !p.leap) Combat.skill(this, p, aim);
     if (p.legend) {
-      if (!(this.time < p.ultBusyUntil)) p.ult = Math.min(Combat.ULT_MAX, p.ult + (st.name === 'ヒーラー' ? 2.4 : 1.0) * DT * (p.ultBoost || 1)); // 時間でも少しずつたまる（ヒーラーは多め）
+      if (!(this.time < p.ultBusyUntil)) p.ult = Math.min(Combat.ULT_MAX, p.ult + (st.name === 'ヒーラー' ? 2.4 : 1.0) * DT * (p.ultBoost || 1) * (this.ultGainTeam || 1)); // 時間でも少しずつたまる（ヒーラーは多め）
       if (inp.ult && p.ult >= Combat.ULT_MAX && !busy) Combat.ultimate(this, p, aim);
     }
 
@@ -1160,6 +1175,7 @@ class Room {
       else p.reviveProg = Math.max(0, p.reviveProg - DT * 0.5);
       if (p.reviveProg >= REVIVE_TIME) {
         p.down = false; p.hp = p.maxHp * 0.4; p.reviveProg = 0; p.invulT = 2;
+        if (this.activePlayers().some(q => q.passive === 'reviver' && dist(p, q) < REVIVE_RANGE * 1.5)) { p.invulT = 5; p.atkUpT = Math.max(p.atkUpT || 0, 5); } // メリュジーヌの加護: 5秒無敵＋攻撃アップ
         for (const q of this.activePlayers()) if (q !== p && dist(p, q) < REVIVE_RANGE) q.revives++; // 起こした人に記録
         this.events.push({ k: 'revive', id: p.id });
       }
@@ -1261,7 +1277,7 @@ class Room {
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
-        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: +(p.jump || 0).toFixed(2), dodge: !!p.dodge,
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? { type: b.type, x: Math.round(b.x), y: Math.round(b.y), hp: Math.round(b.hp), maxHp: b.maxHp, face: +b.face.toFixed(2), st: b.state, stun: b.stunT > 0, target: b.state === 'hunt' || b.state === 'engage' ? b.target : null, hunt: b.state === 'hunt', flash: b.hitFlash > 0, rage: !!b.rage,

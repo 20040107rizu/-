@@ -2552,10 +2552,10 @@
         const st = S.yokaiStats(me.yokai);
         let mx = input.mx, my = input.my; const m = Math.hypot(mx, my);
         if (m > 1) { mx /= m; my /= m; }
-        const run = input.dash && m > 0.15 && (me.inf || (!me.exh && me.stam > 0));
+        const run = input.dash && m > 0.15 && (me.inf || me.fly || (!me.exh && me.stam > 0));
         const spd = st.speed * (run ? 1.4 : 1) * (me.su ? 1.15 : 1);
         myPred.x += mx * spd * dt; myPred.y += my * spd * dt;
-        S.collide(map, myPred, 18);
+        if (!me.fly) S.collide(map, myPred, 18); // 空を飛んでいるときは建物を越えられる
       }
       const k = me.dash ? 0.5 : 0.12;
       myPred.x += (me.x - myPred.x) * k; myPred.y += (me.y - myPred.y) * k;
