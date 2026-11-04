@@ -166,14 +166,15 @@
     };
   }
   // フレンドに見せる自分の情報（持っている妖怪の数・記録・称号）
-  const PROF_YOKAI = S.YOKAI.concat(S.LEGENDS);
+  const PROF_YOKAI = S.YOKAI.concat(S.LEGENDS); // 引き継ぎコードのレベルの並び（変えない）
+  const PROF_LIST = PROF_YOKAI.concat(S.GODS);   // フレンドに見せる並び（神は最後。前のバージョンの人は神の分が無い）
   function myProfile() {
     return {
-      f: PROF_YOKAI.map(y => Math.min(9, countOf(y.id))).join(''),
+      f: PROF_LIST.map(y => Math.min(9, countOf(y.id))).join(''),
       s: [stats.plays, stats.escapes, stats.best, stats.dama],
       c: S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0),
       tc: titlesDone().length, wt: weeklyTitles, fv: favYokai,
-      lv: PROF_YOKAI.map(y => lvOfId(y.id).toString(36).padStart(2, '0')).join(''), // お友達レベル（2けたの36進数）
+      lv: PROF_LIST.map(y => lvOfId(y.id).toString(36).padStart(2, '0')).join(''), // お友達レベル（2けたの36進数）
     };
   }
   function helloAgain() {
@@ -229,10 +230,14 @@
     const b = self ? { name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() } : buddies[profPid] || {};
     const live = self ? { status: 'me' } : buddyLive.find(f => f.pid === profPid) || { status: 'off', seen: b.seen };
     const pr = b.prof;
-    const fav = pr && pr.fv && S.YOKAI_BY_ID[pr.fv]; // お気に入りがあれば、いまのお友達の代わりに出す
+    // レジェンド・神は、自分がもう解放している人にだけ見せる
+    const seeL = self || S.LEGENDS.some(l => friends[l.id]), seeG = self || godTabShown();
+    const canSee = q => !q || (!(q.legend && !seeL) && !(q.god && !seeG));
+    const favQ = pr && pr.fv && S.YOKAI_BY_ID[pr.fv];
+    const fav = canSee(favQ) ? favQ : null; // お気に入りがあれば、いまのお友達の代わりに出す
     const y = fav || S.YOKAI_BY_ID[live.yokai || b.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
-    const counts = pr ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
-    const own = S.YOKAI.filter(q => counts[q.id]).length, legends = S.LEGENDS.filter(q => counts[q.id]);
+    const counts = pr ? Object.fromEntries(PROF_LIST.map((q, i) => [q.id, +(pr.f[i] || 0)])) : {};
+    const own = S.YOKAI.filter(q => counts[q.id]).length, legends = seeL ? S.LEGENDS.filter(q => counts[q.id]) : [], gods = seeG ? S.GODS.filter(q => counts[q.id]) : [];
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
     const bosses = S.BOSS_LIST.map(k => [k, S.BOSS_ORDER.indexOf(k)]).map(([k, i]) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].gimmick && !(pr && pr.c & (1 << i)) && !S.bossUnlocked(k, stats.cleared) ? '？？' : S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join(''); // 並びは BOSS_LIST、ビットは BOSS_ORDER の位置
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
@@ -240,7 +245,7 @@
       <div><span class="st ${live.status}">${st}</span></div>
       <div>${fav ? '⭐ お気に入り' : 'いまのお友達'}：<span style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</span></div>
       ${self ? `<small class="fav-hint">右のお友達をタップすると、お気に入りにできます${fav ? '（もう一度タップではずす）' : ''}</small>` : ''}
-      ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　L レジェンド ${legends.length}体` : ''}</dd>
+      ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　L レジェンド ${legends.length}体` : ''}${gods.length ? `　✨ 神 ${gods.length}体` : ''}</dd>
         <dt>遊んだ</dt><dd>${pr.s[0] || 0}回（脱出 ${pr.s[1] || 0}回）</dd>
         <dt>鬼玉</dt><dd>最高 ${pr.s[2] || 0}個・合計 ${(pr.s[3] || 0).toLocaleString('ja-JP')}個</dd>
         <dt>称号</dt><dd>${pr.tc || 0}個${(pr.wt || []).length ? `（限定 ${pr.wt.map(titleTag).join(' ')}）` : ''}</dd>
@@ -251,18 +256,19 @@
     if ($('profJoin')) $('profJoin').onclick = () => connect({ t: 'join', code: live.room });
     if ($('profWatch')) $('profWatch').onclick = () => connect({ t: 'watch', code: live.room });
     // 持っている妖怪
-    const tabs = [['all', 'ぜんぶ'], ['L', 'L'], ['S', 'S'], ['A', 'A'], ['B', 'B'], ['C', 'C']];
+    const tabs = [['all', 'ぜんぶ'], ...(seeG ? [['G', '✨神']] : []), ...(seeL ? [['L', 'L']] : []), ['S', 'S'], ['A', 'A'], ['B', 'B'], ['C', 'C']];
+    if (!tabs.some(([k]) => k === profTab)) profTab = 'all';
     $('profTabs').innerHTML = pr ? tabs.map(([k, l]) => {
-      const pool = k === 'all' ? S.YOKAI : k === 'L' ? S.LEGENDS : S.YOKAI.filter(q => q.rank === k);
+      const pool = k === 'all' ? S.YOKAI : k === 'L' ? S.LEGENDS : k === 'G' ? S.GODS : S.YOKAI.filter(q => q.rank === k);
       return `<button class="tab${profTab === k ? ' on' : ''}" data-k="${k}">${l} <small>${pool.filter(q => counts[q.id]).length}/${pool.length}</small></button>`;
     }).join('') : '';
     for (const t of $('profTabs').querySelectorAll('button')) t.onclick = () => { profTab = t.dataset.k; $('profGrid').scrollTop = 0; renderProfile(state); };
-    const pool = profTab === 'all' ? S.LEGENDS.concat(S.YOKAI) : profTab === 'L' ? S.LEGENDS : S.YOKAI.filter(q => q.rank === profTab);
+    const pool = profTab === 'all' ? (seeG ? S.GODS : []).concat(seeL ? S.LEGENDS : [], S.YOKAI) : profTab === 'L' ? S.LEGENDS : profTab === 'G' ? S.GODS : S.YOKAI.filter(q => q.rank === profTab);
     const list = pool.filter(q => counts[q.id]);
-    const lvs = pr && typeof pr.lv === 'string' ? Object.fromEntries(PROF_YOKAI.map((q, i) => [q.id, parseInt(pr.lv.substr(i * 2, 2), 36) || 1])) : {};
+    const lvs = pr && typeof pr.lv === 'string' ? Object.fromEntries(PROF_LIST.map((q, i) => [q.id, parseInt(pr.lv.substr(i * 2, 2), 36) || 1])) : {};
     $('profGrid').innerHTML = !pr ? '' : list.length ? list.map(q => {
       const n = counts[q.id], tt = S.totsuOf(n), qlv = lvs[q.id] || 1;
-      return `<div class="yk${q.legend ? ' legend' : ''}${fav && fav.id === q.id ? ' fav' : ''}" data-id="${q.id}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${qlv > 1 ? `<span class="lvc">Lv${qlv}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
+      return `<div class="yk${q.legend ? ' legend' : ''}${q.god ? ' god' : ''}${fav && fav.id === q.id ? ' fav' : ''}" data-id="${q.id}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.god ? "神" : q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${qlv > 1 ? `<span class="lvc">Lv${qlv}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
     }).join('') : '<p class="sub">このランクのお友達はまだいません</p>';
     if (self) for (const el of $('profGrid').querySelectorAll('.yk')) el.onclick = () => {
       favYokai = favYokai === el.dataset.id ? null : el.dataset.id;
@@ -1198,7 +1204,7 @@
       d.className = 'yk' + (y.id === selYokai ? ' sel' : '') + (owned ? '' : ' locked') + (y.legend ? ' legend' : '') + (y.god ? ' god' : '');
       d.dataset.id = y.id;
       d.innerHTML = owned
-        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
+        ? `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.god ? "神" : y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y)}<span class="nm">${y.name}</span><small class="nm">${S.ROLES[y.role].name}・${y.origin}</small>`
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
