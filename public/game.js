@@ -521,7 +521,8 @@
       <br><small>封印の8体が全員そろって凸すると、${esc(l.name)}も凸します${lt < S.TOTSU_MAX ? `（凸${next}まで：あと${short}体）` : ''}</small>
       <div class="mem">${l.seal.map(id => { const y = S.YOKAI_BY_ID[id], t = S.totsuOf(friends[id] || 0); return `<span class="got${t >= next && lt < S.TOTSU_MAX ? ' ok' : ''}">${y.name} ${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>`; }).join('')}</div>
       <div class="cond"><span class="cl">🔮 封印の欠片（${S.STAGES[l.stage].name}でボスを倒すともらえる）</span><span class="pg">${frag}個</span></div>
-      <button id="btnSealGacha" class="big"${frag >= S.SEAL.gacha && lt < S.TOTSU_MAX ? '' : ' disabled'}>🔮 封印ガチャ（欠片${S.SEAL.gacha}個：封印の8体のどれかが出る）</button>
+      <button id="btnSealGacha" class="big"${frag >= S.SEAL.gacha ? '' : ' disabled'}>🔮 封印ガチャ（欠片${S.SEAL.gacha}個：封印の8体のどれかが出る）</button>
+      ${lt >= S.TOTSU_MAX ? '<small>凸MAXでも引けます。完凸の妖怪が出たら経験値に変わります</small>' : ''}
       <p id="sealGachaMsg" class="sub"></p>`;
   }
   function sealGacha(l) {
