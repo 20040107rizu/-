@@ -306,7 +306,7 @@
   function renderZukan() {
     $('zukanTitles').hidden = zukanRank !== 'title';
     $('zukanGrid').hidden = zukanRank === 'title';
-    if (zukanRank === 'god' && !godReady()) zukanRank = 'all';
+    if (zukanRank === 'god' && !godTabShown()) zukanRank = 'all';
     $('zukanRoles').hidden = zukanRank === 'title' || zukanRank === 'legend' || zukanRank === 'god';
     const got = S.YOKAI.filter(y => friends[y.id]).length;
     $('zukanCount').textContent = `${got} / ${S.YOKAI.length} 体`;
@@ -315,7 +315,7 @@
       const l = k === 'all' ? S.YOKAI : S.YOKAI.filter(y => y.rank === k);
       return `<button class="tab${zukanRank === k ? ' on' : ''}" data-k="${k}">${label} <small>${l.filter(y => friends[y.id]).length}/${l.length}</small></button>`;
     }).join('') + `<button class="tab legend-tab${zukanRank === 'legend' ? ' on' : ''}" data-k="legend"><span style="color:${S.RANKS.L.color}">L</span> レジェンド <small>${S.LEGENDS.filter(l => friends[l.id]).length}/${S.LEGENDS.length}</small></button>`
-      + (godReady() ? `<button class="tab god-tab${zukanRank === 'god' ? ' on' : ''}" data-k="god">✨ 神 <small>${S.GODS.filter(g => friends[g.id]).length}/${S.GODS.length}</small></button>` : '')
+      + (godTabShown() ? `<button class="tab god-tab${zukanRank === 'god' ? ' on' : ''}" data-k="god">✨ 神 <small>${S.GODS.filter(g => friends[g.id]).length}/${S.GODS.length}</small></button>` : '')
       + `<button class="tab title-tab${zukanRank === 'title' ? ' on' : ''}" data-k="title">🏅 称号 <small>${titlesDone().length}/${titleTotal()}</small></button>`;
     $('zukanRoles').innerHTML = [['all', 'ぜんぶ'], ...Object.entries(S.ROLES).map(([k, r]) => [k, r.name])].map(([k, label]) =>
       `<button class="tab${zukanRole === k ? ' on' : ''}" data-k="${k}">${label}</button>`).join('');
@@ -431,6 +431,7 @@
     };
   }
   // ---------- 神（隠し）: レジェンドを全員集めて、隠しボスを全部たおした人だけ ----------
+  const godTabShown = () => godReady() || S.GODS.some(g => friends[g.id]); // 神を1体でも持っていれば図鑑に神のタブを出す
   function godReady() { return S.LEGENDS.every(l => friends[l.id]) && !!stats.feats.gokuou && !!stats.feats.hyakki && !!stats.feats.shin; }
   function renderGods() {
     if (!S.YOKAI_BY_ID[zukanSel]?.god) zukanSel = S.GODS[0].id;
