@@ -2034,37 +2034,59 @@
   }
 
   // 鬼玉: 別のキャンバスを使わずにその場で描く（iPhone でキャンバスのメモリが足りなくなっても消えないように）
-  // どデカい鬼玉は、落としたボス鬼の色の玉＋目立つ色のツノ（赤鬼なら赤い玉に金のツノ、白鬼なら白い玉に赤いツノ）
+  // どデカい鬼玉は、落としたボス鬼の色のつやつやの玉に、同じ色の鬼のツノ（赤鬼は赤、黒鬼は紫…）
   const hexRgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
   const mixHex = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+  const ORB_COLOR = {
+    red: '#ff4a1a', blue: '#2a7aff', black: '#8a3aff', gold: '#ffb81a', white: '#dff0ff', fuurai: '#1ad8a0', kishin: '#ff7a1a',
+    yakubyo: '#86c832', kage: '#4a1ab8', nue: '#4a6ad8', twin: '#22d4a0', twin2: '#ffcc22', kyubi: '#ffd890', toki: '#2a9ae0',
+    gasha: '#f0e2b8', amanojaku: '#e03aa8', gokuou: '#a00818', hyakki: '#a02ae8', shin: '#ff2a8a',
+  };
+  const orbCache = new Map();
   function orbColors(b) {
-    const base = (S.BOSSES[b] && S.BOSSES[b].color) || '#ff3da8';
-    const [r, g, bl] = hexRgb(base), lum = (0.299 * r + 0.587 * g + 0.114 * bl) / 255;
-    return { hi: mixHex(base, '#ffffff', 0.65), mid: lum < 0.25 ? mixHex(base, '#ffffff', 0.25) : base, lo: mixHex(base, '#000000', 0.45), glow: base, horn: lum > 0.6 ? '#d8243a' : '#ffd23a', hornLine: lum > 0.6 ? '#ffb0b8' : '#a87a10' };
+    const key = b || '';
+    if (orbCache.has(key)) return orbCache.get(key);
+    const base = ORB_COLOR[b] || (S.BOSSES[b] && S.BOSSES[b].color) || '#ff3da8';
+    const oc = { mid: base, hi: mixHex(base, '#fffbe0', 0.55), lo: mixHex(base, '#000000', 0.4), line: mixHex(base, '#000000', 0.6), halo: mixHex(base, '#ffe14a', 0.6), horn: '#ffe14a' };
+    orbCache.set(key, oc);
+    return oc;
   }
+  const PINK = { mid: '#ff3da8', hi: '#ffd0f0', lo: '#a8106a', line: '#6a0a44', halo: '#ff8ad0' };
   function drawOrb(x, y, r, big, b) {
-    const oc = big ? orbColors(b) : null;
-    const gr = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * (big ? 2.2 : 1.9));
-    if (big) { const [cr, cg, cb] = hexRgb(oc.glow); gr.addColorStop(0, `rgba(${cr},${cg},${cb},0.75)`); gr.addColorStop(1, `rgba(${cr},${cg},${cb},0)`); }
-    else { gr.addColorStop(0, 'rgba(255,61,168,0.7)'); gr.addColorStop(1, 'rgba(255,61,168,0)'); }
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * (big ? 2.2 : 1.9), 0, Math.PI * 2); ctx.fill();
-    if (big) { // どデカい鬼玉には鬼のツノ
-      for (const s of [-1, 1]) {
-        ctx.beginPath();
-        ctx.moveTo(x + s * r * 0.25, y - r * 0.82);
-        ctx.quadraticCurveTo(x + s * r * 0.45, y - r * 1.55, x + s * r * 0.95, y - r * 1.75);
-        ctx.quadraticCurveTo(x + s * r * 0.85, y - r * 1.2, x + s * r * 0.8, y - r * 0.5);
-        ctx.closePath();
-        ctx.fillStyle = oc.horn; ctx.strokeStyle = '#1a0810'; ctx.lineWidth = 3; ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x + s * r * 0.4, y - r * 1.05); ctx.lineTo(x + s * r * 0.82, y - r * 1.0); ctx.moveTo(x + s * r * 0.55, y - r * 1.35); ctx.lineTo(x + s * r * 0.86, y - r * 1.33);
-        ctx.strokeStyle = oc.hornLine; ctx.lineWidth = 2; ctx.stroke();
-      }
-    }
-    const core = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    if (big) { core.addColorStop(0, oc.hi); core.addColorStop(0.45, oc.mid); core.addColorStop(1, oc.lo); } else { core.addColorStop(0, '#ffd0f0'); core.addColorStop(0.45, '#ff5ab8'); core.addColorStop(1, '#c8187a'); }
-    ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = big ? '#1a0810' : '#7a0a4a'; ctx.lineWidth = big ? 3 : 1.5; ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.globalAlpha *= 0.85; ctx.beginPath(); ctx.arc(x - r / 3, y - r / 3, r / 4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha /= 0.85;
+    const oc = big ? orbColors(b) : PINK;
+    // まわりの光（参考: 黄色っぽくふわっと光る）
+    const R2 = r * (big ? 2.1 : 1.8);
+    const gr = ctx.createRadialGradient(x, y, r * 0.7, x, y, R2);
+    const [hr, hg, hb] = hexRgb(oc.halo);
+    gr.addColorStop(0, `rgba(${hr},${hg},${hb},0.95)`); gr.addColorStop(0.45, `rgba(${hr},${hg},${hb},0.6)`); gr.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R2, 0, Math.PI * 2); ctx.fill();
+    // 体（どデカい鬼玉は玉と左右のツノをひとつの形にする）
+    const horns = () => { ctx.beginPath(); for (const s of [-1, 1]) {
+      ctx.moveTo(x + s * r * 0.9, y - r * 0.42);
+      ctx.quadraticCurveTo(x + s * r * 1.12, y - r * 0.95, x + s * r * 1.0, y - r * 1.38);
+      ctx.quadraticCurveTo(x + s * r * 0.62, y - r * 1.2, x + s * r * 0.4, y - r * 0.9);
+      ctx.closePath();
+    } };
+    const ball = () => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); };
+    const body = ctx.createRadialGradient(x - r * 0.25, y - r * 0.35, r * 0.05, x, y, r * 1.15);
+    body.addColorStop(0, oc.hi); body.addColorStop(0.5, oc.mid); body.addColorStop(1, oc.lo);
+    // 外側だけふちどり: 先に全部を太く描いてから、上を塗る
+    ctx.strokeStyle = oc.line; ctx.lineWidth = big ? 5 : 2.5; ctx.lineJoin = 'round';
+    if (big) { horns(); ctx.stroke(); }
+    ball(); ctx.stroke();
+    ctx.fillStyle = body;
+    if (big) { horns(); ctx.fill(); }
+    ball(); ctx.fill();
+    // つや: 上の大きな光と、下のふちの照り返し
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,252,230,0.75)';
+    ctx.beginPath(); ctx.ellipse(x - r * 0.12, y - r * 0.5, r * 0.36, r * 0.22, -0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.ellipse(x - r * 0.2, y - r * 0.55, r * 0.14, r * 0.08, -0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,240,220,0.35)'; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, r * 0.8, 0.35, 1.9); ctx.stroke();
+    if (big) for (const s of [-1, 1]) { ctx.fillStyle = 'rgba(255,250,225,0.55)'; ctx.beginPath(); ctx.ellipse(x + s * r * 0.92, y - r * 0.95, r * 0.06, r * 0.16, s * -0.4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
   }
   // 使い終わったキャンバスのメモリをすぐ返す（iPhone は合計の上限が小さく、こえると新しいキャンバスが真っ白になる）
   const freeCanvas = c => { if (c) { c.width = 0; c.height = 0; } };
@@ -3053,9 +3075,8 @@
       const r = d.v > 1 ? 30 + Math.sin(now * 6) * 2 : 9;
       drawOrb(d.x, d.y + bob, r, d.v > 1, d.b);
       if (d.v > 1) {
-        ctx.strokeStyle = orbColors(d.b).horn; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(d.x, d.y + bob, r + 4, 0, Math.PI * 2); ctx.stroke();
-        ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-        ctx.strokeText(`×${d.v}`, d.x, d.y + bob - r * 1.9 - 8); ctx.fillStyle = orbColors(d.b).horn; ctx.fillText(`×${d.v}`, d.x, d.y + bob - r * 1.9 - 8);
+                ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+        ctx.strokeText(`×${d.v}`, d.x, d.y + bob - r * 1.45 - 10); ctx.fillStyle = orbColors(d.b).horn; ctx.fillText(`×${d.v}`, d.x, d.y + bob - r * 1.45 - 10);
       }
     }
     // アイテム
