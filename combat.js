@@ -37,7 +37,7 @@ function hit(room, p, e, amount, el) {
     if (runes.length >= 3) { const old = runes.reduce((a, b) => (a.t < b.t ? a : b)); e.dots = e.dots.filter(d => d !== old); }
     (e.dots = e.dots || []).push({ dps: amount * 0.1, t: 4, owner: p.id, rune: true });
   }
-  if (p && p.passive === 'shock' && e.hp > 0 && Math.random() < 0.2 && !(room.time < (e.stunReadyAt || 0))) { // ゼウス: ときどきしびれさせる
+  if (p && p.passive === 'shock' && e.hp > 0 && Math.random() < 0.12 && !(room.time < (e.stunReadyAt || 0))) { // ゼウス: ときどきしびれさせる
     e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 1 : 0.4);
     if (!e.isPatrol) e.stunReadyAt = room.time + 4;
   }
@@ -303,8 +303,8 @@ function ultimate(room, p, aim) {
       break;
     case 'tenrai': // 天の雷: 町じゅうの鬼に雷＋しびれ
       for (const e of enemiesInCircle(room, p.x, p.y, 1600)) {
-        hit(room, p, e, P * (e.isPatrol ? 3 : 13), el);
-        if (e.hp > 0) { e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 3.5 : 2.5); if (!e.isPatrol) e.stunReadyAt = room.time + 5; }
+        hit(room, p, e, P * 3, el);
+        if (e.hp > 0) { e.stunT = Math.max(e.stunT || 0, e.isPatrol ? 2.5 : 1.5); if (!e.isPatrol) e.stunReadyAt = room.time + 5; }
         room.events.push({ k: 'bolt', x: R(e.x), y: R(e.y), c: '#fff27a', big: true });
       }
       break;

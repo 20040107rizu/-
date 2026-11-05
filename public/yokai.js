@@ -234,7 +234,7 @@
       passive: 'godArmor', passiveDesc: '金の鎧：受けるダメージ -35%／鬼の神：鬼へのダメージ +30%。近くに来た見回り鬼はひれふして15秒間手下になる（3体まで。いっぱいのときは逃げていく）。見回り鬼に報告されない', trial: 'オニガミの試練：鬼神・真との戦いで、自分が一度も倒れずにたおす',
       story: '鬼の世界の神。何度もたおされるうちに、妖怪たちの強さを認めて仲間になった。' },
     { id: 'zeus', name: 'ゼウス', role: R, color: '#3a6ad8', origin: 'ギリシャ', look: 't=human hair=long hat=crown acc=spear eyes=angry fx=spark beard=1',
-      el: 'thunder', normal: 'bolt', strong: 'thunder', ult: 'tenrai', ultName: '天雷ケラウノス', ultDesc: '町じゅうの鬼に雷が落ちて、大ダメージ＋しびれさせる（ボス鬼には特大ダメージ）',
+      el: 'thunder', normal: 'bolt', strong: 'thunder', ult: 'tenrai', ultName: '天雷ケラウノス', ultDesc: '町じゅうの鬼に雷が落ちて、大ダメージ＋しびれさせる',
       passive: 'shock', passiveDesc: '攻撃が当たると、ときどき鬼がしびれる／雷雲：ダッシュ中は空を飛んで建物をこえられる', trial: 'ゼウスの試練：獄王を4分以内にたおす',
       story: 'オリンポスの神々の王。いかずちを投げて、天も地もおさめる。' },
     { id: 'odin', name: 'オーディン', role: F, color: '#4a5a8a', origin: '北欧', look: 't=human hair=long hat=helmet acc=spear eyes=one scarf=1 fx=ice',
