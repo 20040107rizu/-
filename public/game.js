@@ -1270,9 +1270,9 @@
     const y = S.YOKAI_BY_ID[selYokai], at = Attacks.of(y.id), sk = Attacks.SKILL[y.role], el = Attacks.ELEMENT[at.el];
     const url = artUrl('yokai/' + y.id);
     $('yokaiInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : `<div class="big-face" style="background:${y.color}"></div>`}
-      <div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.rank} ${esc(y.name)}</b> <span class="lv-tag">Lv${myLv()}</span> ${totsuTag(myTotsu())} <button id="btnLobbyZukan" class="small lobby-zukan">📖 お守り・レベル</button>
+      <div class="pv"><div class="lb-title"><b style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.rank} ${esc(y.name)}</b> <span class="lv-tag">Lv${myLv()}</span> ${totsuTag(myTotsu())} <button id="btnLobbyZukan" class="small lobby-zukan">📖 お守り・レベル</button></div>
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>${myTotsu() || myLv() > 1 ? `・<span class="totsu-up">HP・攻撃 +${Math.round((myTotsu() * S.TOTSU_STEP + (myLv() - 1) * S.LV_STEP) * 1000) / 10}%</span>` : ''}</div>
-      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd>${equippedOf(y.id).length ? `<dt>お守り</dt><dd>${equippedOf(y.id).map(charmTag).join('<br>')}</dd>` : ''}</dl>
+      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd>${equippedOf(y.id).length ? `<dt>お守り</dt><dd class="lb-charms">${equippedOf(y.id).map(c => `<span class="charm-tag r${c.r}" style="--cc:${charmColor(c)}">🧿${S.CHARM_RARITY[c.r].name}</span>`).join(' ')}</dd>` : ''}</dl>
       <small>${el.name}属性：${el.effect}</small></div>`;
     $('btnLobbyZukan').onclick = openZukanFromLobby;
   }
