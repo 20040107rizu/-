@@ -2390,7 +2390,7 @@
     // アイテム（画面に見えているものだけ種類がわかる）
     ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const it of snap.items) {
-      const known = inView(it.x, it.y);
+      const known = inView(it.x, it.y) || snap.reveal; // ホルスの天空の目: アイテムの種類も全部見える
       if (known) { ctx.font = '10px sans-serif'; ctx.fillText(S.ITEMS[it.type].icon, ox + it.x * sx, oy + it.y * sx); }
       else { dot(it.x, it.y, 4, '#d0c0ff'); ctx.fillStyle = '#301050'; ctx.font = 'bold 7px sans-serif'; ctx.fillText('?', ox + it.x * sx, oy + it.y * sx + 0.5); }
     }

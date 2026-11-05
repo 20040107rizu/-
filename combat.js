@@ -122,6 +122,7 @@ function normal(room, p, aim, target) {
   const st = p.stats, base = st.atkDmg * K.dmg * dmgMul(p), m = st.strongMul, c = color(el);
   p.atkT = K.cd;
   p.face = aim;
+  if (p.skyT > 0 && p.passive === 'falcon' && skyShot(room, p, base, el)) return;
   if (p.dragonT > 0) { beam(room, p, aim, 460, 46, base * 1.6, 'water'); return; } // メリュジーヌの竜の姿: 水のブレス
   const front = (k = 0.6) => ({ x: p.x + Math.cos(aim) * K.range * k, y: p.y + Math.sin(aim) * K.range * k });
   switch (at.normal) {
@@ -164,8 +165,18 @@ function normal(room, p, aim, target) {
 }
 
 // ---------- 強攻撃 ----------
+// ホルスの天空の目: 必殺技の間は、どこからでもボス鬼に必ず当たる（壁があっても）
+function skyShot(room, p, amount, el) {
+  const bs = [room.boss, room.boss2].filter(b => b && b.hp > 0 && !(b.downT > 0));
+  if (!bs.length) return false;
+  const b = bs.reduce((a, c) => (dist(p, c) < dist(p, a) ? c : a));
+  hit(room, p, b, amount, el);
+  room.events.push({ k: 'beam', x: R(p.x), y: R(p.y), x2: R(b.x), y2: R(b.y), w: 10, c: '#ffe680' });
+  return true;
+}
 function strong(room, p, aim, target) {
   const at = A.of(p.yokai), K = A.STRONG[at.strong], el = at.el;
+  if (p.skyT > 0 && p.passive === 'falcon') { p.strongT = K.cd; if (skyShot(room, p, 30 * p.stats.strongMul * dmgMul(p) * 2.5, el)) return; }
   const m = p.stats.strongMul, P = 30 * m * dmgMul(p), c = color(el);
   p.strongT = K.cd;
   const tgtDist = target ? Math.min(dist(p, target), K.range) : K.range * 0.7;

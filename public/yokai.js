@@ -271,7 +271,7 @@
       passive: 'immortal', passiveDesc: '仙女の守り：近くの仲間は呪い・魅了・さかさまに半分の確率でかからない／桃の香り：近くの仲間は回復されると攻撃力が5秒アップ', trial: '西王母の試練：疫病鬼の戦いで、チームの呪いを5回消してたおす',
       story: '崑崙山にすむ仙女の女王。食べると不老長寿になる桃を育てている。' },
     { id: 'horus', name: 'ホルス', role: R, color: '#2a6ab8', origin: 'エジプト', look: 't=bird hat=pharaoh acc=bow fx=spark', frag: 15,
-      el: 'light', normal: 'beam', strong: 'multiHoming', normalName: '天空の矢', strongName: '鷹の急襲', ult: 'skyeye', ultName: '天空の目', ultDesc: '15秒間、ボス・見回り鬼の場所が全員のミニマップに出る＋ホルスの攻撃力 +50%',
+      el: 'light', normal: 'beam', strong: 'multiHoming', normalName: '天空の矢', strongName: '鷹の急襲', ult: 'skyeye', ultName: '天空の目', ultDesc: '15秒間、ボス・見回り鬼・アイテムの場所と種類が全員のミニマップに出る＋ホルスの攻撃力 +50%。その間は壁があっても、どこからでもボス鬼に必ず当たる',
       passive: 'falcon', passiveDesc: '鷹の目：九尾鬼の偽者がひと目で分かる（本物だけ金色に光る）／天の見張り：近くの見回り鬼の方向が画面のはしに出る', trial: 'ホルスの試練：九尾鬼を、偽者を1体も攻撃せずにたおす',
       story: '天空と太陽の神。ハヤブサの頭をもち、右目は太陽、左目は月だという。' },
     { id: 'kronos', name: 'クロノス', role: T, color: '#7a7a92', origin: 'ギリシャ', look: 't=human hair=long acc=staff eyes=angry fx=ice beard=1', frag: 15,
