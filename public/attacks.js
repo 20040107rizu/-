@@ -191,7 +191,7 @@
   // レジェンドは決まった攻撃
   for (const l of (YOKAI.LEGENDS || []).concat(YOKAI.GODS || [])) {
     const E = ELEMENT[l.el];
-    BY_ID[l.id] = { normal: l.normal, strong: l.strong, el: l.el, normalName: `${E.name}の${NORMAL[l.normal].label}`, strongName: `${E.adj}の${STRONG[l.strong].label}`, ult: l.ult, ultName: l.ultName };
+    BY_ID[l.id] = { normal: l.normal, strong: l.strong, el: l.el, normalName: l.normalName || `${E.name}の${NORMAL[l.normal].label}`, strongName: l.strongName || `${E.adj}の${STRONG[l.strong].label}`, ult: l.ult, ultName: l.ultName };
   }
   function of(id) { return BY_ID[id] || BY_ID[YOKAI[0].id]; }
 

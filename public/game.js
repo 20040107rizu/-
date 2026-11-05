@@ -437,6 +437,7 @@
     };
   }
   // ---------- 神（隠し）: レジェンドを全員集めて、隠しボスを全部たおした人だけ ----------
+  const godCost = g => g.frag || S.GOD_FRAG; // 封印・凸に使う神の欠片（追加の10柱は15個）
   const godTabShown = () => godReady() || S.GODS.some(g => friends[g.id]); // 神を1体でも持っていれば図鑑に神のタブを出す
   function godReady() { return S.LEGENDS.every(l => friends[l.id]) && !!stats.feats.gokuou && !!stats.feats.hyakki && !!stats.feats.shin; }
   function renderGods() {
@@ -444,7 +445,7 @@
     const grid = $('zukanGrid');
     grid.innerHTML = ''; grid.dataset.sig = '';
     for (const g of S.GODS) {
-      const n = friends[g.id] || 0, t = S.totsuOf(n), can = (stats.gods.tr[g.id] || 0) > 0 && stats.gods.frag >= S.GOD_FRAG && n < S.FULL_COUNT;
+      const n = friends[g.id] || 0, t = S.totsuOf(n), can = (stats.gods.tr[g.id] || 0) > 0 && stats.gods.frag >= godCost(g) && n < S.FULL_COUNT;
       const d = document.createElement('div');
       d.className = 'yk god' + (g.id === zukanSel ? ' sel' : '') + (n ? '' : ' locked');
       d.innerHTML = `<span class="rk" style="color:${S.RANKS.G.color}">神</span>${can ? '<span class="cnt">✨</span>' : n > 1 ? `<span class="cnt">${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>` : ''}${n && lvOfId(g.id) > 1 ? `<span class="lvc">Lv${lvOfId(g.id)}</span>` : ''}${faceImg(g, !n)}<span class="nm">${g.name}</span><small class="nm">${g.origin}</small>`;
@@ -453,15 +454,15 @@
       grid.appendChild(d);
     }
     const g = S.YOKAI_BY_ID[zukanSel], n = friends[g.id] || 0, tr = stats.gods.tr[g.id] || 0, frag = stats.gods.frag;
-    const max = n >= S.FULL_COUNT, ready = tr > 0 && frag >= S.GOD_FRAG && !max;
+    const max = n >= S.FULL_COUNT, ready = tr > 0 && frag >= godCost(g) && !max;
     const box = document.createElement('div');
     box.className = 'seal-box god-box';
     box.innerHTML = `<b>${n ? `✨ ${esc(g.name)}　${max ? '凸MAX' : `凸${S.totsuOf(n)}`}` : `🔒 ${esc(g.name)}の封印`}</b>
       <small>${n ? '凸するたびに、神の試練をもう一度クリアして神の欠片を集める' : '神の試練をクリアして、神の欠片を集めると封印がとける'}</small>
       <div class="cond${tr ? ' ok' : ''}"><span class="ck">${tr ? '✓' : ''}</span><span class="cl">${esc(g.trial)}</span><span class="pg">${tr ? `クリア${tr}回ぶん` : 'まだ'}</span></div>
-      <div class="cond${frag >= S.GOD_FRAG ? ' ok' : ''}"><span class="ck">${frag >= S.GOD_FRAG ? '✓' : ''}</span><span class="cl">⚡ 神の欠片（隠しボスをたおすともらえる・だれも倒れなければ2個）</span><span class="pg">${Math.min(frag, S.GOD_FRAG)}/${S.GOD_FRAG}</span></div>
-      <div class="tbar"><i style="width:${Math.min(100, Math.round((frag / S.GOD_FRAG) * 100))}%"></i></div>
-      <button id="btnGodUnseal" class="big"${ready ? '' : ' disabled'}>${max ? '凸MAX' : n ? `✨ 凸する（試練1回＋欠片${S.GOD_FRAG}個）` : `✨ 封印をとく（試練1回＋欠片${S.GOD_FRAG}個）`}</button>`;
+      <div class="cond${frag >= godCost(g) ? ' ok' : ''}"><span class="ck">${frag >= godCost(g) ? '✓' : ''}</span><span class="cl">⚡ 神の欠片（隠しボスや鬼神のあとのボスをたおすともらえる・だれも倒れなければ2個）</span><span class="pg">${Math.min(frag, godCost(g))}/${godCost(g)}</span></div>
+      <div class="tbar"><i style="width:${Math.min(100, Math.round((frag / godCost(g)) * 100))}%"></i></div>
+      <button id="btnGodUnseal" class="big"${ready ? '' : ' disabled'}>${max ? '凸MAX' : n ? `✨ 凸する（試練1回＋欠片${godCost(g)}個）` : `✨ 封印をとく（試練1回＋欠片${godCost(g)}個）`}</button>`;
     grid.appendChild(box);
     $('btnGodUnseal').onclick = () => unsealGod(g);
     renderGodInfo(g);
@@ -479,8 +480,8 @@
   }
   function unsealGod(g) {
     const n = friends[g.id] || 0;
-    if (!godReady() || n >= S.FULL_COUNT || !(stats.gods.tr[g.id] > 0) || stats.gods.frag < S.GOD_FRAG) return;
-    stats.gods.tr[g.id]--; stats.gods.frag -= S.GOD_FRAG;
+    if (!godReady() || n >= S.FULL_COUNT || !(stats.gods.tr[g.id] > 0) || stats.gods.frag < godCost(g)) return;
+    stats.gods.tr[g.id]--; stats.gods.frag -= godCost(g);
     friends[g.id] = n + 1;
     saveAll(); updateFriendCount(); helloAgain();
     beep(392, 0.25, 'triangle', 0.08); setTimeout(() => beep(587, 0.25, 'triangle', 0.08), 180); setTimeout(() => beep(784, 0.25, 'triangle', 0.09), 360); setTimeout(() => beep(1175, 0.7, 'triangle', 0.1), 540);
@@ -1959,6 +1960,7 @@
     else bossAura(b, pos, now);
     const wob = Math.sin(now * 5) * 3;
     if (b.st !== 'wander' && !b.stun) { ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 30; }
+    if (snap.falcon && b.type === 'kyubi') { ctx.shadowColor = '#ffd23a'; ctx.shadowBlur = 40; } // ホルスの鷹の目: 本物は金色に光る
     const img = art('oni/boss-' + (b.type || 'red'));
     const size = b.big ? 330 : 180; // がしゃどくろ王は巨大
     if (b.down) { ctx.save(); ctx.globalAlpha *= 0.55; ctx.translate(pos.x, pos.y); ctx.rotate(-1.2); ctx.translate(-pos.x, -pos.y); } // 双子鬼: 倒れている
@@ -2005,8 +2007,10 @@
   }
   function drawDecoy(e, pos, now) {
     const img = art('oni/boss-kyubi');
+    if (snap.falcon) ctx.globalAlpha = 0.35; // ホルスの鷹の目: 偽者はうすく見える
     const wob = Math.sin(now * 5 + e.id) * 3;
     if (img) { ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 180, Math.cos(e.face) < 0); }
+    ctx.globalAlpha = 1;
   }
   // 金鬼から先のボスのまわりの光
   function bossAura(b, pos, now) {
@@ -2195,6 +2199,13 @@
       for (let k = 0; k < 12; k++) { const a = now * 1.2 + k * Math.PI / 6; ctx.beginPath(); ctx.moveTo(z.x + Math.cos(a) * z.r * 0.55, z.y + Math.sin(a) * z.r * 0.55); ctx.lineTo(z.x + Math.cos(a) * z.r, z.y + Math.sin(a) * z.r); ctx.stroke(); }
       ctx.restore(); return;
     }
+    if (z.shape === 'swirl') { // 天沼矛: 光のうず
+      for (let k = 0; k < 3; k++) {
+        ctx.strokeStyle = `rgba(255,242,160,${0.7 - k * 0.2})`; ctx.lineWidth = 10 - k * 3;
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (0.45 + k * 0.25), now * (3 + k) , now * (3 + k) + 4.2); ctx.stroke();
+      }
+      ctx.restore(); return;
+    }
     if (z.shape === 'tandava') { // 破壊の舞: 青黒い炎の輪がまわる
       ctx.fillStyle = 'rgba(60,40,140,0.18)'; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill();
       for (let k = 0; k < 16; k++) {
@@ -2290,7 +2301,8 @@
     for (const e of snap.patrols) dot(e.x, e.y, 3, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#b08cff');
     if (snap.ring) { ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ox + snap.ring.x * sx, oy + snap.ring.y * sx, snap.ring.r * sx, 0, Math.PI * 2); ctx.stroke(); }
     if (snap.boss2) dot(snap.boss2.x, snap.boss2.y, 6, BOSS_UI.twin2);
-    if (snap.boss && !snap.boss.bliz) {
+    if (snap.reveal) for (const e of snap.decoys || []) dot(e.x, e.y, 5, '#888'); // ホルスの天空の目
+    if (snap.boss && (!snap.boss.bliz || snap.reveal)) {
       dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + snap.boss.x * sx, oy + snap.boss.y * sx, 6, 0, Math.PI * 2); ctx.stroke();
     }
@@ -2368,7 +2380,8 @@
 
   // ぬえ鬼: 町が真っ暗。自分のまわりしか見えず、ときどき鳴き声の方向だけ分かる
   function drawNueDark(me, now) {
-    const scale = H / 640, r0 = 95 * scale, r1 = 230 * scale;
+    const moon = S.YOKAI_BY_ID[me.yokai]?.passive === 'moonlit' ? 2 : 1; // ツクヨミの夜目: 2倍見える
+    const scale = H / 640, r0 = 95 * scale * moon, r1 = 230 * scale * moon;
     const g = ctx.createRadialGradient(W / 2, H / 2, r0, W / 2, H / 2, r1);
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.97)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -2386,6 +2399,16 @@
     Stages.drawTint(ctx, W, H, stage);
     const dark = snap.boss && snap.boss.type === 'nue';
     if (dark) drawNueDark(me, now);
+    if (snap.players.some(p => p.crit)) { ctx.fillStyle = 'rgba(20,20,80,0.28)'; ctx.fillRect(0, 0, W, H); } // ツクヨミの月夜の帳
+    if (me && S.YOKAI_BY_ID[me.yokai]?.passive === 'falcon' && myPred) { // ホルスの天の見張り: 近くの見回り鬼の方向
+      const scale = H / 640;
+      for (const e of snap.patrols) {
+        const dx = (e.x - myPred.x) * scale, dy = (e.y - myPred.y) * scale, d = Math.hypot(e.x - myPred.x, e.y - myPred.y);
+        if (d > 900 || (Math.abs(dx) < W / 2 - 20 && Math.abs(dy) < H / 2 - 20)) continue;
+        const a = Math.atan2(dy, dx), ex = W / 2 + Math.cos(a) * (W / 2 - 40), ey = H / 2 + Math.sin(a) * (H / 2 - 40);
+        ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); ctx.fillStyle = '#ffe680'; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-6, -8); ctx.lineTo(-6, 8); ctx.fill(); ctx.restore();
+      }
+    }
     if (dark) { // ぬえ鬼: ミニマップが使えない
       const mw = Math.min(W * 0.21, 200), mh = mw * map.h / map.w;
       ctx.fillStyle = '#000'; ctx.fillRect(10, 10, mw, mh); ctx.strokeStyle = '#fff4'; ctx.strokeRect(10, 10, mw, mh);
@@ -2727,8 +2750,9 @@
       if (cimg) { ctx.globalAlpha = 0.6 + Math.sin(now * 12) * 0.15; drawSprite(cimg, t.x, t.y + 16, 70, false); ctx.globalAlpha = 1; continue; } // ソンゴクウの分身
       const mimg = t.mn && art('oni/patrol');
       if (mimg) { // オニガミの手下になった見回り鬼（金色に光る）
-        ctx.save(); ctx.shadowColor = '#ffd23a'; ctx.shadowBlur = 14; drawSprite(mimg, t.x, t.y + 16, 64, false); ctx.restore();
-        ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd23a'; ctx.fillText('手下', t.x, t.y - 44);
+        const hades = t.c === '#b07aff'; // ハデスの冥府の兵は紫
+        ctx.save(); ctx.shadowColor = t.c || '#ffd23a'; ctx.shadowBlur = 14; if (hades) ctx.filter = 'hue-rotate(200deg) brightness(.8)'; drawSprite(mimg, t.x, t.y + 16, 64, false); ctx.restore();
+        ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = t.c || '#ffd23a'; ctx.fillText(hades ? '冥府の兵' : '手下', t.x, t.y - 44);
         continue;
       }
       ctx.fillStyle = '#3a2a4a'; ctx.strokeStyle = t.c; ctx.lineWidth = 3;

@@ -392,7 +392,7 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, revT: 0, charmT: 0, curseT: 0, curseTick: 0, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, critT: 0, skyT: 0, regenT: 0, bondT: 0, trickUsed: false, yomiUses: 0, mimicDodge: 0, ownShade: 0, decoyHits: 0, weakDmg: 0, orbFrac: 0, gutsUsed: false, revT: 0, charmT: 0, curseT: 0, curseTick: 0, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
@@ -447,6 +447,9 @@ class Room {
       this.mainBoss = this.boss;
     }
     this.boss2 = null; this.shades = []; this.decoys = [];
+    this.curseCleared = 0; this.rewound = 0; this.twinFin = {}; this.revealT = 0;
+    this.luckTeam = [...this.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].passive === 'luckgod'); // ガネーシャ
+    if ([...this.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].passive === 'chronos')) { this.timeLimit += 30; this.timeLeft += 30; } // クロノス: 制限時間 +30秒
     if (kind.gimmick) this.gimmickSetup(this.boss);
     this.firstBoss = this.boss;
     this.ring = null; // 鬼神の最後の形態: だんだんせまくなる安全な輪
@@ -490,7 +493,8 @@ class Room {
   // ---- ダメージ ----
   damageOni(src, e, amount) {
     if (e.hp <= 0 || e.downT > 0) return; // 倒れている双子鬼には効かない
-    if (e.weakT > 0) amount *= 2; // がしゃどくろ王: 手をたたいたあとは弱点
+    if (e.weakT > 0) { amount *= 2; if (src) src.weakDmg += amount; } // がしゃどくろ王: 手をたたいたあとは弱点
+    if (e.isDecoy && src) src.decoyHits++;
     if (e === this.boss && this.bossArmor(e) && src) {
       // 金の鎧: 正面からは35%しか効かない（鬼神は60%）。背中からは1.3倍
       const off = angleDiff(Math.atan2(src.y - e.y, src.x - e.x), e.face);
@@ -513,7 +517,7 @@ class Room {
       if (e.isPatrol && src) src.kills++;
       if (e.isPatrol) this.killPatrol(e, src);
       else if (e.isShade || e.isDecoy) this.killMinor(e, src);
-      else if (e.twinPair) this.twinDown(e);
+      else if (e.twinPair) this.twinDown(e, src);
       else this.killBoss();
     }
   }
@@ -537,6 +541,15 @@ class Room {
     if (p.passive === 'nightDash' && p.dashing) return; // ジャージーデビル: 飛んでいるあいだは当たらない
     if (p.passive === 'bossGuard') amount *= p.hp < p.maxHp / 2 ? 0.49 : 0.7; // ウラ: ボス鬼からのダメージ -30%（体力が半分を切ると、さらに -30%）
     if (p.passive === 'godArmor') amount *= 0.65; // オニガミ: 金の鎧
+    if (p.passive === 'underlord') amount *= 1 - 0.4 * (1 - p.hp / p.maxHp); // ハデス: 冥王の鎧
+    if (p.ch && p.ch.guard > 0) amount *= 1 - p.ch.guard; // お守り: 鉄壁
+    if (p.passive === 'trickster' && !p.trickUsed && p.hp - amount <= 0) { // ロキ: 化かし（分身と入れかわってよける）
+      p.trickUsed = true; p.invulT = 1.5;
+      this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 100, c: '#7aff9a' });
+      const a = Math.random() * Math.PI * 2; p.x += Math.cos(a) * 150; p.y += Math.sin(a) * 150; S.collide(this.map, p, PLAYER_R);
+      return;
+    }
+    if (p.ch && p.ch.guts && !p.gutsUsed && p.hp - amount <= 0) { p.gutsUsed = true; p.hp = 1; p.invulT = 1.5; this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 100, c: '#ffd23a' }); return; } // お守り: 根性
     if (p.eye && amount >= 20) { p.eye = false; p.invulT = Math.max(p.invulT, 0.5); this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 90, c: '#c8a0ff' }); return; } // シヴァの第三の目で防いだ
     if (p.passive === 'lastStand' && !p.standUsed && p.hp - amount <= 0) { // ジョカ: 1度だけ耐える
       p.standUsed = true; p.hp = 1; p.invulT = 2;
@@ -545,7 +558,8 @@ class Room {
     }
     p.hp -= amount;
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
-    if (p.hp <= 0 && this.activePlayers().some(q => q !== p && q.passive === 'lastStand')) { // ジョカの五色の石: 倒れた場所に回復の石。5秒で自動で起きる
+    if (p.hp <= 0 && p.passive === 'yomi' && p.yomiUses < 2) { p.yomiUses++; p.autoRevT = 10; } // イザナミ: 黄泉の主（10秒で自分で起きる）
+    else if (p.hp <= 0 && this.activePlayers().some(q => q !== p && q.passive === 'lastStand')) { // ジョカの五色の石: 倒れた場所に回復の石。5秒で自動で起きる
       p.autoRevT = 5;
       this.zones.push({ id: this.newId(), owner: p.id, x: p.x, y: p.y, r: 110, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#7dffd8' });
     }
@@ -554,7 +568,8 @@ class Room {
 
   healPlayer(p, amount) {
     if (p.down || p.escaped) return;
-    if (p.curseT > 0) { p.curseT = 0; this.events.push({ k: 'curseOff', id: p.id }); } // 疫病鬼の呪いは回復で消える
+    if (p.curseT > 0) { p.curseT = 0; this.curseCleared = (this.curseCleared || 0) + 1; this.events.push({ k: 'curseOff', id: p.id }); } // 疫病鬼の呪いは回復で消える
+    if (amount > 0 && this.activePlayers().some(q => q.passive === 'immortal' && dist(p, q) < 300)) p.atkUpT = Math.max(p.atkUpT || 0, 5); // 西王母: 桃の香り
     const before = p.hp;
     p.hp = Math.min(p.maxHp, p.hp + amount);
     if (p.hp > before) this.events.push({ k: 'heal', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(p.hp - before) });
@@ -653,6 +668,7 @@ class Room {
     this.events.push({ k: 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
     if (src && src.passive === 'nightDash' && src.legend) src.ult = Math.min(Combat.ULT_MAX, src.ult + 25); // ジャージーデビル: 鬼を狩るほど必殺技がたまる
     if (src && src.passive === 'godArmor') this.makeMinion(src, e); // オニガミ: 倒した見回り鬼も手下になる
+    if (src && src.passive === 'kuniumi') this.zones.push({ id: genId(), owner: src.id, x: e.x, y: e.y, r: 120, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#fff2a0' }); // イザナギ: 国生み（回復の島）
     this.calmPatrol(e); // 伝達はここで途切れる
     this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
     e.respawnT = 25;
@@ -994,11 +1010,12 @@ class Room {
       case 'toki':
         if ((b.stealT -= DT) <= 0) { // 時間を奪う
           b.stealT = 18;
-          if (this.timeLeft > 40) { this.timeLeft -= 10; this.events.push({ k: 'gimmick', g: 'steal' }); }
+          if (this.timeLeft > 40 && !this.hasPassive('chronos')) { this.timeLeft -= 10; this.events.push({ k: 'gimmick', g: 'steal' }); } // クロノスがいると時間をうばえない
         }
         if (!b.rew && (b.rewT -= DT) <= 0) { b.rew = { hp: b.hp, t: 8 }; this.events.push({ k: 'gimmick', g: 'rewindStart' }); } // 8秒後に時を戻す（それまでに大ダメージで止める）
         if (b.rew && (b.rew.t -= DT) <= 0) {
-          if (b.hp > b.rew.hp - b.maxHp * 0.1) { b.hp = Math.max(b.hp, b.rew.hp); this.events.push({ k: 'gimmick', g: 'rewind' }); }
+          if (this.hasPassive('chronos')) this.events.push({ k: 'gimmick', g: 'rewindFail' }); // クロノス: 巻き戻しが効かない
+          else if (b.hp > b.rew.hp - b.maxHp * 0.1) { b.hp = Math.max(b.hp, b.rew.hp); this.rewound = (this.rewound || 0) + 1; this.events.push({ k: 'gimmick', g: 'rewind' }); }
           else this.events.push({ k: 'gimmick', g: 'rewindFail' });
           b.rew = null; b.rewT = 24;
         }
@@ -1019,13 +1036,13 @@ class Room {
       case 'amanojaku':
         if ((b.revT -= DT) <= 0) { // さかさまの呪い
           b.revT = b.rage ? 11 : 14;
-          for (const p of ps) if (dist(p, b) < 900) p.revT = 5;
+          for (const p of ps) if (dist(p, b) < 900 && p.passive !== 'trickster' && !this.warded(p)) p.revT = 5; // ロキ・西王母のそばの人には効かない
           this.events.push({ k: 'gimmick', g: 'reverse' });
         }
         if (b.mimic && (b.mimic.t -= DT) <= 0) { // まねっこ: さっきの必殺技を撃ち返す
           const t = this.players.get(b.mimic.id);
           if (t && !t.down && !t.escaped) {
-            this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x, y: t.y, r: 230, t: 1.0, max: 1.0, dmg: 55 * b.kind.dmg, c: 'mimic' });
+            this.telegraphs.push({ id: genId(), shape: 'circle', x: t.x, y: t.y, r: 230, t: 1.0, max: 1.0, dmg: 55 * b.kind.dmg, c: 'mimic', tid: t.id });
             this.events.push({ k: 'gimmick', g: 'mimic', name: b.mimic.name });
           }
           b.mimic = null;
@@ -1034,7 +1051,8 @@ class Room {
     }
   }
   // 双子鬼: 片方が倒れたら、ひとりなら6秒・2人以上なら3秒以内にもう片方も倒す
-  twinDown(e) {
+  twinDown(e, src) {
+    this.twinFin = this.twinFin || {}; this.twinFin[e.type] = src ? src.id : null; // イザナギ・イザナミの試練: だれがとどめをさしたか
     const other = e === this.boss ? this.boss2 : this.boss;
     if (other && other.downT > 0) {
       const main = this.boss;
@@ -1054,6 +1072,7 @@ class Room {
     if (e.isShade) {
       this.dropDama(e.x, e.y, 2);
       if (src && src.id === e.of) { // 自分の影を自分で倒すとボーナス
+        src.ownShade++;
         src.atkUpT = Math.max(src.atkUpT || 0, 8); this.healPlayer(src, src.maxHp * 0.3);
         this.events.push({ k: 'gimmick', g: 'ownShade', id: src.id });
       }
@@ -1101,12 +1120,17 @@ class Room {
       for (const q of this.activePlayers()) if (q !== p && !(q.curseT > 0) && dist(p, q) < 110) { q.curseT = 8; q.curseTick = 1; this.events.push({ k: 'curse', id: q.id }); }
     }
   }
+  // 西王母: 近くの仲間は半分の確率で状態異常にかからない
+  warded(p) { return this.activePlayers().some(q => q.passive === 'immortal' && dist(p, q) < 300) && Math.random() < 0.5; }
   onBossHit(p, tg) {
     if (p.down) return;
     const b = this.boss;
+    if ((tg.charm || tg.curse || (b && b.type === 'yakubyo')) && this.warded(p)) return;
+    if (tg.charm && p.passive === 'trickster') return; // ロキには魅了が効かない
     if ((tg.curse || (b && b.type === 'yakubyo')) && !(p.curseT > 0)) { p.curseT = 8; p.curseTick = 1; this.events.push({ k: 'curse', id: p.id }); }
     if (tg.charm) { p.charmT = 3; this.events.push({ k: 'charm', id: p.id }); }
   }
+  hasPassive(k) { return [...this.players.values()].some(p => p.passive === k && !p.escaped); }
   bossSees(b, t) { return b.seeAll ? !t.down && !t.escaped : this.visibleTo(t); }
   // さかさまの呪い・魅了で、入力を変えたものを使う（p.input そのものは書きかえない）
   effInput(p) {
@@ -1258,13 +1282,15 @@ class Room {
       const b = tg.owner || this.boss;
       if (b && b.stunT > 0) continue; // しびれている間は止まる
       if (tg.follow && b) { tg.x = b.x; tg.y = b.y; }
-      tg.t -= DT;
+      tg.t -= DT * (this.activePlayers().some(q => q.passive === 'chronos' && dist(q, tg) < 320) ? 0.77 : 1); // クロノス: 未来視（予告が長い）
       if (tg.t > 0) continue;
       if (tg.then === 'charge') { if (b && b.hp > 0) { b.state = 'charging'; b.stateT = 0.85; } continue; }
       if (tg.clap && this.boss && this.boss.hp > 0 && !(this.boss.weakT > 0)) { this.boss.weakT = 5; this.events.push({ k: 'weak' }); } // がしゃどくろ王: 手をたたいたあとは弱点
+      if (tg.tid) { const t = this.players.get(tg.tid); if (t && !t.down && !t.escaped && !(dist(t, tg) <= tg.r)) t.mimicDodge++; } // ロキの試練: まねっこをよけた
       for (const p of this.activePlayers()) {
         const hit = tg.shape === 'rect' ? inRect(p, tg, tg.a, tg.len, tg.w) : dist(p, tg) <= tg.r;
         if (!hit) continue;
+        if (tg.knock && p.passive === 'seaking') { this.damagePlayer(p, tg.dmg); this.onBossHit(p, tg); continue; } // ポセイドン: 吹き飛ばされない
         this.damagePlayer(p, tg.dmg);
         this.onBossHit(p, tg);
         if (tg.knock && !p.down) { // 突風: 向きにそって吹き飛ばす
@@ -1295,9 +1321,16 @@ class Room {
 
   updatePlayer(p) {
     const st = p.stats;
-    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT', 'dragonT', 'raT', 'revT', 'charmT']) p[k] = Math.max(0, (p[k] || 0) - DT);
+    for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT', 'dragonT', 'raT', 'revT', 'charmT', 'critT', 'skyT', 'regenT', 'bondT']) p[k] = Math.max(0, (p[k] || 0) - DT);
     if (p.down || p.escaped) return;
     this.updateCurse(p);
+    { const b = this.boss; p.inDark = !!(b && b.hp > 0 && (b.type === 'nue' || b.bliz > 0)) || p.critT > 0; } // ツクヨミ: 暗い場所
+    if (p.regenT > 0) this.healPlayer(p, p.maxHp * 0.04 * DT); // 西王母の不老の桃
+    if (p.ch && p.ch.regen > 0) { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * p.ch.regen * DT); } // お守り: 自然回復（呪いは消えない）
+    if (p.passive === 'kuniumi' || p.passive === 'yomi') { // 夫婦の絆: イザナギとイザナミが近くにいる
+      const mate = this.activePlayers().find(q => q !== p && (q.passive === (p.passive === 'kuniumi' ? 'yomi' : 'kuniumi')) && dist(p, q) < 400);
+      if (mate) { p.bondT = 0.5; p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.01 * DT); }
+    }
     if (p.passive === 'sunAura' && (p.auraT -= DT) <= 0) { // ラー: まわりの仲間が少しずつ回復
       p.auraT = 1;
       for (const q of this.activePlayers()) if (dist(p, q) < 320) { this.healPlayer(q, q.maxHp * 0.015); q.raT = 1.3; } // ＋太陽の光: 攻撃力 +15%
@@ -1370,7 +1403,8 @@ class Room {
     // 拾う
     for (const d of this.dama) {
       if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < 32) {
-        d.taken = true; p.dama += d.v;
+        d.taken = true;
+        { const mul = (this.luckTeam ? 1.2 : 1) * (p.ch ? 1 + p.ch.orb : 1); p.orbFrac += d.v * mul; const n = Math.floor(p.orbFrac); p.orbFrac -= n; p.dama += n; } // ガネーシャ（幸運の神）・お守り（鬼玉）
         if (p.passive === 'orbHeal') this.healPlayer(p, 3 * Math.min(d.v, 8)); // クルピラ: 鬼玉で少し回復（1個3・どデカい鬼玉24まで）
         this.events.push({ k: 'dg', id: d.id, by: p.id, v: d.v });
       }
@@ -1463,6 +1497,7 @@ class Room {
         p.down = false; p.hp = p.maxHp * 0.4; p.reviveProg = 0; p.invulT = 2;
         if (this.activePlayers().some(q => q.passive === 'reviver' && dist(p, q) < REVIVE_RANGE * 1.5)) { p.invulT = 5; p.atkUpT = Math.max(p.atkUpT || 0, 5); } // メリュジーヌの加護: 5秒無敵＋攻撃アップ
         for (const q of this.activePlayers()) if (q !== p && dist(p, q) < REVIVE_RANGE) q.revives++; // 起こした人に記録
+        for (const q of this.activePlayers()) if (q.passive === 'underlord') this.healPlayer(q, q.maxHp * 0.2); // ハデス: 魂の帰還
         this.events.push({ k: 'revive', id: p.id });
       }
     }
@@ -1473,6 +1508,7 @@ class Room {
     if (this.introT > 0) { this.introT -= DT; return; }
     this.time += DT;
     this.timeLeft -= DT;
+    if (this.revealT > 0) this.revealT -= DT;
     if (DEMO_AI) for (const p of this.players.values()) this.demoInput(p);
     for (const p of this.players.values()) this.updatePlayer(p);
     this.updateRevive();
@@ -1505,7 +1541,7 @@ class Room {
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
-      gacha: rollGacha(p.escaped ? team : team / 2),
+      gacha: rollGacha((p.escaped ? team : team / 2) + (this.luckTeam ? 150 : 0)), // ガネーシャ: 富の神（1つ上の色が出やすい）
       // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
       god: this.godResult(p),
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
@@ -1522,17 +1558,33 @@ class Room {
   godResult(p) {
     const main = this.mainDown && (this.mainType === 'gokuou' || this.mainType === 'hyakki');
     const shin = this.shinBoss && this.shinBoss.hp <= 0;
-    if (!main && !shin) return undefined;
+    const gim = this.mainDown && S.BOSSES[this.mainType].gimmick; // 鬼神のあとの8体からも欠片が出る
     let frag = 0;
     if (main) frag += this.anyDownAtKill ? 1 : 2;
     if (shin) frag += this.shinClean ? 2 : 1;
-    const ps = [...this.players.values()], trials = [];
-    if (shin && p.shinDowns != null && p.shinDowns === (p.downs || 0) && !p.down) trials.push('onigami'); // 鬼神・真との戦いで自分が一度も倒れなかった
-    if (this.mainDown && this.mainType === 'gokuou' && this.bossKillT != null && this.bossKillT <= 240) trials.push('zeus');
-    if (this.mainDown && this.mainType === 'hyakki' && ps.length === 1) trials.push('odin');
-    if (p.yokai === 'nurarihyon' || p.yokai === 'melusine') trials.push('ra');
-    if (p.revives >= 3) trials.push('joka'); // 倒れた仲間を3回起こした
-    if (this.mainDown && this.mainType === 'gokuou' && !p.judgeHits) trials.push('shiva');
+    if (gim) frag += this.anyDownAtKill ? 1 : 2;
+    const ps = [...this.players.values()], trials = [], t = this.mainType, won = this.mainDown;
+    if (main || shin) {
+      if (shin && p.shinDowns != null && p.shinDowns === (p.downs || 0) && !p.down) trials.push('onigami'); // 鬼神・真との戦いで自分が一度も倒れなかった
+      if (won && t === 'gokuou' && this.bossKillT != null && this.bossKillT <= 240) trials.push('zeus');
+      if (won && t === 'hyakki' && ps.length === 1) trials.push('odin');
+      if (p.yokai === 'nurarihyon' || p.yokai === 'melusine') trials.push('ra');
+      if (p.revives >= 3) trials.push('joka'); // 倒れた仲間を3回起こした
+      if (won && t === 'gokuou' && !p.judgeHits) trials.push('shiva');
+    }
+    // 追加の10柱（相手は鬼神のあとの8体）
+    if (won && t === 'nue' && !this.anyDownAtKill) trials.push('tsukuyomi');
+    if (won && t === 'amanojaku' && p.mimicDodge >= 3) trials.push('loki');
+    if (won && t === 'kage' && p.ownShade > 0) trials.push('hades');
+    if (won && t === 'yakubyo' && this.curseCleared >= 5) trials.push('seioubo');
+    if (won && t === 'kyubi' && !p.decoyHits) trials.push('horus');
+    if (won && t === 'toki' && !this.rewound) trials.push('kronos');
+    if (won && t === 'gasha' && this.mainBoss && p.weakDmg >= this.mainBoss.maxHp * 0.1) trials.push('poseidon');
+    if (p.escaped && ps.reduce((a, q) => a + q.dama, 0) >= 700) trials.push('ganesha');
+    const tf = this.twinFin || {};
+    if (won && t === 'twin' && tf.twin === p.id && tf.twin2 && tf.twin2 !== p.id) trials.push('izanagi');
+    if (won && t === 'twin' && tf.twin2 === p.id && tf.twin && tf.twin !== p.id) trials.push('izanami');
+    if (!frag && !trials.length) return undefined;
     return { frag, trials };
   }
 
@@ -1570,11 +1622,12 @@ class Room {
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
-        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, rev: p.revT > 0 || undefined, charm: p.charmT > 0 || undefined, curse: p.curseT > 0 || undefined, dodge: !!p.dodge,
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, rev: p.revT > 0 || undefined, charm: p.charmT > 0 || undefined, curse: p.curseT > 0 || undefined, crit: p.critT > 0 || undefined, dodge: !!p.dodge,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? this.bossSnap(b) : null,
       boss2: this.boss2 && this.boss2.hp > 0 ? this.bossSnap(this.boss2) : undefined,
+      reveal: this.revealT > 0 || undefined, falcon: this.hasPassive('falcon') || undefined,
       shades: this.shades.length ? this.shades.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), yokai: e.yokai, of: e.of, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 || undefined })) : undefined,
       decoys: this.decoys.length ? this.decoys.map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2) })) : undefined,
       ring: this.ring ? { x: Math.round(this.ring.x), y: Math.round(this.ring.y), r: Math.round(this.ring.r) } : null,

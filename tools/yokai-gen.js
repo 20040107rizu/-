@@ -339,7 +339,7 @@ const BODY = {
     if (L.beard) { // 白いひげ（ゼウス）
       h.front += kit.cel('M96 104 Q100 120 108 140 Q118 160 128 172 Q138 160 148 140 Q156 120 160 104 Q146 118 128 118 Q110 118 96 104Z', '#eceaf4', { dx: 4, dy: 3 });
       h.head.kuma = null;
-    } else if (L.role === 'ranger' && L.nose !== 'long') {
+    } else if (L.role === 'ranger' && L.nose !== 'long' && !L.nomask) {
       h.front += kit.cel('M98 104 Q128 98 158 104 L156 116 Q144 126 128 132 Q112 126 100 116Z', '#22202a', { dx: 3, dy: 2, thin: true });
       h.head.noMouth = true; h.head.kuma = null;
     }

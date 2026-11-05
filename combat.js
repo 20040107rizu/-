@@ -21,15 +21,17 @@ function rayLen(map, x, y, a, max) {
 }
 
 // ---------- 当てる ----------
-function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1) * (p.raT > 0 ? 1.15 : 1); } // ＋ラーの太陽の光 // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
+function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.5 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1) * (p.raT > 0 ? 1.15 : 1) * (p.critT > 0 ? 2 : 1) * (p.passive === 'moonlit' && p.inDark ? 1.3 : 1) * (p.skyT > 0 ? 1.5 : 1) * (p.bondT > 0 ? 1.2 : 1) * (p.ch ? 1 + p.ch.atk : 1); } // ＋ラーの太陽の光・ツクヨミ・ホルス・夫婦の絆・お守り // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
 
 const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
   if (!e || e.hp <= 0) return 0;
   if (room.elemMul) amount *= room.elemMul(e, el); // 九尾鬼（光っている尾の属性は効かない）・ぬえ鬼（姿ごとの弱点）
   room.damageOni(p, e, amount);
-  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1)); // 必殺技の効果中はたまらない
+  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1) * (p.ch ? 1 + p.ch.ult : 1)); // 必殺技の効果中はたまらない
   if (el) applyElement(room, p, e, amount, el);
+  if (p && p.passive === 'seaking' && e.hp > 0) slow(e, 0.6, 2); // ポセイドン: 潮の力
+  if (p && p.ch && p.ch.drain > 0) room.healPlayer(p, amount * p.ch.drain); // お守り: 吸血
   if (p && p.passive === 'backstab' && e.hp > 0) { // オーディン: ルーンの呪い（4秒で当てたダメージの40%、3つまで重なる）
     const runes = (e.dots || []).filter(d => d.rune);
     if (runes.length >= 3) { const old = runes.reduce((a, b) => (a.t < b.t ? a : b)); e.dots = e.dots.filter(d => d !== old); }
@@ -216,7 +218,7 @@ function strong(room, p, aim, target) {
 // ---------- スキル（タイプごと） ----------
 function skill(room, p, aim) {
   const role = S.YOKAI_BY_ID[p.yokai].role, K = A.SKILL[role], m = p.stats.strongMul;
-  p.skillT = K.cd;
+  p.skillT = K.cd * (p.ch ? 1 - p.ch.haste : 1); // お守り: 早業
   const inp = p.input;
   switch (K.key) {
     case 'dodge': {
@@ -249,7 +251,7 @@ function ultimate(room, p, aim) {
   const L = S.YOKAI_BY_ID[p.yokai], el = L.el, c = color(el);
   const P = 30 * p.stats.strongMul * dmgMul(p);
   p.ult = 0;
-  p.ultBusyUntil = room.time + ({ parade: 6, nyoi: 10, dragon: 8, forest: 8, dive: 3, hellsweep: 2, sunboat: 6, tandava: 6 }[L.ult] || 0);
+  p.ultBusyUntil = room.time + ({ parade: 6, nyoi: 10, dragon: 8, forest: 8, dive: 3, hellsweep: 2, sunboat: 6, tandava: 6, tsukiyo: 10, mirror: 12, hadesgate: 10, peach: 10, skyeye: 15, timestop: 5, nuboko: 6, yomigaeri: 4 }[L.ult] || 0);
   room.events.push({ k: 'ult', id: p.id, kind: L.ult, name: L.ultName, x: R(p.x), y: R(p.y), a: +aim.toFixed(2), c });
   switch (L.ult) {
     case 'roar': // 鬼王の咆哮: まわりの鬼をしびれさせて大ダメージ
@@ -311,6 +313,46 @@ function ultimate(room, p, aim) {
       break;
     case 'tandava': // 破壊の舞: まわりで舞いつづけて何度も大ダメージ
       zone(room, p, p.x, p.y, 290, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.8, every: 0.35, el, c, shape: 'tandava' });
+      break;
+    // ---- 追加の10柱 ----
+    case 'tsukiyo': // 月夜の帳: 10秒、見つからない＋会心
+      p.invisT = Math.max(p.invisT, 10); p.critT = 10;
+      for (const e of room.patrols) if (e.state === 'alert' && e.target === p.id) room.calmPatrol(e);
+      break;
+    case 'mirror': // いたずらの鏡: 分身3体
+      for (const side of [1, -1, 2.6]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 12, t: 0.3, dmg: P * 0.6, el, c, clone: p.yokai, follow: side });
+      break;
+    case 'hadesgate': // 冥府の門: 冥府の兵（見回り鬼）3体
+      for (const side of [1.2, -1.2, 2.6]) room.turrets.push({ id: room.newId(), owner: p.id, x: p.x, y: p.y, life: 10, t: 0.5, dmg: P * 0.45, el, c: '#b07aff', minion: true, follow: side });
+      break;
+    case 'peach': // 不老の桃: 10秒かけて大回復＋状態異常を消す
+      for (const q of room.activePlayers()) { q.regenT = 10; q.curseT = 0; q.charmT = 0; q.revT = 0; room.events.push({ k: 'ring', x: R(q.x), y: R(q.y), r: 90, c: '#ff9ac8' }); }
+      break;
+    case 'skyeye': // 天空の目: 15秒、敵の場所が全員に見える＋ホルスの攻撃 +50%
+      room.revealT = 15; p.skyT = 15;
+      break;
+    case 'timestop': // 時の停止: 5秒、ボスと見回り鬼が止まる
+      for (const b of [room.boss, room.boss2]) if (b && b.hp > 0) { b.stunT = Math.max(b.stunT || 0, 5); b.stunReadyAt = room.time + 8; }
+      for (const e of room.patrols) if (e.hp > 0) e.stunT = Math.max(e.stunT || 0, 5);
+      break;
+    case 'tsunami': // 大津波: 見回り鬼を押し流す＋ボスに大ダメージ
+      for (const e of room.patrols) if (e.hp > 0 && dist(e, p) < 1600) { knock(room, e, p, 420); e.stunT = Math.max(e.stunT || 0, 2); if (e.state === 'alert') room.calmPatrol(e); }
+      for (const b of [room.boss, room.boss2]) if (b && b.hp > 0 && dist(b, p) < 1600) { hit(room, p, b, P * 5, el); if (!(room.time < (b.stunReadyAt || 0))) { b.stunT = Math.max(b.stunT || 0, 3); b.stunReadyAt = room.time + 6; } }
+      break;
+    case 'fortune': // 障害をとりのぞく: 見回り鬼を吹き飛ばす＋状態異常を消す＋鬼玉を引きよせる
+      for (const e of room.patrols) if (e.hp > 0 && dist(e, p) < 520) { knock(room, e, p, 320); if (e.state === 'alert') room.calmPatrol(e); }
+      for (const q of room.activePlayers()) { q.curseT = 0; q.charmT = 0; q.revT = 0; }
+      for (const d of room.dama) if (!d.taken && dist(d, p) < 1200) { d.x = p.x + (Math.random() - 0.5) * 40; d.y = p.y + (Math.random() - 0.5) * 40; room.events.push({ k: 'da', id: d.id, x: R(d.x), y: R(d.y), v: d.v }); }
+      break;
+    case 'nuboko': // 天沼矛: まわりに光のうず
+      zone(room, p, p.x, p.y, 280, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.7, every: 0.35, el, c, shape: 'swirl' });
+      break;
+    case 'yomigaeri': // 黄泉がえり: 全員起こす＋10秒たましいの盾
+      for (const q of room.players.values()) {
+        if (q.escaped) continue;
+        if (q.down) { q.down = false; q.hp = q.maxHp * 0.5; q.reviveProg = 0; q.invulT = 2; room.events.push({ k: 'revive', id: q.id }); }
+        q.shieldT = Math.max(q.shieldT || 0, 10);
+      }
       break;
   }
 }
