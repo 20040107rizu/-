@@ -21,14 +21,14 @@ function rayLen(map, x, y, a, max) {
 }
 
 // ---------- 当てる ----------
-function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.8 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1) * (p.raT > 0 ? 1.25 : 1) * (p.critT > 0 ? 2 : 1) * (p.passive === 'moonlit' && p.inDark ? 1.3 : 1) * (p.skyT > 0 ? 1.5 : 1) * (p.bondT > 0 ? 1.2 : 1) * (p.ch ? 1 + p.ch.atk : 1); } // ＋ラーの太陽の光・ツクヨミ・ホルス・夫婦の絆・お守り // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
+function dmgMul(p) { return (p.atkUpT > 0 ? 1.3 : 1) * (p.passive === 'fury' ? 1 + 0.8 * (1 - p.hp / p.maxHp) : 1) * (p.passive === 'bossGuard' && p.hp < p.maxHp / 2 ? 1.5 : 1) * (p.raT > 0 ? 1.15 : 1) * (p.critT > 0 ? 2 : 1) * (p.passive === 'moonlit' && p.inDark ? 1.3 : 1) * (p.skyT > 0 ? 1.5 : 1) * (p.bondT > 0 ? 1.2 : 1) * (p.ch ? 1 + p.ch.atk : 1); } // ＋ラーの太陽の光・ツクヨミ・ホルス・夫婦の絆・お守り // シヴァ: 体力が減るほど強い／ウラ: 体力が半分を切ると本気
 
 const ULT_MAX = 100, ULT_GAIN = 0.03; // レジェンドの必殺技ゲージ（当てたダメージでたまる）
 function hit(room, p, e, amount, el) {
   if (!e || e.hp <= 0) return 0;
   if (room.elemMul) amount *= room.elemMul(e, el); // 九尾鬼（光っている尾の属性は効かない）・ぬえ鬼（姿ごとの弱点）
   room.damageOni(p, e, amount);
-  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1) * (p.ch ? 1 + p.ch.ult : 1)); // 必殺技の効果中はたまらない
+  if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1) * (p.ch ? 1 + p.ch.ult : 1) * (p.passive === 'shock' ? 0.5 : 1)); // 必殺技の効果中はたまらない／ゼウスはたまるのが半分
   if (el) applyElement(room, p, e, amount, el);
   if (p && p.passive === 'seaking' && e.hp > 0) slow(e, 0.6, 2); // ポセイドン: 潮の力
   if (p && p.ch && p.ch.drain > 0) room.healPlayer(p, amount * p.ch.drain); // お守り: 吸血
@@ -312,8 +312,8 @@ function ultimate(room, p, aim) {
       beam(room, p, aim, 1400, 100, P * 12, el, { big: true });
       break;
     case 'sunboat': // 太陽の船: みんな大回復＋まわりを焼く
-      for (const q of room.activePlayers()) { room.healPlayer(q, q.maxHp * 0.8); q.raT = Math.max(q.raT || 0, 8); }
-      zone(room, p, p.x, p.y, 340, 7, { kind: 'dmg', follow: p.id, tickDmg: P * 0.9, every: 0.35, el, c, shape: 'sun' });
+      for (const q of room.activePlayers()) room.healPlayer(q, q.maxHp * 0.6);
+      zone(room, p, p.x, p.y, 320, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.5, every: 0.35, el, c, shape: 'sun' });
       break;
     case 'mend': // 天のつくろい: 倒れた仲間を全員起こす＋回復
       for (const q of room.players.values()) {
