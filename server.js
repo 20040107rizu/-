@@ -321,7 +321,7 @@ class Room {
   watchStart(ws, watch = true) {
     ws.send(JSON.stringify({
       t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: this.timeLimit, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch, rejoin: !watch,
-      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
+      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v, b: d.b })),
     }));
   }
 
@@ -401,7 +401,7 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, critT: 0, skyT: 0, regenT: 0, bondT: 0, trickUsed: false, yomiUses: 0, mimicDodge: 0, ownShade: 0, decoyHits: 0, weakDmg: 0, orbFrac: 0, gutsUsed: false, revT: 0, charmT: 0, curseT: 0, curseTick: 0, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), godFighter: !!(S.YOKAI_BY_ID[p.yokai].god && S.YOKAI_BY_ID[p.yokai].role === 'fighter'), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, critT: 0, skyT: 0, regenT: 0, bondT: 0, trickUsed: false, yomiUses: 0, mimicDodge: 0, ownShade: 0, decoyHits: 0, weakDmg: 0, orbFrac: 0, gutsUsed: false, revT: 0, charmT: 0, curseT: 0, curseTick: 0, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
@@ -467,7 +467,7 @@ class Room {
 
     this.broadcast({
       t: 'start', seed, stage: this.stage, timeLimit: this.timeLimit, challenge: !!this.challenge, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN,
-      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v })),
+      dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v, b: d.b })),
     });
   }
 
@@ -585,12 +585,12 @@ class Room {
   }
 
   // 鬼玉を落とす（v はその玉1個の価値。ボス鬼は v の大きい「どデカい鬼玉」1個）
-  dropDama(x, y, n, v = 1) {
+  dropDama(x, y, n, v = 1, b) {
     for (let k = 0; k < n; k++) {
-      const d = { id: genId(), x: x + rand(-40, 40), y: y + rand(-40, 40), v };
+      const d = { id: genId(), x: x + rand(-40, 40), y: y + rand(-40, 40), v, b }; // b: 落としたボス鬼（どデカい鬼玉の色）
       S.collide(this.map, d, v > 1 ? 30 : 10);
       this.dama.push(d);
-      this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v });
+      this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v, b });
     }
   }
 
@@ -609,7 +609,7 @@ class Room {
     if (process.env.DEMO_HP) { this.boss.hp = this.boss.maxHp * +process.env.DEMO_HP; }
     if (process.env.DEMO_FAST) Object.assign(this.boss, { blizT: 4, modeT: 7 });
     for (const e of this.patrols.slice(0, 3)) Object.assign(e, near(220, 480, this.gridS));
-    if (process.env.DEMO_DAMA) { for (const d of this.dama.slice(0, 8)) Object.assign(d, near(80, 300, this.gridS)); const q = near(150, 260, this.gridS); this.dama.push({ id: genId(), x: q.x, y: q.y, v: 50 }); } // 鬼玉の見た目の確認用
+    if (process.env.DEMO_DAMA) { for (const d of this.dama.slice(0, 8)) Object.assign(d, near(80, 300, this.gridS)); const q = near(150, 260, this.gridS); this.dama.push({ id: genId(), x: q.x, y: q.y, v: 50, b: process.env.DEMO_DAMA }); } // 鬼玉の見た目の確認用
   }
 
   // ---- デモ撮影用の自動操作（DEMO_AI=1）: いちばん近い鬼に向かって攻撃し、必殺技がたまったら使う ----
@@ -791,7 +791,7 @@ class Room {
     }
     for (const p of this.players.values()) { p.judge = null; p.revT = 0; p.charmT = 0; p.curseT = 0; } // 獄王の裁き・さかさま・魅了・呪いもおしまい
     if (b === this.mainBoss) { this.boss2 = null; this.shades = []; this.decoys = []; }
-    this.dropDama(b.x, b.y, 1, b.kind.drop * (b.rushStep != null ? 0.4 : 1)); // ラッシュ中のボスの鬼玉は少なめ
+    this.dropDama(b.x, b.y, 1, b.kind.drop * (b.rushStep != null ? 0.4 : 1), b.type); // ラッシュ中のボスの鬼玉は少なめ
     this.telegraphs = [];
     this.ring = null;
   }
@@ -1417,7 +1417,7 @@ class Room {
     p.prevItem = inp.item;
 
     // 拾う（ガネーシャは幸運の神: まわりの鬼玉を遠くから引きよせて拾う）
-    const reach = p.passive === 'luckgod' ? 900 : 32;
+    const reach = 32; // ガネーシャも拾える範囲はみんなと同じ（必殺技でマップ中の鬼玉を集める）
     for (const d of this.dama) {
       if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < reach) {
         d.taken = true;

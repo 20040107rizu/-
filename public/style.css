@@ -514,7 +514,7 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .co-legend .face { width: 54px; height: 54px; object-fit: contain; }
 .co-legend small { font-size: 10px; opacity: .8; }
 .pick-btn { background: linear-gradient(#ff7ac8, #c8287a) !important; }
-.co-picks { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; max-height: 46vh; overflow-y: auto; padding: 2px; }
+.co-picks { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; max-height: 46vh; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 2px; }
 .co-prank { width: 100%; font-weight: bold; font-size: 12px; text-align: left; margin-top: 4px; }
 .co-pick { display: flex; flex-direction: column; align-items: center; width: 70px; padding: 3px; border-radius: 9px; background: #2a1a3a; border: 1px solid #ffffff33; color: #fff; font-size: 10px; }
 .co-pick.new { border-color: #ffe14a; }

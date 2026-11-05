@@ -1444,7 +1444,7 @@
     $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = $('btnChoiceCharm').hidden = $('btnChoicePick').hidden = true;
     const card = y => { const n = friends[y.id] || 0, t = S.totsuOf(n);
       return `<button class="co-pick${n ? '' : ' new'}" data-id="${y.id}">${faceImg(y, false)}<b>${esc(y.name)}</b><small style="color:${S.RANKS[y.rank].color}">${y.rank}${n ? (t >= S.TOTSU_MAX ? '・凸MAX' : `・凸${t}`) : '・NEW'}</small></button>`; };
-    $('choiceOdds').innerHTML = `<div class="co-rank">🎯 どの妖怪を指名する？（選んだ妖怪が${S.PICK_COPIES}体ぶん仲間になる。凸MAXをこえた分は経験値）</div>
+    $('choiceOdds').innerHTML = `<div class="co-rank">🎯 どの妖怪を指名する？（Sランクまでの好きな妖怪が1体仲間になる。持っていれば凸＋1、凸MAXをこえた分は経験値）</div>
       <div class="co-picks">${['S', 'A', 'B', 'C'].map(r => `<div class="co-prank" style="color:${S.RANKS[r].color}">${r}ランク</div>` + S.YOKAI.filter(y => y.rank === r).map(card).join('')).join('')}</div>
       <button id="btnPickBack" class="small">もどる</button>`;
     for (const b of document.querySelectorAll('#choiceOdds .co-pick')) b.onclick = () => {
@@ -1468,7 +1468,7 @@
     saveAll(); updateFriendCount(); helloAgain();
     const t = S.totsuOf(friends[y.id]);
     beep(660, 0.15, 'triangle', 0.07); setTimeout(() => beep(990, 0.15, 'triangle', 0.08), 130); setTimeout(() => beep(1320, 0.3, 'triangle', 0.08), 260);
-    const line = `${y.name}が${S.PICK_COPIES}体ぶん仲間になった！（${isNew ? 'はじめてのお友達・' : ''}${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）${over ? `　あふれた分が 📈 経験値 +${over.toLocaleString('ja-JP')} に変わった` : ''}`;
+    const line = `${y.name}が仲間になった！（${isNew ? 'はじめてのお友達・' : ''}${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）${over ? `　あふれた分が 📈 経験値 +${over.toLocaleString('ja-JP')} に変わった` : ''}`;
     $('rewardWeek').textContent = '🎯 指名召喚';
     $('rewardTitle').textContent = `${y.name}を指名した！`;
     $('rewardSub').textContent = line;
@@ -1723,7 +1723,7 @@
         } else if (ev.v > 1) banner = { text: `${nameOf(ev.by)}がどデカい鬼玉をゲット！`, t: 1.8, c: '#ff8ad8' };
         break;
       case 'da':
-        dama.set(ev.id, { id: ev.id, x: ev.x, y: ev.y, v: ev.v || 1 });
+        dama.set(ev.id, { id: ev.id, x: ev.x, y: ev.y, v: ev.v || 1, b: ev.b });
         if (ev.v > 1) banner = { text: `どデカい鬼玉（${ev.v}個分）が落ちた！`, t: 2.4, c: '#ff8ad8' };
         break;
       case 'pick':
@@ -1887,7 +1887,7 @@
   }
 
   const watchExitBtn = () => ({ x: W - 150, y: 12, w: 138, h: 40 });
-  const playing = () => $('game').classList.contains('active') && !$('gacha').classList.contains('active') && !$('result').classList.contains('active');
+  const playing = () => $('game').classList.contains('active') && !['gacha', 'result', 'choiceScreen', 'rewardScreen'].some(id => $(id).classList.contains('active')); // バトルの上に出る画面（指名のリストなど）はスライドできるように
   // タップ位置を、キャンバスに描いている座標（W×H）に直す
   function toCanvas(e) {
     const r = cv.getBoundingClientRect();
@@ -2034,9 +2034,19 @@
   }
 
   // 鬼玉: 別のキャンバスを使わずにその場で描く（iPhone でキャンバスのメモリが足りなくなっても消えないように）
-  function drawOrb(x, y, r, big) {
+  // どデカい鬼玉は、落としたボス鬼の色の玉＋目立つ色のツノ（赤鬼なら赤い玉に金のツノ、白鬼なら白い玉に赤いツノ）
+  const hexRgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const mixHex = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+  function orbColors(b) {
+    const base = (S.BOSSES[b] && S.BOSSES[b].color) || '#ff3da8';
+    const [r, g, bl] = hexRgb(base), lum = (0.299 * r + 0.587 * g + 0.114 * bl) / 255;
+    return { hi: mixHex(base, '#ffffff', 0.65), mid: lum < 0.25 ? mixHex(base, '#ffffff', 0.25) : base, lo: mixHex(base, '#000000', 0.45), glow: base, horn: lum > 0.6 ? '#d8243a' : '#ffd23a', hornLine: lum > 0.6 ? '#ffb0b8' : '#a87a10' };
+  }
+  function drawOrb(x, y, r, big, b) {
+    const oc = big ? orbColors(b) : null;
     const gr = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * (big ? 2.2 : 1.9));
-    gr.addColorStop(0, big ? 'rgba(255,225,74,0.75)' : 'rgba(255,61,168,0.7)'); gr.addColorStop(1, 'rgba(255,61,168,0)');
+    if (big) { const [cr, cg, cb] = hexRgb(oc.glow); gr.addColorStop(0, `rgba(${cr},${cg},${cb},0.75)`); gr.addColorStop(1, `rgba(${cr},${cg},${cb},0)`); }
+    else { gr.addColorStop(0, 'rgba(255,61,168,0.7)'); gr.addColorStop(1, 'rgba(255,61,168,0)'); }
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * (big ? 2.2 : 1.9), 0, Math.PI * 2); ctx.fill();
     if (big) { // どデカい鬼玉には鬼のツノ
       for (const s of [-1, 1]) {
@@ -2045,15 +2055,15 @@
         ctx.quadraticCurveTo(x + s * r * 0.45, y - r * 1.55, x + s * r * 0.95, y - r * 1.75);
         ctx.quadraticCurveTo(x + s * r * 0.85, y - r * 1.2, x + s * r * 0.8, y - r * 0.5);
         ctx.closePath();
-        ctx.fillStyle = '#fff2c8'; ctx.strokeStyle = '#3a1020'; ctx.lineWidth = 3; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = oc.horn; ctx.strokeStyle = '#1a0810'; ctx.lineWidth = 3; ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(x + s * r * 0.4, y - r * 1.05); ctx.lineTo(x + s * r * 0.82, y - r * 1.0); ctx.moveTo(x + s * r * 0.55, y - r * 1.35); ctx.lineTo(x + s * r * 0.86, y - r * 1.33);
-        ctx.strokeStyle = '#c8a070'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = oc.hornLine; ctx.lineWidth = 2; ctx.stroke();
       }
     }
     const core = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    core.addColorStop(0, '#ffd0f0'); core.addColorStop(0.45, '#ff5ab8'); core.addColorStop(1, '#c8187a');
+    if (big) { core.addColorStop(0, oc.hi); core.addColorStop(0.45, oc.mid); core.addColorStop(1, oc.lo); } else { core.addColorStop(0, '#ffd0f0'); core.addColorStop(0.45, '#ff5ab8'); core.addColorStop(1, '#c8187a'); }
     ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = big ? '#3a1020' : '#7a0a4a'; ctx.lineWidth = big ? 3 : 1.5; ctx.stroke();
+    ctx.strokeStyle = big ? '#1a0810' : '#7a0a4a'; ctx.lineWidth = big ? 3 : 1.5; ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.globalAlpha *= 0.85; ctx.beginPath(); ctx.arc(x - r / 3, y - r / 3, r / 4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha /= 0.85;
   }
   // 使い終わったキャンバスのメモリをすぐ返す（iPhone は合計の上限が小さく、こえると新しいキャンバスが真っ白になる）
@@ -2529,7 +2539,7 @@
       ctx.strokeText(`🐘 落ちている鬼玉 ${n}個`, ox + 2, oy + mh + 14); ctx.fillText(`🐘 落ちている鬼玉 ${n}個`, ox + 2, oy + mh + 14);
     }
     // どデカい鬼玉
-    for (const d of dama.values()) if (d.v > 1) dot(d.x, d.y, 3 + Math.abs(Math.sin(now * 5)) * 2.5, '#ff5ac8');
+    for (const d of dama.values()) if (d.v > 1) dot(d.x, d.y, 3 + Math.abs(Math.sin(now * 5)) * 2.5, d.b && S.BOSSES[d.b] ? orbColors(d.b).mid : '#ff5ac8');
     // アイテム（画面に見えているものだけ種類がわかる）
     ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const it of snap.items) {
@@ -3041,11 +3051,11 @@
       if (Math.abs(d.x - cam.x) > cam.vw / 2 + 30 || Math.abs(d.y - cam.y) > cam.vh / 2 + 30) continue;
       const bob = Math.sin(now * 4 + d.id) * 3;
       const r = d.v > 1 ? 30 + Math.sin(now * 6) * 2 : 9;
-      drawOrb(d.x, d.y + bob, r, d.v > 1);
+      drawOrb(d.x, d.y + bob, r, d.v > 1, d.b);
       if (d.v > 1) {
-        ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(d.x, d.y + bob, r + 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = orbColors(d.b).horn; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(d.x, d.y + bob, r + 4, 0, Math.PI * 2); ctx.stroke();
         ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-        ctx.strokeText(`×${d.v}`, d.x, d.y + bob - r - 10); ctx.fillStyle = '#ffe14a'; ctx.fillText(`×${d.v}`, d.x, d.y + bob - r - 10);
+        ctx.strokeText(`×${d.v}`, d.x, d.y + bob - r * 1.9 - 8); ctx.fillStyle = orbColors(d.b).horn; ctx.fillText(`×${d.v}`, d.x, d.y + bob - r * 1.9 - 8);
       }
     }
     // アイテム
