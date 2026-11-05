@@ -1557,7 +1557,7 @@ class Room {
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
     const bn = this.bonusBoss, sh = this.shinBoss;
-    this.lastResult = { t: 'result', players, team, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
+    this.lastResult = { t: 'result', players, team, luck: this.luckTeam || undefined, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
     this.broadcast(this.lastResult);
     for (const p of this.players.values()) p.missedResult = !!p.away; // 通信が切れていた人には、つなぎ直したときに送る
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）

@@ -284,7 +284,7 @@
       story: '海と地震の神。三叉の槍で海をかきまぜ、嵐と津波をおこす。' },
     { id: 'ganesha', name: 'ガネーシャ', role: H, color: '#8aa0b8', origin: 'インド', look: 't=human skin=c nose=long hat=crown acc=staff fx=star', frag: 15,
       el: 'earth', normal: 'healOrb', strong: 'healZone', normalName: '幸運の弾', strongName: '知恵の輪', ult: 'fortune', ultName: '障害をとりのぞく', ultDesc: '見回り鬼をまわりから吹き飛ばし、仲間の状態異常を全部消す＋落ちている鬼玉を引きよせる',
-      passive: 'luckgod', passiveDesc: '幸運の神：チームの拾う鬼玉 +20%／富の神：バトルのあとのガチャで、1つ上の色の玉が出やすい', trial: 'ガネーシャの試練：1回のバトルで、チームで鬼玉を700個以上集めて脱出する',
+      passive: 'luckgod', passiveDesc: '幸運の神：チームの拾う鬼玉 +20%／富の神：バトルのあとのガチャ・お守りガチャ・お守りのドロップで、1つ上の色が出やすい', trial: 'ガネーシャの試練：1回のバトルで、チームで鬼玉を700個以上集めて脱出する',
       story: '象の頭をもつ、幸運と知恵の神。商売や学問の神様として人気がある。' },
     { id: 'izanagi', name: 'イザナギ', role: F, color: '#d8c890', origin: '日本', look: 't=human hair=long acc=spear eyes=angry fx=spark', frag: 15,
       el: 'light', normal: 'slash', strong: 'quake', normalName: '天の斬撃', strongName: '国生みの突き', ult: 'nuboko', ultName: '天沼矛', ultDesc: '天の槍で町をかきまぜ、まわりに大きな光のうずを作る（6秒、何度もダメージ）',

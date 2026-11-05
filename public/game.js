@@ -1329,7 +1329,7 @@
     if (mine && result.bossDown) {
       const i = Math.max(0, S.BOSS_LIST.indexOf(result.boss)), k = S.BOSSES[result.boss];
       if (Math.random() < Math.min(0.5, 0.15 + 0.025 * i)) {
-        const c = S.rollCharm((k ? k.drop : 50) * 1.4), got = addCharm(c);
+        const c = S.rollCharm((k ? k.drop : 50) * 1.4 + (result.luck ? 150 : 0)), got = addCharm(c); // ガネーシャ: 1つ上の色が出やすい
         result.charmNote = got.full ? `🧿 ${S.charmName(c)}を拾ったけど、いっぱいなので📈 経験値 +${got.exp} に変わった` : `🧿 ボスが${S.charmName(c)}を落とした！（${S.charmText(c)}）`;
       }
     }
@@ -1345,7 +1345,7 @@
     }
     if (mine && mine.gacha) {
       // ガチャか経験値かを選ぶ。選ぶ前にアプリを閉じても、次に開いたときにまた選べるように残しておく
-      pending = { gacha: mine.gacha, count: mine.count ?? result.team ?? mine.dama, escaped: mine.escaped, team: result.team };
+      pending = { gacha: mine.gacha, count: mine.count ?? result.team ?? mine.dama, escaped: mine.escaped, team: result.team, luck: !!result.luck };
       try { localStorage.setItem('pendingChoice', JSON.stringify(pending)); } catch {}
     }
     if (mine) { saveAll(); updateFriendCount(); helloAgain(); }
@@ -1378,8 +1378,8 @@
     $('btnChoiceExp').textContent = `📈 経験値にする（＋${expOf(pending.count).toLocaleString('ja-JP')}）`;
     $('btnChoiceSeal').hidden = pending.count < S.SEAL_PICK;
     $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceCharm').hidden = false;
-    const co = S.charmOdds(pending.count), cs = co.reduce((a, b) => a + b, 0);
-    $('choiceOdds').insertAdjacentHTML('beforeend', `<div class="co-rank">🧿 お守りガチャ：${S.CHARM_RARITY.map((R, i) => `<span style="color:${R.color === 'rainbow' ? '#ff9ae8' : R.color}">${R.name} ${Math.round(co[i] / cs * 100)}%</span>`).join('　')}</div>`);
+    const co = S.charmOdds(charmCount(pending)), cs = co.reduce((a, b) => a + b, 0);
+    $('choiceOdds').insertAdjacentHTML('beforeend', `<div class="co-rank">🧿 お守りガチャ${pending.luck ? '（🐘ガネーシャで1つ上）' : ''}：${S.CHARM_RARITY.map((R, i) => `<span style="color:${R.color === 'rainbow' ? '#ff9ae8' : R.color}">${R.name} ${Math.round(co[i] / cs * 100)}%</span>`).join('　')}</div>`);
     show('choiceScreen', inBattle);
   }
   // 鬼玉が700個以上なら「好きなレジェンドの封印ガチャ」も選べる: まずレジェンドを選ぶ
@@ -1393,10 +1393,11 @@
     for (const b of document.querySelectorAll('#choiceOdds .co-legend')) b.onclick = () => pickSeal(S.YOKAI_BY_ID[b.dataset.id]);
     $('btnSealBack').onclick = () => showChoice(choiceInBattle);
   };
-  // お守りガチャ: 鬼玉が多いほど、いいお守りが出やすい
+  // お守りガチャ: 鬼玉が多いほど、いいお守りが出やすい（ガネーシャがいると鬼玉+150個ぶん）
+  const charmCount = p => p.count + (p.luck ? 150 : 0);
   $('btnChoiceCharm').onclick = () => {
     if (!pending) return;
-    const c = S.rollCharm(pending.count), got = addCharm(c), inBattle = choiceInBattle;
+    const c = S.rollCharm(charmCount(pending)), got = addCharm(c), inBattle = choiceInBattle;
     pending = null;
     try { localStorage.removeItem('pendingChoice'); } catch {}
     saveAll();

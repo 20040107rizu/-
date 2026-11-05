@@ -81,9 +81,10 @@
   const CHARM_MAX = 100; // 持てる数
   // 鬼玉の数ごとの、お守りガチャのレア度の確率（白・青・赤・金・虹 の%）
   const CHARM_ODDS = [[0, 70, 25, 5, 0, 0], [100, 45, 35, 16, 4, 0], [200, 25, 35, 28, 10, 2], [300, 12, 30, 35, 18, 5], [500, 0, 20, 40, 30, 10], [700, 0, 10, 35, 40, 15]];
-  function charmOdds(count) { let row = CHARM_ODDS[0]; for (const r of CHARM_ODDS) if (count >= r[0]) row = r; return row.slice(1); }
-  function rollCharm(count, rnd = Math.random) {
-    const odds = charmOdds(count), sum = odds.reduce((a, b) => a + b, 0);
+  // up: ガネーシャがいると1段上の確率になる
+  function charmOdds(count, up = 0) { let i = 0; CHARM_ODDS.forEach((r, k) => { if (count >= r[0]) i = k; }); return CHARM_ODDS[Math.min(CHARM_ODDS.length - 1, i + up)].slice(1); }
+  function rollCharm(count, rnd = Math.random, up = 0) {
+    const odds = charmOdds(count, up), sum = odds.reduce((a, b) => a + b, 0);
     let x = rnd() * sum, r = 0;
     for (let i = 0; i < odds.length; i++) { if (x < odds[i]) { r = i; break; } x -= odds[i]; }
     const R = CHARM_RARITY[r], s = [], used = new Set();
