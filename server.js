@@ -394,7 +394,8 @@ class Room {
       const st = S.yokaiStats(p.yokai, p.totsu, p.lv);
       Object.assign(p, {
         stats: st, x: sp.x, y: sp.y, face: 0,
-        hp: Math.round(st.hp * (1 + (p.charm.hp || 0))), maxHp: Math.round(st.hp * (1 + (p.charm.hp || 0))), ch: p.charm, atkT: 0, // お守り: 体力 strongT: 0, down: false, reviveProg: 0, escaped: false,
+        hp: Math.round(st.hp * (1 + (p.charm.hp || 0))), maxHp: Math.round(st.hp * (1 + (p.charm.hp || 0))), ch: p.charm, atkT: 0, // お守り: 体力
+        strongT: 0, down: false, reviveProg: 0, escaped: false,
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
