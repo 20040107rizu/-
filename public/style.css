@@ -565,4 +565,4 @@ html.rot .gacha-next { right: max(16px, env(safe-area-inset-bottom)); bottom: 14
 .member-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 4px 0; } .member-pop dt { opacity: .65; } .member-pop dd { margin: 0; }
 .member-pop #memberClose { align-self: center; padding: 6px 30px; font-size: 16px; }
 #yokaiInfo { position: relative; }
-.lobby-zukan { position: absolute; right: 8px; bottom: 8px; font-size: 11px !important; padding: 4px 8px !important; background: #1e3a3a !important; border: 1px solid #3ac8b0; z-index: 2; }
+.lobby-zukan { font-size: 11px !important; padding: 2px 8px !important; margin-left: 4px; vertical-align: middle; background: #1e3a3a !important; border: 1px solid #3ac8b0; white-space: nowrap; }
