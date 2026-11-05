@@ -86,6 +86,26 @@
   if (!friends[selYokai]) selYokai = 'nekomata';
   // お友達レベル: levels = { id: たまった経験値 }、stats.expStock = まだ使っていない経験値
   let levels = loadJSON('levels', {});
+  // お守り: [{ id, r: レア度, s: [[スキル, 強さ], ...], fav }]、equips: { 妖怪ID: [お守りID, ...] }（ふつうは1つ、神は2つ）
+  let charms = loadJSON('charms', []).filter(c => c && S.CHARM_RARITY[c.r] && Array.isArray(c.s));
+  let equips = loadJSON('equips', {});
+  let charmSeq = Math.max(0, ...charms.map(c => c.id || 0));
+  const charmSlots = id => (S.YOKAI_BY_ID[id]?.god ? 2 : 1);
+  const equippedOf = id => (equips[id] || []).map(cid => charms.find(c => c.id === cid)).filter(Boolean);
+  const myCharm = () => S.charmEffects(equippedOf(selYokai));
+  function saveCharms() { try { localStorage.setItem('charms', JSON.stringify(charms)); localStorage.setItem('equips', JSON.stringify(equips)); } catch {} }
+  // お守りをふやす（いっぱいのときは経験値に変える）
+  function addCharm(c) {
+    if (charms.length >= S.CHARM_MAX) { const e = S.CHARM_RARITY[c.r].exp; stats.expStock += e; saveAll(); return { full: true, exp: e }; }
+    c.id = ++charmSeq; charms.push(c); saveCharms(); return { c };
+  }
+  function removeCharm(cid) {
+    charms = charms.filter(c => c.id !== cid);
+    for (const k of Object.keys(equips)) { equips[k] = equips[k].filter(x => x !== cid); if (!equips[k].length) delete equips[k]; }
+    saveCharms();
+  }
+  const charmColor = c => (S.CHARM_RARITY[c.r].color === 'rainbow' ? '#ff9ae8' : S.CHARM_RARITY[c.r].color);
+  const charmTag = c => `<span class="charm-tag r${c.r}" style="--cc:${charmColor(c)}">🧿 ${S.charmName(c)}</span> <span class="charm-sk">${esc(S.charmText(c))}</span>`;
   const lvOfId = id => S.lvOf(levels[id] || 0);
   const myLv = () => lvOfId(selYokai);
   function saveAll() {
@@ -95,6 +115,7 @@
       localStorage.setItem('stats', JSON.stringify(stats));
       localStorage.setItem('yokai', selYokai);
     } catch {}
+    saveCharms();
   }
   // ブラウザに勝手に消されにくくする
   navigator.storage?.persist?.().catch(() => {});
@@ -112,6 +133,9 @@
   function makeSaveCode() {
     const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock,
       ...(S.GODS.some(g => friends[g.id]) || stats.gods.frag ? { gd: S.GODS.map(g => friends[g.id] || 0), gx: [stats.gods.frag, ...S.GODS.map(g => stats.gods.tr[g.id] || 0)], gl: S.GODS.map(g => levels[g.id] || 0) } : {}) };
+    // お守りは、つけているものとお気に入りだけ入れる
+    const keep = charms.filter(c => c.fav || Object.values(equips).some(l => l.includes(c.id)));
+    if (keep.length) { data.cm = keep.map(c => [c.r, c.fav ? 1 : 0, ...c.s.flat()]); data.eq = Object.fromEntries(Object.entries(equips).map(([k, l]) => [k, l.map(cid => keep.findIndex(c => c.id === cid)).filter(i => i >= 0)])); }
     const body = b64.enc(JSON.stringify(data));
     return `ONI1-${body}-${checksum(body)}`;
   }
@@ -132,7 +156,10 @@
     const lvs = {};
     PROF_YOKAI.forEach((y, i) => { const e = Math.floor(+(d.lv || [])[i] || 0); if (e > 0) lvs[y.id] = Math.min(e, S.expForLv(S.LV_MAX)); });
     S.GODS.forEach((g, i) => { const e = Math.floor(+(d.gl || [])[i] || 0); if (e > 0) lvs[g.id] = Math.min(e, S.expForLv(S.LV_MAX)); });
-    return { gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
+    const cm = Array.isArray(d.cm) ? d.cm.slice(0, S.CHARM_MAX).map((a, i) => ({ id: i + 1, r: Math.max(0, Math.min(4, a[0] | 0)), fav: !!a[1], s: [[a[2], a[3]], [a[4], a[5]]].filter(([k, lv]) => S.CHARM_SKILLS[k]).map(([k, lv]) => [k, Math.max(1, Math.min(5, lv | 0))]) })).filter(c => c.s.length) : [];
+    const eq = {};
+    if (d.eq && typeof d.eq === 'object') for (const [k, l] of Object.entries(d.eq)) if (S.YOKAI_BY_ID[k] && Array.isArray(l)) eq[k] = l.map(i => cm[i] && cm[i].id).filter(Boolean).slice(0, charmSlots(k));
+    return { cm, eq, gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
       feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
   }
 
@@ -391,7 +418,39 @@
     return `<div class="lv-box"><div class="lv-top"><b>Lv ${lv}</b>${max ? '<span class="lv-max">MAX</span>' : ''}<small>HP・攻撃 +${lvBonus(lv)}%</small></div>
       <div class="tbar"><i style="width:${pct}%"></i></div>
       <small>${max ? 'これ以上は上がりません' : `次のレベルまで ${need.toLocaleString('ja-JP')}`}</small>
-      <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1Lv</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10Lv</button><button class="small alt wide" data-lv="all"${can ? '' : ' disabled'}>📈 ストックを全部</button></div></div>`;
+      <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1Lv</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10Lv</button><button class="small alt wide" data-lv="all"${can ? '' : ' disabled'}>📈 ストックを全部</button></div>
+      <div class="charm-slots">${Array.from({ length: charmSlots(id) }, (_, i) => { const c = equippedOf(id)[i]; return `<button class="small charm-slot${c ? ' on' : ''}" data-slot="${i}" style="${c ? `--cc:${charmColor(c)}` : ''}">${c ? `🧿 ${esc(S.charmText(c))}` : '🧿 ＋お守り'}</button>`; }).join('')}</div></div>`;
+  }
+  // ---- お守りをえらぶ画面（図鑑から開く） ----
+  function openCharmPick(id, slot, rerender) {
+    let box = $('charmPick');
+    if (!box) { box = document.createElement('div'); box.id = 'charmPick'; box.className = 'lv-confirm charm-pick'; $('zukan').appendChild(box); }
+    const y = S.YOKAI_BY_ID[id], cur = equippedOf(id)[slot];
+    const owner = cid => Object.entries(equips).find(([k, l]) => l.includes(cid))?.[0];
+    const list = charms.slice().sort((a, b) => b.r - a.r || (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || b.id - a.id);
+    box.hidden = false;
+    box.innerHTML = `<div class="cp-in"><div class="cp-head"><b>🧿 ${esc(y.name)}のお守り（${slot + 1}つ目）</b><small>持っているお守り ${charms.length}/${S.CHARM_MAX}</small>
+      ${cur ? '<button class="small" data-act="off">はずす</button>' : ''}<button class="small alt" data-act="close">とじる</button></div>
+      <div class="cp-list">${list.length ? list.map(c => { const o = owner(c.id), eff = S.charmEffects([c]);
+        return `<div class="cp-row${cur && cur.id === c.id ? ' on' : ''}"><div class="cp-main">${charmTag(c)}<small>${Object.entries(eff).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}${o ? `　（${esc(S.YOKAI_BY_ID[o].name)}がつけている）` : ''}</small></div>
+          <button class="small" data-act="eq" data-id="${c.id}">つける</button><button class="small fav${c.fav ? ' on' : ''}" data-act="fav" data-id="${c.id}">${c.fav ? '★' : '☆'}</button><button class="small del" data-act="del" data-id="${c.id}"${c.fav ? ' disabled' : ''}>📈+${S.CHARM_RARITY[c.r].exp}</button></div>`; }).join('')
+        : '<p class="sub">まだお守りがありません。ボスを倒すとたまに落とします。バトルのあとの「🧿 お守りガチャ」でも手に入ります</p>'}</div></div>`;
+    for (const b of box.querySelectorAll('button')) b.onclick = () => {
+      const act = b.dataset.act, cid = +b.dataset.id;
+      if (act === 'close') { box.hidden = true; return; }
+      if (act === 'off') { equips[id] = (equips[id] || []).filter(x => x !== cur.id); if (!equips[id].length) delete equips[id]; }
+      if (act === 'eq') {
+        for (const k of Object.keys(equips)) { equips[k] = equips[k].filter(x => x !== cid); if (!equips[k].length) delete equips[k]; } // ほかの妖怪からはずす
+        const l = (equips[id] = equips[id] || []); if (cur) l.splice(l.indexOf(cur.id), 1);
+        l.splice(slot, 0, cid); equips[id] = l.slice(0, charmSlots(id));
+        beep(660, 0.1, 'triangle', 0.06);
+      }
+      if (act === 'fav') { const c = charms.find(x => x.id === cid); c.fav = !c.fav; }
+      if (act === 'del') { const c = charms.find(x => x.id === cid); if (!c || c.fav) return; stats.expStock += S.CHARM_RARITY[c.r].exp; removeCharm(cid); saveAll(); }
+      saveCharms();
+      if (id === selYokai && ws) send({ t: 'yokai', id, totsu: myTotsu(), lv: myLv(), ch: myCharm(), title: myTitle });
+      if (act === 'eq' || act === 'off') { box.hidden = true; rerender(); } else { openCharmPick(id, slot, rerender); rerender(); box.hidden = false; }
+    };
   }
   // 使う前の確認（画面のまんなかに出すので、スクロールしなくても見える）
   function renderLvConfirm(id) {
@@ -410,6 +469,7 @@
   }
   function bindLevelButtons(id, rerender) {
     renderLvConfirm(id);
+    for (const b of document.querySelectorAll('#zukanInfo .charm-slot')) b.onclick = () => openCharmPick(id, +b.dataset.slot, rerender);
     for (const b of document.querySelectorAll('#zukanInfo .lv-btns button, #lvConfirm button')) b.onclick = () => {
       const exp = levels[id] || 0, lv = S.lvOf(exp), k = b.dataset.lv;
       const top = Math.min(exp + stats.expStock, S.expForLv(S.LV_MAX)); // ストックで届くところまで
@@ -424,7 +484,7 @@
         rerender();
         const card = document.querySelector(`#zukanGrid .yk[data-id="${id}"]`), nlv = S.lvOf(levels[id]);
         if (card && nlv > 1) { let b = card.querySelector('.lvc'); if (!b) { b = document.createElement('span'); b.className = 'lvc'; card.querySelector('.rk').after(b); } b.textContent = `Lv${nlv}`; }
-        if (id === selYokai && ws) send({ t: 'yokai', id, totsu: myTotsu(), lv: myLv(), title: myTitle });
+        if (id === selYokai && ws) send({ t: 'yokai', id, totsu: myTotsu(), lv: myLv(), ch: myCharm(), title: myTitle });
         return;
       }
       // ＋1・＋10 は押すたびに上乗せ（＋10を2回で＋20）
@@ -772,6 +832,7 @@
     if (!confirm(`お友達${n}体のデータを読み込みます。\nこの端末の今のデータは上書きされます。よろしいですか？`)) return;
     friends = data.friends; stats = data.stats; stats.seals = data.seals; stats.gods = data.gods;
     levels = data.levels; stats.expStock = data.expStock;
+    charms = data.cm; equips = data.eq; charmSeq = Math.max(0, ...charms.map(c => c.id)); saveCharms();
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
     myTitle = data.title; checkMyTitle(); try { localStorage.setItem('title', myTitle || ''); } catch {}
@@ -962,7 +1023,7 @@
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     watcher = first.t === 'watch';
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), lv: myLv(), title: myTitle, zip: CAN_ZIP ? 1 : undefined });
+    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), lv: myLv(), ch: myCharm(), title: myTitle, zip: CAN_ZIP ? 1 : undefined });
     // 圧縮されたメッセージ（バイナリ）は戻してから読む。順番が入れかわらないように、1つずつ順に処理する
     let rx = Promise.resolve();
     ws.onmessage = e => {
@@ -1185,7 +1246,7 @@
     $('yokaiInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : `<div class="big-face" style="background:${y.color}"></div>`}
       <div class="pv"><b style="color:${S.RANKS[y.rank].color}">${y.rank} ${esc(y.name)}</b> <span class="lv-tag">Lv${myLv()}</span> ${totsuTag(myTotsu())}
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>${myTotsu() || myLv() > 1 ? `・<span class="totsu-up">HP・攻撃 +${Math.round((myTotsu() * S.TOTSU_STEP + (myLv() - 1) * S.LV_STEP) * 1000) / 10}%</span>` : ''}</div>
-      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd></dl>
+      <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd>${equippedOf(y.id).length ? `<dt>お守り</dt><dd>${equippedOf(y.id).map(charmTag).join('<br>')}</dd>` : ''}</dl>
       <small>${el.name}属性：${el.effect}</small></div>`;
   }
   function renderFriends() {
@@ -1209,7 +1270,7 @@
         : `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${faceImg(y, true)}<span class="unk nm">${'？'.repeat([...y.name].length)}</span><small class="nm">${y.origin}</small>`; // 名前は文字数ぶんの？
       if (owned) d.onclick = () => {
         selYokai = y.id; saveAll();
-        send({ t: 'yokai', id: y.id, totsu: myTotsu(), lv: myLv(), title: myTitle });
+        send({ t: 'yokai', id: y.id, totsu: myTotsu(), lv: myLv(), ch: myCharm(), title: myTitle });
         helloAgain();
         renderFriends();
       };
@@ -1258,6 +1319,15 @@
       for (const id of cleared) stats.gods.tr[id] = (stats.gods.tr[id] || 0) + 1;
       result.godNote = [`⚡ 神の欠片を${mine.god.frag}個ゲット！（${stats.gods.frag}個）`, ...cleared.map(id => `✨ ${S.YOKAI_BY_ID[id].name}の試練をクリア！`)].join('　');
     }
+    // お守りのドロップ: ボスを倒すとたまに落とす（強いボスほど落としやすく、いいお守りが出やすい）
+    result.charmNote = null;
+    if (mine && result.bossDown) {
+      const i = Math.max(0, S.BOSS_LIST.indexOf(result.boss)), k = S.BOSSES[result.boss];
+      if (Math.random() < Math.min(0.5, 0.15 + 0.025 * i)) {
+        const c = S.rollCharm((k ? k.drop : 50) * 1.4), got = addCharm(c);
+        result.charmNote = got.full ? `🧿 ${S.charmName(c)}を拾ったけど、いっぱいなので📈 経験値 +${got.exp} に変わった` : `🧿 ボスが${S.charmName(c)}を落とした！（${S.charmText(c)}）`;
+      }
+    }
     result.sealNote = null;
     if (mine && mine.seal) {
       const sl = (stats.seals[mine.seal.legend] = stats.seals[mine.seal.legend] || { frag: 0 });
@@ -1302,19 +1372,38 @@
       <div class="co-fresh">まだ持っていない妖怪が出る確率：<b>${pct(o.fresh)}</b></div>`;
     $('btnChoiceExp').textContent = `📈 経験値にする（＋${expOf(pending.count).toLocaleString('ja-JP')}）`;
     $('btnChoiceSeal').hidden = pending.count < S.SEAL_PICK;
-    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = false;
+    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceCharm').hidden = false;
+    const co = S.charmOdds(pending.count), cs = co.reduce((a, b) => a + b, 0);
+    $('choiceOdds').insertAdjacentHTML('beforeend', `<div class="co-rank">🧿 お守りガチャ：${S.CHARM_RARITY.map((R, i) => `<span style="color:${R.color === 'rainbow' ? '#ff9ae8' : R.color}">${R.name} ${Math.round(co[i] / cs * 100)}%</span>`).join('　')}</div>`);
     show('choiceScreen', inBattle);
   }
   // 鬼玉が700個以上なら「好きなレジェンドの封印ガチャ」も選べる: まずレジェンドを選ぶ
   $('btnChoiceSeal').onclick = () => {
     if (!pending || pending.count < S.SEAL_PICK) return;
-    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = true;
+    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = $('btnChoiceCharm').hidden = true;
     $('choiceOdds').innerHTML = `<div class="co-rank">どのレジェンドの封印ガチャを引く？（封印の8体のどれかが出る）</div>
       <div class="co-legends">${S.LEGENDS.map(l => { const got = l.seal.filter(id => friends[id]).length;
         return `<button class="co-legend" data-id="${l.id}">${faceImg(l, !friends[l.id])}<b>${l.name}</b><small>${friends[l.id] ? `凸${S.legendTotsu(l, friends)}` : `封印の8体 ${got}/8`}</small></button>`; }).join('')}</div>
       <button id="btnSealBack" class="small">もどる</button>`;
     for (const b of document.querySelectorAll('#choiceOdds .co-legend')) b.onclick = () => pickSeal(S.YOKAI_BY_ID[b.dataset.id]);
     $('btnSealBack').onclick = () => showChoice(choiceInBattle);
+  };
+  // お守りガチャ: 鬼玉が多いほど、いいお守りが出やすい
+  $('btnChoiceCharm').onclick = () => {
+    if (!pending) return;
+    const c = S.rollCharm(pending.count), got = addCharm(c), inBattle = choiceInBattle;
+    pending = null;
+    try { localStorage.removeItem('pendingChoice'); } catch {}
+    saveAll();
+    beep(523, 0.15, 'triangle', 0.07); setTimeout(() => beep(784, 0.15, 'triangle', 0.07), 120); if (c.r >= 3) setTimeout(() => beep(1175, 0.4, 'triangle', 0.09), 260);
+    const line = got.full ? `お守りがいっぱい（${S.CHARM_MAX}個）なので、📈 経験値 +${got.exp} に変わった` : '図鑑で妖怪をえらんで、つけられます';
+    $('rewardWeek').textContent = '🧿 お守りガチャ';
+    $('rewardTitle').innerHTML = `<span style="color:${charmColor(c)}">${S.charmName(c)}</span>が出た！`;
+    $('rewardSub').textContent = line;
+    $('rewardPrizes').innerHTML = `<div class="charm-big r${c.r}" style="--cc:${charmColor(c)}">🧿</div><div class="charm-lines">${c.s.map(([k, lv]) => `<div><b>${S.CHARM_SKILLS[k].name}${S.CHARM_SKILLS[k].once ? '' : '+' + lv}</b>　${S.CHARM_SKILLS[k].text(S.CHARM_SKILLS[k].per * lv)}</div>`).join('')}</div>`;
+    if (inBattle && result) { result.myChoice = 'charm'; result.expNote = `🧿 お守りガチャ：${S.charmName(c)}（${S.charmText(c)}）`; }
+    $('btnRewardOk').onclick = () => { if (inBattle && result) { renderResult(); show('result', true); menuMusic(); } else show('title'); };
+    show('rewardScreen', inBattle);
   };
   function pickSeal(l) {
     if (!pending || pending.count < S.SEAL_PICK) return;
@@ -1430,6 +1519,7 @@
     if (result.bonus) notes.push(esc(result.bonus.down ? `💥 乱入してきた${S.BOSSES[result.bonus.type].name}もたおした！` : `乱入してきた${S.BOSSES[result.bonus.type].name}からは生きのびた…`));
     if (result.sealNote) notes.push(esc(result.sealNote));
     if (result.godNote) notes.push(esc(result.godNote));
+    if (result.charmNote) notes.push(esc(result.charmNote));
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
     $('resUnlock').hidden = !notes.length;
     $('resUnlock').innerHTML = notes.join('<br>');
@@ -1440,6 +1530,7 @@
         return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
           : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
           : result.myChoice === 'seal' ? 'L 封印ガチャ'
+          : result.myChoice === 'charm' ? '🧿 お守りガチャ'
           : `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}${p.escaped ? '' : ` <small>（鬼玉${p.count ?? '半分'}個で）</small>`}`}</td></tr>`;
       }).join('');
     if (watcher) {

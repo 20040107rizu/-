@@ -538,3 +538,22 @@ html.rot .net-msg, html.rot .update-bar, html.rot .invited-card { top: 8px; }
 html.rot .invite-panel { top: 56px; left: max(16px, env(safe-area-inset-top)); }
 html.rot .build-info { right: max(6px, env(safe-area-inset-bottom)); }
 html.rot .gacha-next { right: max(16px, env(safe-area-inset-bottom)); bottom: 14px; }
+
+/* お守り */
+.charm-btn { background: linear-gradient(#3ac8b0, #1a7a6a) !important; }
+.charm-tag { font-weight: bold; color: var(--cc); white-space: nowrap; }
+.charm-tag.r4 { background: linear-gradient(90deg, #ff4a4a, #ffd23a, #4ae07a, #3ac8ff, #c85aff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.charm-sk { font-size: .92em; }
+.charm-slots { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.charm-slot { flex: 1; min-width: 0; font-size: 11px !important; padding: 4px 6px !important; background: #1e3a3a !important; border: 1px dashed #3ac8b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.charm-slot.on { border: 1px solid var(--cc); color: #fff; background: #0e2a2a !important; }
+.charm-pick .cp-in { background: linear-gradient(#1e3a3a, #0e1a1e); border: 2px solid #3ac8b0; border-radius: 16px; padding: 10px 14px; width: min(640px, calc(94 * var(--vw, 1vw))); max-height: calc(86 * var(--vh, 1vh)); display: flex; flex-direction: column; gap: 6px; }
+.cp-head { display: flex; align-items: center; gap: 8px; } .cp-head b { flex: 1; }
+.cp-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.cp-row { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 10px; background: #ffffff10; }
+.cp-row.on { outline: 2px solid #3ac8b0; }
+.cp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; } .cp-main small { opacity: .75; font-size: 10px; }
+.cp-row .fav.on { color: #ffd23a; }
+.cp-row .del { background: #5a3a6a !important; }
+.charm-big { font-size: 64px; filter: drop-shadow(0 0 18px var(--cc)); animation: unlockPop .8s ease-out; }
+.charm-lines { display: flex; flex-direction: column; gap: 2px; font-size: 14px; text-align: left; }

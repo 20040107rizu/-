@@ -324,9 +324,9 @@ class Room {
     };
   }
 
-  addPlayer(ws, name, yokai, pid, totsu, title, lv) {
+  addPlayer(ws, name, yokai, pid, totsu, title, lv, ch) {
     const p = {
-      id: genId(), ws, pid, totsu: cleanTotsu(totsu), lv: cleanLv(lv), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
+      id: genId(), ws, pid, totsu: cleanTotsu(totsu), lv: cleanLv(lv), charm: cleanCharm(ch), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
       input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false, ult: false }, prevItem: false,
     };
@@ -386,7 +386,7 @@ class Room {
       const st = S.yokaiStats(p.yokai, p.totsu, p.lv);
       Object.assign(p, {
         stats: st, x: sp.x, y: sp.y, face: 0,
-        hp: st.hp, maxHp: st.hp, atkT: 0, strongT: 0, down: false, reviveProg: 0, escaped: false,
+        hp: Math.round(st.hp * (1 + (p.charm.hp || 0))), maxHp: Math.round(st.hp * (1 + (p.charm.hp || 0))), ch: p.charm, atkT: 0, // お守り: 体力 strongT: 0, down: false, reviveProg: 0, escaped: false,
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
         item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
@@ -1759,13 +1759,13 @@ wss.on('connection', ws => {
         room = target;
         pid = cleanPid(msg.pid);
         if (pid) touchPlayer(pid, msg.name, msg.yokai);
-        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title, msg.lv);
+        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title, msg.lv, msg.ch);
         send({ t: 'welcome', id: me.id });
         room.broadcast(room.lobbyInfo());
         break;
       }
       case 'yokai':
-        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
+        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.charm = cleanCharm(msg.ch); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
         if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
@@ -1845,6 +1845,12 @@ function cleanProfile(p) {
 }
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
 const cleanLv = v => Math.max(1, Math.min(S.LV_MAX, v | 0));
+// お守りの効果（スマホで計算したもの）は、上限をこえないようにして使う
+function cleanCharm(ch) {
+  const out = { drain: 0, regen: 0, guard: 0, hp: 0, atk: 0, haste: 0, ult: 0, guts: 0, orb: 0 };
+  if (ch && typeof ch === 'object') for (const k of Object.keys(out)) { const n = +ch[k]; if (n > 0) out[k] = Math.min(S.CHARM_SKILLS[k].max * 2, n); } // 神は2つつけられるので上限の2倍まで
+  return out;
+}
 const cleanTitle = v => (S.TITLE_BY_ID[v] || S.weeklyTitle(v) ? v : null);
 const cleanPid = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,40}$/.test(v) ? v : null);
 function touchPlayer(pid, name, yokai, title) {

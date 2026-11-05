@@ -57,6 +57,54 @@
     return { ...r, hp: Math.round(r.hp * m * k), atkDmg: r.atkDmg * m * k, strongMul: m * k, speed: r.speed + (m - 1) * 20 };
   }
 
+  // ---------- お守り（ランダムなスキルがつく装備。ふつうは1体に1つ、神は2つまで） ----------
+  const CHARM_SKILLS = {
+    drain: { name: '吸血',     per: 0.01,  max: 0.1,  text: v => `攻撃したダメージの${Math.round(v * 100)}%回復` },
+    regen: { name: '自然回復', per: 0.002, max: 0.02, text: v => `1秒ごとに最大体力の${(v * 100).toFixed(1)}%回復` },
+    guard: { name: '鉄壁',     per: 0.03,  max: 0.3,  text: v => `受けるダメージ -${Math.round(v * 100)}%` },
+    hp:    { name: '体力',     per: 0.04,  max: 0.4,  text: v => `最大体力 +${Math.round(v * 100)}%` },
+    atk:   { name: '攻撃',     per: 0.03,  max: 0.4,  text: v => `攻撃力 +${Math.round(v * 100)}%` },
+    haste: { name: '早業',     per: 0.06,  max: 0.4,  text: v => `スキルの待ち時間 -${Math.round(v * 100)}%` },
+    ult:   { name: '必殺',     per: 0.08,  max: 0.6,  text: v => `必殺技ゲージ +${Math.round(v * 100)}%` },
+    guts:  { name: '根性',     per: 1,     max: 1,    text: () => '倒れるダメージを1回だけ耐える', once: true },
+    orb:   { name: '鬼玉',     per: 0.04,  max: 0.4,  text: v => `拾う鬼玉 +${Math.round(v * 100)}%` },
+  };
+  const CHARM_WEIGHT = { drain: 10, regen: 10, guard: 12, hp: 12, atk: 12, haste: 10, ult: 8, guts: 4, orb: 8 };
+  // レア度: 白・青・赤・金・虹（n: スキルの数、lv: スキルの強さの範囲）
+  const CHARM_RARITY = [
+    { name: '白', color: '#e8e8f0', n: 1, lv: [1, 2], exp: 50 },
+    { name: '青', color: '#4a8bff', n: 1, lv: [2, 3], exp: 150 },
+    { name: '赤', color: '#ff4a4a', n: 2, lv: [1, 3], exp: 400 },
+    { name: '金', color: '#ffd23a', n: 2, lv: [2, 4], exp: 1000 },
+    { name: '虹', color: 'rainbow', n: 2, lv: [4, 5], exp: 3000 },
+  ];
+  const CHARM_MAX = 100; // 持てる数
+  // 鬼玉の数ごとの、お守りガチャのレア度の確率（白・青・赤・金・虹 の%）
+  const CHARM_ODDS = [[0, 70, 25, 5, 0, 0], [100, 45, 35, 16, 4, 0], [200, 25, 35, 28, 10, 2], [300, 12, 30, 35, 18, 5], [500, 0, 20, 40, 30, 10], [700, 0, 10, 35, 40, 15]];
+  function charmOdds(count) { let row = CHARM_ODDS[0]; for (const r of CHARM_ODDS) if (count >= r[0]) row = r; return row.slice(1); }
+  function rollCharm(count, rnd = Math.random) {
+    const odds = charmOdds(count), sum = odds.reduce((a, b) => a + b, 0);
+    let x = rnd() * sum, r = 0;
+    for (let i = 0; i < odds.length; i++) { if (x < odds[i]) { r = i; break; } x -= odds[i]; }
+    const R = CHARM_RARITY[r], s = [], used = new Set();
+    for (let k = 0; k < R.n; k++) {
+      const pool = Object.keys(CHARM_WEIGHT).filter(id => !used.has(id)), tot = pool.reduce((a, id) => a + CHARM_WEIGHT[id], 0);
+      let y = rnd() * tot, id = pool[0];
+      for (const q of pool) { if (y < CHARM_WEIGHT[q]) { id = q; break; } y -= CHARM_WEIGHT[q]; }
+      used.add(id);
+      s.push([id, CHARM_SKILLS[id].once ? 1 : R.lv[0] + Math.floor(rnd() * (R.lv[1] - R.lv[0] + 1))]);
+    }
+    return { r, s };
+  }
+  // つけているお守りの効果を合わせる（上限つき）
+  function charmEffects(list) {
+    const e = {};
+    for (const c of list || []) for (const [id, lv] of c.s || []) { const k = CHARM_SKILLS[id]; if (k) e[id] = Math.min(k.max, (e[id] || 0) + k.per * lv); }
+    return e;
+  }
+  const charmName = c => `${CHARM_RARITY[c.r].name}のお守り`;
+  const charmText = c => c.s.map(([id, lv]) => `${CHARM_SKILLS[id].name}${CHARM_SKILLS[id].once ? '' : '+' + lv}`).join('・');
+
   // ---------- 称号（図鑑のコンプリート報酬） ----------
   const REGION = {
     japan: ['日本', '沖縄'],
@@ -446,5 +494,5 @@
     return true;
   }
 
-  return { RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });
