@@ -569,4 +569,5 @@ html.rot .gacha-next { right: max(16px, env(safe-area-inset-bottom)); bottom: 14
 
 /* ルームの妖怪の説明: 長くなっても名前が上に切れないように、上から並べてはみ出す分はスクロール */
 #yokaiInfo .pv { max-height: 100%; overflow-y: auto; align-self: stretch; display: flex; flex-direction: column; justify-content: safe center; }
-.lb-charms { white-space: nowrap; }
+.lb-charms { font-size: 10px; line-height: 1.35; }
+.lb-charms .charm-tag { font-size: 11px; }
