@@ -2103,7 +2103,7 @@
     }
     if (b.bliz) { ctx.restore(); return; }
     const top = pos.y - (img ? 132 * size / 180 : 72);
-    if (b.type !== 'kyubi') bar(pos.x - 50, top, 100, 6, b.hp / b.maxHp, '#ff8a3d'); // 九尾鬼は体力のバーで本物がばれないように出さない
+    bar(pos.x - 50, top, 100, 6, b.hp / b.maxHp, '#ff8a3d');
     if (b.rune) { ctx.textAlign = 'center'; ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#7ad8ff'; ctx.shadowColor = '#3ac8ff'; ctx.shadowBlur = 8; ctx.fillText('ᚱ'.repeat(b.rune), pos.x + 70, top + 8); ctx.shadowBlur = 0; } // オーディンのルーン
     // ボスのようす（姿・効かない属性・弱点・巻き戻し）
     const tag = b.form ? `${NUE_FORM[b.form][0]}の姿：${NUE_FORM[b.form][1]}に弱い` : b.immune ? `${Attacks.ELEMENT[b.immune].name}属性が効かない` : b.weak ? '弱点！ ダメージ2倍' : b.rew != null ? `時を戻すまで ${Math.ceil(b.rew)}秒（大ダメージで止めろ）` : b.name || '';
@@ -2129,6 +2129,13 @@
     if (snap.falcon) ctx.globalAlpha = 0.35; // ホルスの鷹の目: 偽者はうすく見える
     const wob = Math.sin(now * 5 + e.id) * 3;
     if (img) { ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50, 15, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, 180, Math.cos(e.face) < 0); }
+    // 偽者も本物と同じ体力バーと「◯属性が効かない」を出す（見た目では見分けられないように）
+    const b = snap.boss;
+    if (b && b.type === 'kyubi' && !snap.falcon) {
+      const top = pos.y - 132;
+      bar(pos.x - 50, top, 100, 6, b.hp / b.maxHp, '#ff8a3d');
+      if (b.immune) { const t = `${Attacks.ELEMENT[b.immune].name}属性が効かない`; ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; ctx.strokeText(t, pos.x, top - 8); ctx.fillStyle = Attacks.ELEMENT[b.immune].color; ctx.fillText(t, pos.x, top - 8); }
+    }
     ctx.globalAlpha = 1;
   }
   // 金鬼から先のボスのまわりの光
@@ -2420,7 +2427,7 @@
     for (const e of snap.patrols) dot(e.x, e.y, 3, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#b08cff');
     if (snap.ring) { ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ox + snap.ring.x * sx, oy + snap.ring.y * sx, snap.ring.r * sx, 0, Math.PI * 2); ctx.stroke(); }
     if (snap.boss2) dot(snap.boss2.x, snap.boss2.y, 6, BOSS_UI.twin2);
-    if (snap.reveal) for (const e of snap.decoys || []) dot(e.x, e.y, 5, '#888'); // ホルスの天空の目
+    for (const e of snap.decoys || []) if (snap.reveal || snap.falcon) dot(e.x, e.y, 5, '#888'); else { dot(e.x, e.y, 6, BOSS_UI.kyubi); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + e.x * sx, oy + e.y * sx, 6, 0, Math.PI * 2); ctx.stroke(); } // 九尾鬼の偽者もミニマップでは本物と同じに見える（ホルスがいると灰色）
     if (snap.boss && (!snap.boss.bliz || snap.reveal)) {
       dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + snap.boss.x * sx, oy + snap.boss.y * sx, 6, 0, Math.PI * 2); ctx.stroke();

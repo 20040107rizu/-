@@ -1587,7 +1587,7 @@ class Room {
     if (won && t === 'amanojaku' && p.mimicDodge >= 3) trials.push('loki');
     if (won && t === 'kage' && p.ownShade > 0) trials.push('hades');
     if (won && t === 'yakubyo' && this.curseCleared >= 5) trials.push('seioubo');
-    if (won && t === 'kyubi' && !p.decoyHits) trials.push('horus');
+    if (won && t === 'kyubi' && p.decoyHits <= 5) trials.push('horus'); // 偽者を5体までしか攻撃せずに
     if (won && t === 'toki' && !this.rewound) trials.push('kronos');
     if (won && t === 'gasha' && this.mainBoss && p.weakDmg >= this.mainBoss.maxHp * 0.1) trials.push('poseidon');
     if (p.escaped && ps.reduce((a, q) => a + q.dama, 0) >= 700) trials.push('ganesha');
