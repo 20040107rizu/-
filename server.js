@@ -496,7 +496,7 @@ class Room {
   }
 
   activePlayers() { return [...this.players.values()].filter(p => !p.down && !p.escaped); }
-  visibleTo(p) { return !p.down && !p.escaped && p.invisT <= 0; }
+  visibleTo(p) { return !p.down && !p.escaped && p.invisT <= 0 && !p.away; } // 通信が切れている人は鬼に見つからない
 
   // ---- ダメージ ----
   damageOni(src, e, amount) {
@@ -544,7 +544,7 @@ class Room {
   }
 
   damagePlayer(p, amount) {
-    if (p.down || p.escaped || p.dashT > 0 || p.invulT > 0) return;
+    if (p.down || p.escaped || p.dashT > 0 || p.invulT > 0 || p.away) return; // 通信が切れている間はダメージを受けない（電波が悪くても急に倒れないように）
     if (p.shieldT > 0) amount *= 0.3;
     if (p.passive === 'nightDash' && p.dashing) return; // ジャージーデビル: 飛んでいるあいだは当たらない
     if (p.passive === 'bossGuard') amount *= p.hp < p.maxHp / 2 ? 0.49 : 0.7; // ウラ: ボス鬼からのダメージ -30%（体力が半分を切ると、さらに -30%）
@@ -683,6 +683,7 @@ class Room {
   }
 
   canSee(e, p, range, halfAngle) {
+    if (p.away) return false;
     if (e.seeAll ? (p.down || p.escaped) : !this.visibleTo(p)) return false; // 天邪鬼: 消えていても見える
     if (e.seeAll) { const d = dist(e, p); return d <= range && S.lineOfSight(this.map, e, p); }
     if (e.seeThrough) return dist(e, p) <= range * 1.3; // がしゃどくろ王: 建物の上からのぞきこむ
@@ -1120,7 +1121,7 @@ class Room {
   }
   // 疫病鬼の呪い: 少しずつ体力がへり、近くの仲間にうつる。回復で消える
   updateCurse(p) {
-    if (!(p.curseT > 0)) return;
+    if (!(p.curseT > 0) || p.away) return;
     p.curseT -= DT;
     if ((p.curseTick -= DT) <= 0) {
       p.curseTick = 1;
@@ -1139,7 +1140,7 @@ class Room {
     if (tg.charm) { p.charmT = 3; this.events.push({ k: 'charm', id: p.id }); }
   }
   hasPassive(k) { return [...this.players.values()].some(p => p.passive === k && !p.escaped); }
-  bossSees(b, t) { return b.seeAll ? !t.down && !t.escaped : this.visibleTo(t); }
+  bossSees(b, t) { return b.seeAll ? !t.down && !t.escaped && !t.away : this.visibleTo(t); }
   // さかさまの呪い・魅了で、入力を変えたものを使う（p.input そのものは書きかえない）
   effInput(p) {
     const inp = p.input;
@@ -1740,7 +1741,7 @@ wss.on('connection', ws => {
         if (!p) return send({ t: 'error', msg: 'ルームがなくなりました（時間がたったか、みんなが抜けたかも）', rejoinFailed: true });
         if (p.ws && p.ws !== AWAY_WS) { const old = p.ws; p.ws = null; try { old.close(); } catch {} } // 前の接続がまだ残っていたら閉じる
         room = target; me = p; pid = id;
-        p.ws = ws; p.away = null;
+        p.ws = ws; p.away = null; p.invulT = Math.max(p.invulT || 0, 2); // つなぎ直した直後は2秒無敵
         send({ t: 'welcome', id: p.id, rejoin: true });
         if (room.state === 'battle') room.watchStart(ws, false);
         room.broadcast(room.lobbyInfo());
