@@ -66,6 +66,14 @@ const server = http.createServer((req, res) => {
     return sendJSON(req, res, { v: VERSION, ...whatsNew() });
   }
   if (urlPath === '/wsstats') return sendJSON(req, res, wsStats); // 圧縮が使えているかの確認用
+  // スマホで起きた描画のエラー（不具合を調べるため。新しい20件だけ覚える）
+  if (urlPath === '/clienterr' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => { if (body.length < 2000) body += c; });
+    req.on('end', () => { try { const e = JSON.parse(body); clientErrs.unshift({ t: new Date().toISOString(), v: String(e.v).slice(0, 20), y: String(e.y).slice(0, 20), b: String(e.b).slice(0, 20), m: String(e.m).slice(0, 600) }); clientErrs.length = Math.min(clientErrs.length, 20); } catch {} res.writeHead(204); res.end(); });
+    return;
+  }
+  if (urlPath === '/clienterrs') return sendJSON(req, res, clientErrs);
   // 週替わりランキング: /ranking?pid=...&week=prev（先週）／week=3（第4回。終わった週の結果も見られる）
   if (urlPath === '/ranking') {
     const q = new URL(req.url, 'http://x').searchParams, w = q.get('week'), cur = S.weekIndex();
@@ -1667,6 +1675,7 @@ setInterval(() => {
 
 // 圧縮が使えているかの確認用（/wsstats）: 起動してからつながった数
 const wsStats = { deflate: 0, plain: 0 };
+const clientErrs = [];
 wss.on('connection', ws => {
   if (/permessage-deflate/.test(ws.extensions || '')) wsStats.deflate++; else wsStats.plain++;
   ws.isAlive = true;

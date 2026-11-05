@@ -1069,6 +1069,7 @@
         if (!m.ok) { const f = buddyLive.find(q => q.pid === m.to); $('inviteMsg').textContent = `${f ? f.name : 'その人'}は、もうホームにいなかったみたい`; }
         break;
       case 'lobby':
+        for (const p of m.players || []) if (!S.YOKAI_BY_ID[p.yokai]) p.yokai = 'nekomata';
         lobby = m;
         if (m.state === 'lobby') { renderLobby(); show('lobby'); }
         else if (m.state === 'battle') show('game');
@@ -1092,6 +1093,10 @@
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
         break;
       case 'state':
+        // 知らない妖怪・ボス（仲間が新しいバージョンのとき）が来ても止まらないように置きかえる
+        for (const p of m.players) if (!S.YOKAI_BY_ID[p.yokai]) p.yokai = 'nekomata';
+        for (const e of m.shades || []) if (!S.YOKAI_BY_ID[e.yokai]) e.yokai = 'nekomata';
+        if (m.boss && !S.BOSSES[m.boss.type]) m.boss.type = 'red';
         snap = m;
         for (const ev of m.ev) handleEvent(ev);
         break;
@@ -2729,11 +2734,25 @@
 
   // ---------- メインループ ----------
   let last = performance.now();
+  // 描画の途中でエラーが出ても、ボタンなどの表示（HUD）は必ず出す。エラーはサーバーに知らせる（不具合を調べるため）
+  const errSent = new Set();
+  function reportError(e) {
+    const msg = String((e && e.stack) || e).slice(0, 600);
+    if (errSent.has(msg) || errSent.size > 5) return;
+    errSent.add(msg);
+    try { fetch('clienterr', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ v: typeof BUILD !== 'undefined' ? BUILD : '', y: selYokai, b: snap && snap.boss && snap.boss.type, m: msg }) }); } catch {}
+  }
   function frame(nowMs) {
+    requestAnimationFrame(frame);
+    try { frameInner(nowMs); } catch (e) {
+      console.error(e); reportError(e);
+      try { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; if (snap) drawHUD(snap.players.find(p => p.id === myId), nowMs / 1000); } catch (e2) { reportError(e2); }
+    }
+  }
+  function frameInner(nowMs) {
     const dt = Math.min(0.05, (nowMs - last) / 1000);
     last = nowMs;
     const now = nowMs / 1000;
-    requestAnimationFrame(frame);
     if ($('game').classList.contains('active')) resize();
 
     if (!$('game').classList.contains('active') || !snap || !map) return;
@@ -3004,7 +3023,7 @@
 
     for (const [id, t] of bubbles) { if (t - dt <= 0) bubbles.delete(id); else bubbles.set(id, t - dt); }
     if (Math.random() < 0.05) {
-      const live = new Set(['boss', ...snap.players.map(p => 'p' + p.id), ...snap.patrols.map(e => 'e' + e.id), ...snap.proj.map(p => 'j' + p.id)]);
+      const live = new Set(['boss', 'boss2', ...(snap.shades || []).map(e => 's' + e.id), ...(snap.decoys || []).map(e => 'd' + e.id), ...snap.players.map(p => 'p' + p.id), ...snap.patrols.map(e => 'e' + e.id), ...snap.proj.map(p => 'j' + p.id)]);
       for (const key of ents.keys()) if (!live.has(key)) ents.delete(key);
     }
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
