@@ -1421,6 +1421,7 @@
       <div class="co-fresh">まだ持っていない妖怪が出る確率：<b>${pct(o.fresh)}</b></div>`;
     $('btnChoiceExp').textContent = `📈 経験値にする（＋${expOf(pending.count).toLocaleString('ja-JP')}）`;
     $('btnChoiceSeal').hidden = pending.count < S.SEAL_PICK;
+    $('btnChoicePick').hidden = pending.count < S.PICK_ANY;
     $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceCharm').hidden = false;
     const co = S.charmOdds(pending.count, charmUp(pending)), cs = co.reduce((a, b) => a + b, 0);
     $('choiceOdds').insertAdjacentHTML('beforeend', `<div class="co-rank">🧿 お守りガチャ${pending.luck ? '（🐘ガネーシャで1つ上）' : ''}：${S.CHARM_RARITY.map((R, i) => `<span style="color:${R.color === 'rainbow' ? '#ff9ae8' : R.color}">${R.name} ${Math.round(co[i] / cs * 100)}%</span>`).join('　')}</div>`);
@@ -1429,7 +1430,7 @@
   // 鬼玉が700個以上なら「好きなレジェンドの封印ガチャ」も選べる: まずレジェンドを選ぶ
   $('btnChoiceSeal').onclick = () => {
     if (!pending || pending.count < S.SEAL_PICK) return;
-    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = $('btnChoiceCharm').hidden = true;
+    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = $('btnChoiceCharm').hidden = $('btnChoicePick').hidden = true;
     $('choiceOdds').innerHTML = `<div class="co-rank">どのレジェンドの封印ガチャを引く？（封印の8体のどれかが出る）</div>
       <div class="co-legends">${S.LEGENDS.map(l => { const got = l.seal.filter(id => friends[id]).length;
         return `<button class="co-legend" data-id="${l.id}">${faceImg(l, !friends[l.id])}<b>${l.name}</b><small>${friends[l.id] ? `凸${S.legendTotsu(l, friends)}` : `封印の8体 ${got}/8`}</small></button>`; }).join('')}</div>
@@ -1437,6 +1438,46 @@
     for (const b of document.querySelectorAll('#choiceOdds .co-legend')) b.onclick = () => pickSeal(S.YOKAI_BY_ID[b.dataset.id]);
     $('btnSealBack').onclick = () => showChoice(choiceInBattle);
   };
+  // 鬼玉が1500個以上なら「好きな妖怪の指名」も選べる: 選んだ妖怪を3体ぶんもらえる（凸MAXをこえた分は経験値）
+  $('btnChoicePick').onclick = () => {
+    if (!pending || pending.count < S.PICK_ANY) return;
+    $('btnChoiceGacha').hidden = $('btnChoiceExp').hidden = $('btnChoiceSeal').hidden = $('btnChoiceCharm').hidden = $('btnChoicePick').hidden = true;
+    const card = y => { const n = friends[y.id] || 0, t = S.totsuOf(n);
+      return `<button class="co-pick${n ? '' : ' new'}" data-id="${y.id}">${faceImg(y, false)}<b>${esc(y.name)}</b><small style="color:${S.RANKS[y.rank].color}">${y.rank}${n ? (t >= S.TOTSU_MAX ? '・凸MAX' : `・凸${t}`) : '・NEW'}</small></button>`; };
+    $('choiceOdds').innerHTML = `<div class="co-rank">🎯 どの妖怪を指名する？（選んだ妖怪が${S.PICK_COPIES}体ぶん仲間になる。凸MAXをこえた分は経験値）</div>
+      <div class="co-picks">${['S', 'A', 'B', 'C'].map(r => `<div class="co-prank" style="color:${S.RANKS[r].color}">${r}ランク</div>` + S.YOKAI.filter(y => y.rank === r).map(card).join('')).join('')}</div>
+      <button id="btnPickBack" class="small">もどる</button>`;
+    for (const b of document.querySelectorAll('#choiceOdds .co-pick')) b.onclick = () => {
+      const y = S.YOKAI_BY_ID[b.dataset.id];
+      document.querySelectorAll('#choiceOdds .co-pick.sel').forEach(x => x.classList.remove('sel')); b.classList.add('sel');
+      $('btnPickBack').textContent = 'もどる';
+      let ok = $('btnPickOk');
+      if (!ok) { ok = document.createElement('button'); ok.id = 'btnPickOk'; ok.className = 'big pick-btn'; $('btnPickBack').before(ok); }
+      ok.textContent = `${y.name}を指名する`;
+      ok.onclick = () => pickAny(y);
+    };
+    $('btnPickBack').onclick = () => showChoice(choiceInBattle);
+  };
+  function pickAny(y) {
+    if (!pending || pending.count < S.PICK_ANY) return;
+    pending = null;
+    try { localStorage.removeItem('pendingChoice'); } catch {}
+    const isNew = !friends[y.id];
+    let over = 0;
+    for (let k = 0; k < S.PICK_COPIES; k++) over += addFriend(y.id);
+    saveAll(); updateFriendCount(); helloAgain();
+    const t = S.totsuOf(friends[y.id]);
+    beep(660, 0.15, 'triangle', 0.07); setTimeout(() => beep(990, 0.15, 'triangle', 0.08), 130); setTimeout(() => beep(1320, 0.3, 'triangle', 0.08), 260);
+    const line = `${y.name}が${S.PICK_COPIES}体ぶん仲間になった！（${isNew ? 'はじめてのお友達・' : ''}${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}）${over ? `　あふれた分が 📈 経験値 +${over.toLocaleString('ja-JP')} に変わった` : ''}`;
+    $('rewardWeek').textContent = '🎯 指名召喚';
+    $('rewardTitle').textContent = `${y.name}を指名した！`;
+    $('rewardSub').textContent = line;
+    $('rewardPrizes').innerHTML = `<img class="unseal-img" src="${artUrl('yokai/' + y.id) || ''}" alt="">`;
+    const inBattle = choiceInBattle;
+    if (inBattle && result) { result.myChoice = 'pick'; result.expNote = `🎯 指名召喚：${line}`; }
+    $('btnRewardOk').onclick = () => { if (inBattle && result) { renderResult(); show('result', true); menuMusic(); } else show('title'); };
+    show('rewardScreen', inBattle);
+  }
   // お守りガチャ: 鬼玉が多いほど、いいお守りが出やすい
   const charmUp = p => (p.luck ? 1 : 0); // ガネーシャがいると1段上の確率
   $('btnChoiceCharm').onclick = () => {
@@ -1595,7 +1636,7 @@
         return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
           : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
           : result.myChoice === 'seal' ? 'L 封印ガチャ'
-          : result.myChoice === 'charm' ? '🧿 お守りガチャ'
+          : result.myChoice === 'charm' ? '🧿 お守りガチャ' : result.myChoice === 'pick' ? '🎯 指名召喚'
           : `<span style="color:${S.RANKS[g.rank].color}">${g.rank}</span> ${g.name}${p.escaped ? '' : ` <small>（鬼玉${p.count ?? '半分'}個で）</small>`}`}</td></tr>`;
       }).join('');
     if (watcher) {
@@ -1986,11 +2027,37 @@
       g.shadowColor = glowColor; g.shadowBlur = blur; // ぼかしは画面の点の単位（元の描き方と同じ）
       g.fillStyle = color; g.beginPath(); g.arc(px / 2, px / 2, r * pxs, 0, Math.PI * 2); g.fill();
       sp = { c, half };
-      if (glowCache.size > 200) glowCache.clear();
+      if (glowCache.size > 200) { for (const o of glowCache.values()) freeCanvas(o.c); glowCache.clear(); }
       glowCache.set(key, sp);
     }
     ctx.drawImage(sp.c, x - sp.half, y - sp.half, sp.half * 2, sp.half * 2);
   }
+
+  // 鬼玉: 別のキャンバスを使わずにその場で描く（iPhone でキャンバスのメモリが足りなくなっても消えないように）
+  function drawOrb(x, y, r, big) {
+    const gr = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * (big ? 2.2 : 1.9));
+    gr.addColorStop(0, big ? 'rgba(255,225,74,0.75)' : 'rgba(255,61,168,0.7)'); gr.addColorStop(1, 'rgba(255,61,168,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r * (big ? 2.2 : 1.9), 0, Math.PI * 2); ctx.fill();
+    if (big) { // どデカい鬼玉には鬼のツノ
+      for (const s of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(x + s * r * 0.25, y - r * 0.82);
+        ctx.quadraticCurveTo(x + s * r * 0.45, y - r * 1.55, x + s * r * 0.95, y - r * 1.75);
+        ctx.quadraticCurveTo(x + s * r * 0.85, y - r * 1.2, x + s * r * 0.8, y - r * 0.5);
+        ctx.closePath();
+        ctx.fillStyle = '#fff2c8'; ctx.strokeStyle = '#3a1020'; ctx.lineWidth = 3; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + s * r * 0.4, y - r * 1.05); ctx.lineTo(x + s * r * 0.82, y - r * 1.0); ctx.moveTo(x + s * r * 0.55, y - r * 1.35); ctx.lineTo(x + s * r * 0.86, y - r * 1.33);
+        ctx.strokeStyle = '#c8a070'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+    const core = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+    core.addColorStop(0, '#ffd0f0'); core.addColorStop(0.45, '#ff5ab8'); core.addColorStop(1, '#c8187a');
+    ctx.fillStyle = core; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = big ? '#3a1020' : '#7a0a4a'; ctx.lineWidth = big ? 3 : 1.5; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.globalAlpha *= 0.85; ctx.beginPath(); ctx.arc(x - r / 3, y - r / 3, r / 4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha /= 0.85;
+  }
+  // 使い終わったキャンバスのメモリをすぐ返す（iPhone は合計の上限が小さく、こえると新しいキャンバスが真っ白になる）
+  const freeCanvas = c => { if (c) { c.width = 0; c.height = 0; } };
 
   // ---- 街の絵の使い回し ----
   // 地面と建物（動かない部分）は、600×600 の区画ごとに一度だけ別のキャンバスに描いておき、毎コマはそれを貼るだけにする（軽くするため）
@@ -2021,14 +2088,14 @@
   function drawTown(cam) {
     const pxs = (H / 640) * DPR;
     const key = `${map.seed}|${stage}|${pxs.toFixed(4)}`;
-    if (town.key !== key) { town.key = key; town.chunks.clear(); }
+    if (town.key !== key) { town.key = key; for (const c of town.chunks.values()) freeCanvas(c.cv); town.chunks.clear(); for (const o of glowCache.values()) freeCanvas(o.c); glowCache.clear(); }
     const now = performance.now();
     const cx0 = Math.max(0, Math.floor((cam.x - cam.vw / 2) / CHUNK)), cx1 = Math.min(Math.ceil(map.w / CHUNK) - 1, Math.floor((cam.x + cam.vw / 2) / CHUNK));
     const cy0 = Math.max(0, Math.floor((cam.y - cam.vh / 2) / CHUNK)), cy1 = Math.min(Math.ceil(map.h / CHUNK) - 1, Math.floor((cam.y + cam.vh / 2) / CHUNK));
     for (let cx = cx0; cx <= cx1; cx++) for (let cy = cy0; cy <= cy1; cy++) {
       const k = cx + ',' + cy;
       let c = town.chunks.get(k);
-      if (!c || c.incomplete && c.built < now - 300) { c = buildChunk(cx, cy, pxs); town.chunks.set(k, c); } // 絵が読み込めたら描き直す
+      if (!c || c.incomplete && c.built < now - 300) { if (c) freeCanvas(c.cv); c = buildChunk(cx, cy, pxs); town.chunks.set(k, c); } // 絵が読み込めたら描き直す
       c.used = now;
       ctx.drawImage(c.cv, cx * CHUNK - CPAD, cy * CHUNK - CPAD, CHUNK + CPAD * 2, CHUNK + CPAD * 2);
     }
@@ -2040,7 +2107,7 @@
     }
     if (town.chunks.size > CHUNK_KEEP) { // 古い区画から捨てる
       const old = [...town.chunks.entries()].sort((a, b) => a[1].used - b[1].used).slice(0, town.chunks.size - CHUNK_KEEP);
-      for (const [k] of old) town.chunks.delete(k);
+      for (const [k, c] of old) { freeCanvas(c.cv); town.chunks.delete(k); }
     }
   }
   function drawCity(cam) {
@@ -2454,6 +2521,13 @@
     // 襖
     ctx.fillStyle = '#ffd84a'; ctx.fillRect(ox + fusuma.x * sx - 5, oy + fusuma.y * sx - 6, 10, 12);
     ctx.strokeStyle = '#6a3a1a'; ctx.strokeRect(ox + fusuma.x * sx - 5, oy + fusuma.y * sx - 6, 10, 12);
+    // ガネーシャがチームにいると、落ちている鬼玉が全部ミニマップに出る（と、その数）
+    if (snap.orbMap) {
+      let n = 0;
+      for (const d of dama.values()) { n += d.v; if (d.v === 1) dot(d.x, d.y, 1.6, '#ff8ad8'); }
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ff9ae0';
+      ctx.strokeText(`🐘 落ちている鬼玉 ${n}個`, ox + 2, oy + mh + 14); ctx.fillText(`🐘 落ちている鬼玉 ${n}個`, ox + 2, oy + mh + 14);
+    }
     // どデカい鬼玉
     for (const d of dama.values()) if (d.v > 1) dot(d.x, d.y, 3 + Math.abs(Math.sin(now * 5)) * 2.5, '#ff5ac8');
     // アイテム（画面に見えているものだけ種類がわかる）
@@ -2967,9 +3041,7 @@
       if (Math.abs(d.x - cam.x) > cam.vw / 2 + 30 || Math.abs(d.y - cam.y) > cam.vh / 2 + 30) continue;
       const bob = Math.sin(now * 4 + d.id) * 3;
       const r = d.v > 1 ? 30 + Math.sin(now * 6) * 2 : 9;
-      if (d.v > 1) { const k = r / 30; ctx.save(); ctx.translate(d.x, d.y + bob); ctx.scale(k, k); glowDot(0, 0, 30, '#ff3da8', '#ffe14a', 40); ctx.restore(); }
-      else glowDot(d.x, d.y + bob, 9, '#ff3da8', '#ff3da8', 12);
-      ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(d.x - r / 3, d.y + bob - r / 3, r / 3, 0, Math.PI * 2); ctx.fill();
+      drawOrb(d.x, d.y + bob, r, d.v > 1);
       if (d.v > 1) {
         ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(d.x, d.y + bob, r + 4, 0, Math.PI * 2); ctx.stroke();
         ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';

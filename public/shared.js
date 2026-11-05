@@ -40,6 +40,7 @@
   const FULL_COUNT = TOTSU_MAX + 1, OVER_EXP = { C: 100, B: 300, A: 1000, S: 3000 };
   // ---- お友達レベル（経験値ストックを使って上げる。Lv1 が今までの強さ、1レベルごとに HP・攻撃 +0.8%） ----
   const LV_MAX = 99, LV_STEP = 0.008;
+  const PICK_ANY = 1500, PICK_COPIES = 3; // 鬼玉がこの数以上なら、好きな妖怪を指名して3体ぶん（3凸ぶん）もらえる
   const SEAL_PICK = 700; // 鬼玉がこの数以上なら、バトルのあと好きなレジェンドの封印ガチャも選べる
   const EXP_MUL = 2.5; // バトルのあと「経験値にする」を選ぶと、鬼玉の数の2.5倍の経験値
   // そのレベルになるのに必要な経験値の合計（はじめはすぐ上がり、あとほど重い。Lv50 で約3万、Lv99 で約15万）
@@ -495,5 +496,5 @@
     return true;
   }
 
-  return { CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, PICK_ANY, PICK_COPIES, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

@@ -609,6 +609,7 @@ class Room {
     if (process.env.DEMO_HP) { this.boss.hp = this.boss.maxHp * +process.env.DEMO_HP; }
     if (process.env.DEMO_FAST) Object.assign(this.boss, { blizT: 4, modeT: 7 });
     for (const e of this.patrols.slice(0, 3)) Object.assign(e, near(220, 480, this.gridS));
+    if (process.env.DEMO_DAMA) { for (const d of this.dama.slice(0, 8)) Object.assign(d, near(80, 300, this.gridS)); const q = near(150, 260, this.gridS); this.dama.push({ id: genId(), x: q.x, y: q.y, v: 50 }); } // 鬼玉の見た目の確認用
   }
 
   // ---- デモ撮影用の自動操作（DEMO_AI=1）: いちばん近い鬼に向かって攻撃し、必殺技がたまったら使う ----
@@ -673,13 +674,14 @@ class Room {
     if (b && b.huntBy === e.id) { b.huntBy = null; if (b.state === 'hunt') { b.state = 'wander'; b.target = null; b.path = null; } }
   }
 
+  patrolDrop() { const k = S.BOSSES[this.mainType] || S.BOSSES.red; return 3 + Math.floor((k.drop || 50) / 70); }
   killPatrol(e, src) {
     this.events.push({ k: 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
     if (src && src.passive === 'nightDash' && src.legend) src.ult = Math.min(Combat.ULT_MAX, src.ult + 25); // ジャージーデビル: 鬼を狩るほど必殺技がたまる
     if (src && src.passive === 'godArmor') this.makeMinion(src, e); // オニガミ: 倒した見回り鬼も手下になる
     if (src && src.passive === 'kuniumi') this.zones.push({ id: genId(), owner: src.id, x: e.x, y: e.y, r: 120, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#fff2a0' }); // イザナギ: 国生み（回復の島）
     this.calmPatrol(e); // 伝達はここで途切れる
-    this.dropDama(e.x, e.y, 3 + Math.floor(Math.random() * 3)); // 3〜5個
+    this.dropDama(e.x, e.y, this.patrolDrop() + Math.floor(Math.random() * 3)); // 強いボスの戦いほど多い（赤鬼 3〜5個 … 天邪鬼 9〜11個）
     e.respawnT = 25;
   }
 
@@ -698,6 +700,10 @@ class Room {
   }
 
   updatePatrols() {
+    // 一気にたくさん倒されても（ゼウスの雷など）、見回り鬼は一定数（6割）まではすぐ（2〜5秒で順番に）湧きなおす
+    const dead = this.patrols.filter(e => e.hp <= 0).sort((x, y) => x.respawnT - y.respawnT);
+    const need = Math.ceil(this.patrols.length * 0.6) - (this.patrols.length - dead.length);
+    for (let i = 0; i < need && i < dead.length; i++) dead[i].respawnT = Math.min(dead[i].respawnT, 2 + i * 0.6);
     for (const e of this.patrols) {
       e.isPatrol = true;
       e.hitFlash = Math.max(0, e.hitFlash - DT);
@@ -1080,7 +1086,7 @@ class Room {
     e.hp = 0;
     this.events.push({ k: e.isDecoy ? 'poof' : 'oniDown', x: Math.round(e.x), y: Math.round(e.y) });
     if (e.isShade) {
-      this.dropDama(e.x, e.y, 2);
+      this.dropDama(e.x, e.y, 1 + Math.ceil(this.patrolDrop() / 3));
       if (src && src.id === e.of) { // 自分の影を自分で倒すとボーナス
         src.ownShade++;
         src.atkUpT = Math.max(src.atkUpT || 0, 8); this.healPlayer(src, src.maxHp * 0.3);
@@ -1447,7 +1453,7 @@ class Room {
     switch (type) {
       case 'trap': this.traps.push({ id: genId(), x: p.x, y: p.y, life: 40 }); break;
       case 'bomb': this.bombs.push({ id: genId(), owner: p.id, x: p.x, y: p.y, t: 3 }); break;
-      case 'punch': this.shoot(p, aim, 620, 90, 0.8, 26, '#9ab0c8', { punch: true }); break;
+      case 'punch': this.shoot(p, aim, 620, 500, 0.8, 26, '#9ab0c8', { punch: true }); break;
       case 'stamina': p.staminaT = 10; p.stamina = STAMINA_MAX; p.exhausted = false; break;
       case 'onigiri': { const lost = p.maxHp - p.hp; p.hp = p.maxHp; this.events.push({ k: 'heal', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(lost) }); break; } // 必ず全回復
       case 'jimmy':
@@ -1473,7 +1479,7 @@ class Room {
       bm.t -= DT;
       if (bm.t > 0) continue;
       const owner = this.players.get(bm.owner);
-      this.hitEnemiesInCircle(owner, bm.x, bm.y, 170, 250);
+      this.hitEnemiesInCircle(owner, bm.x, bm.y, 170, 1000);
       for (const q of this.activePlayers()) if (dist(q, bm) < 170) this.damagePlayer(q, 50); // 仲間も巻き込む
       this.events.push({ k: 'boom', x: Math.round(bm.x), y: Math.round(bm.y), r: 170, big: true });
     }
@@ -1640,7 +1646,7 @@ class Room {
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? this.bossSnap(b) : null,
       boss2: this.boss2 && this.boss2.hp > 0 ? this.bossSnap(this.boss2) : undefined,
-      reveal: this.revealT > 0 || undefined, tstop: this.timeStopT > 0 || undefined, falcon: this.hasPassive('falcon') || undefined,
+      reveal: this.revealT > 0 || undefined, tstop: this.timeStopT > 0 || undefined, falcon: this.hasPassive('falcon') || undefined, orbMap: this.luckTeam || undefined,
       shades: this.shades.length ? this.shades.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), yokai: e.yokai, of: e.of, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 || undefined })) : undefined,
       decoys: this.decoys.length ? this.decoys.map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2) })) : undefined,
       ring: this.ring ? { x: Math.round(this.ring.x), y: Math.round(this.ring.y), r: Math.round(this.ring.r) } : null,

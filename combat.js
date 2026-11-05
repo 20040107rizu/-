@@ -351,10 +351,11 @@ function ultimate(room, p, aim) {
       for (const e of room.patrols) if (e.hp > 0 && dist(e, p) < 1600) { knock(room, e, p, 420); e.stunT = Math.max(e.stunT || 0, 2); if (e.state === 'alert') room.calmPatrol(e); }
       for (const b of [room.boss, room.boss2]) if (b && b.hp > 0 && dist(b, p) < 1600) { hit(room, p, b, P * 5, el); if (!(room.time < (b.stunReadyAt || 0))) { b.stunT = Math.max(b.stunT || 0, 3); b.stunReadyAt = room.time + 6; } }
       break;
-    case 'fortune': // 障害をとりのぞく: 見回り鬼を吹き飛ばす＋状態異常を消す＋鬼玉を引きよせる
+    case 'fortune': // 万福招来: 見回り鬼を吹き飛ばす＋状態異常を消す＋マップ中の鬼玉を引きよせる
       for (const e of room.patrols) if (e.hp > 0 && dist(e, p) < 520) { knock(room, e, p, 320); if (e.state === 'alert') room.calmPatrol(e); }
       for (const q of room.activePlayers()) { q.curseT = 0; q.charmT = 0; q.revT = 0; room.healPlayer(q, q.maxHp * 0.4); }
-      for (const d of room.dama) if (!d.taken && dist(d, p) < 1200) { d.x = p.x + (Math.random() - 0.5) * 40; d.y = p.y + (Math.random() - 0.5) * 40; room.events.push({ k: 'da', id: d.id, x: R(d.x), y: R(d.y), v: d.v }); }
+      // マップ中の鬼玉を全部
+      for (const d of room.dama) if (!d.taken) { d.x = p.x + (Math.random() - 0.5) * 40; d.y = p.y + (Math.random() - 0.5) * 40; room.events.push({ k: 'da', id: d.id, x: R(d.x), y: R(d.y), v: d.v }); }
       break;
     case 'nuboko': // 天沼矛: まわりに光のうず
       zone(room, p, p.x, p.y, 280, 6, { kind: 'dmg', follow: p.id, tickDmg: P * 0.7, every: 0.35, el, c, shape: 'swirl' });
