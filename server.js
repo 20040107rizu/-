@@ -48,7 +48,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 function computeVersion() {
   const h = crypto.createHash('sha1');
-  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'attacks.js', 'shared.js', 'stages.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json']) {
+  for (const f of ['index.html', 'style.css', 'music.js', 'yokai.js', 'attacks.js', 'shared.js', 'stages.js', 'title.js', 'gacha.js', 'game.js', 'sw.js', 'art/manifest.json', 'whatsnew.json', 'changelog.json']) {
     try { h.update(fs.readFileSync(path.join(PUBLIC_DIR, f))); } catch {}
   }
   h.update(fs.readFileSync(__filename));

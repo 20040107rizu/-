@@ -5,7 +5,7 @@
 
   const $ = id => document.getElementById(id);
   let rotated = false; // スマホを縦に持っていて、画面を90度回して見せているか
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -13,7 +13,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -988,6 +988,31 @@
     reg.then(r => r && r.update()).catch(() => {}).finally(() => location.reload());
   };
   $('btnWhatsNewClose').onclick = () => show('title');
+
+  // ---- アップデート履歴 ----
+  // changelog.json（これまでの分）に、今の whatsnew.json の新しいお知らせを足して、日付ごとに出す
+  async function openHistory() {
+    show('historyScreen');
+    const get = f => fetch(f + '?t=' + Date.now(), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+    const [log, now] = await Promise.all([get('changelog.json'), get('whatsnew.json')]);
+    const days = Array.isArray(log) ? log.map(d => ({ date: d.date, notes: [...(d.notes || [])] })) : [];
+    const known = new Set(days.flatMap(d => d.notes));
+    const fresh = (now && Array.isArray(now.notes) ? now.notes : []).filter(n => !known.has(n));
+    if (fresh.length) {
+      const date = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); // まだ履歴にのっていない新しいお知らせは「今日」（日本の日付）
+      const d = days.find(x => x.date === date);
+      if (d) d.notes.unshift(...fresh); else days.unshift({ date, notes: fresh });
+      days.sort((a, b) => (a.date < b.date ? 1 : -1));
+    }
+    const fmt = s => { const [y, m, dd] = s.split('-').map(Number); return `${y}年${m}月${dd}日`; };
+    $('historyList').innerHTML = days.length
+      ? days.map((d, i) => `<div class="hist-day${i === 0 ? ' latest' : ''}"><div class="hist-date">${fmt(d.date)}${i === 0 ? '<span>最新</span>' : ''}</div><ul class="notes">${d.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`).join('')
+      : '<p class="sub">履歴を読み込めませんでした。通信を確認してね</p>';
+    $('historyList').scrollTop = 0;
+  }
+  $('btnHistory').onclick = openHistory;
+  $('btnWhatsNewHistory').onclick = openHistory;
+  $('btnHistoryClose').onclick = () => show('title');
 
   // ---------- サウンド（簡易） ----------
   let actx = null;
