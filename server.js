@@ -328,13 +328,13 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, title: p.title, away: !!p.away || undefined })),
+      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined })),
     };
   }
 
-  addPlayer(ws, name, yokai, pid, totsu, title, lv, ch) {
+  addPlayer(ws, name, yokai, pid, totsu, title, lv, ch, cs) {
     const p = {
-      id: genId(), ws, pid, totsu: cleanTotsu(totsu), lv: cleanLv(lv), charm: cleanCharm(ch), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
+      id: genId(), ws, pid, totsu: cleanTotsu(totsu), lv: cleanLv(lv), charm: cleanCharm(ch), charmList: cleanCharmList(cs), title: cleanTitle(title), name: cleanName(name) || 'プレイヤー', yokai: usableYokai(yokai) ? yokai : 'nekomata',
       host: this.players.size === 0, x: 0, y: 0, face: 0,
       input: { mx: 0, my: 0, atk: false, strong: false, item: false, dash: false, skill: false, ult: false }, prevItem: false,
     };
@@ -1770,13 +1770,13 @@ wss.on('connection', ws => {
         room = target;
         pid = cleanPid(msg.pid);
         if (pid) touchPlayer(pid, msg.name, msg.yokai);
-        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title, msg.lv, msg.ch);
+        me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title, msg.lv, msg.ch, msg.cs);
         send({ t: 'welcome', id: me.id });
         room.broadcast(room.lobbyInfo());
         break;
       }
       case 'yokai':
-        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.charm = cleanCharm(msg.ch); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
+        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.charm = cleanCharm(msg.ch); me.charmList = cleanCharmList(msg.cs); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
         if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
@@ -1856,6 +1856,11 @@ function cleanProfile(p) {
 }
 const cleanTotsu = v => Math.max(0, Math.min(S.TOTSU_MAX, v | 0));
 const cleanLv = v => Math.max(1, Math.min(S.LV_MAX, v | 0));
+// ルームの仲間に見せるお守り（[レア度, スキル, 強さ, スキル, 強さ]、2つまで）
+function cleanCharmList(cs) {
+  if (!Array.isArray(cs)) return [];
+  return cs.slice(0, 2).map(a => Array.isArray(a) ? [Math.max(0, Math.min(4, a[0] | 0)), ...[[a[1], a[2]], [a[3], a[4]]].filter(([k]) => S.CHARM_SKILLS[k]).flatMap(([k, lv]) => [k, Math.max(1, Math.min(5, lv | 0))])] : null).filter(a => a && a.length > 1);
+}
 // お守りの効果（スマホで計算したもの）は、上限をこえないようにして使う
 function cleanCharm(ch) {
   const out = { drain: 0, regen: 0, guard: 0, hp: 0, atk: 0, haste: 0, ult: 0, guts: 0, orb: 0 };

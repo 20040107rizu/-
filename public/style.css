@@ -557,3 +557,12 @@ html.rot .gacha-next { right: max(16px, env(safe-area-inset-bottom)); bottom: 14
 .cp-row .del { background: #5a3a6a !important; }
 .charm-big { font-size: 64px; filter: drop-shadow(0 0 18px var(--cc)); animation: unlockPop .8s ease-out; }
 .charm-lines { display: flex; flex-direction: column; gap: 2px; font-size: 14px; text-align: left; }
+/* ルームの仲間をくわしく見る */
+#plist li:not(.empty) { cursor: pointer; }
+.member-pop .mp-in { display: flex; gap: 12px; align-items: center; background: linear-gradient(#2a1840, #140a20); border: 2px solid #c85aff; border-radius: 16px; padding: 10px 16px; width: min(720px, calc(94 * var(--vw, 1vw))); max-height: calc(88 * var(--vh, 1vh)); overflow-y: auto; font-size: 12px; }
+.member-pop .big-face { width: min(30%, 170px); flex: none; }
+.member-pop .pv { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.member-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 4px 0; } .member-pop dt { opacity: .65; } .member-pop dd { margin: 0; }
+.member-pop #memberClose { align-self: center; padding: 6px 30px; font-size: 16px; }
+#yokaiInfo { position: relative; }
+.lobby-zukan { position: absolute; right: 8px; bottom: 8px; font-size: 11px !important; padding: 4px 8px !important; background: #1e3a3a !important; border: 1px solid #3ac8b0; z-index: 2; }
