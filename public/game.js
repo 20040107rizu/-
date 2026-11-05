@@ -1479,6 +1479,21 @@
     const reopen = () => { if (!pending) return; if ($('title').classList.contains('active')) showChoice(false); else setTimeout(reopen, 900); };
     setTimeout(reopen, 1200);
   } else pending = null;
+  // おわびのプレゼント: 経験値 10,000（1つの端末で1回だけ）
+  if (!localStorage.getItem('gift-exp-20261105')) {
+    try { localStorage.setItem('gift-exp-20261105', '1'); } catch {}
+    stats.expStock += 10000; saveAll();
+    const open = () => {
+      if (!$('title').classList.contains('active') || $('rewardScreen').classList.contains('active')) { setTimeout(open, 900); return; }
+      $('rewardWeek').textContent = '🎁 おわびのプレゼント';
+      $('rewardTitle').textContent = '経験値 +10,000！';
+      $('rewardSub').textContent = '不具合でご迷惑をおかけしました。経験値ストックに入れました。図鑑で好きなお友達のレベル上げに使ってね';
+      $('rewardPrizes').innerHTML = '<div class="charm-big" style="--cc:#7dd8ff">📈</div>';
+      $('btnRewardOk').onclick = () => show('title');
+      show('rewardScreen');
+    };
+    setTimeout(open, 1800);
+  }
   // 前からいた「完凸よりあふれたお友達」を、1回だけまとめて経験値に変える
   {
     const over = convertOverflow();
