@@ -1072,6 +1072,7 @@
       case 'lobby':
         for (const p of m.players || []) if (!S.YOKAI_BY_ID[p.yokai]) p.yokai = 'nekomata';
         lobby = m;
+        if (m.state === 'result' && result && $('result').classList.contains('active')) renderResult(); // だれがまだガチャ中か
         if (m.state === 'lobby') { renderLobby(); if (!$('zukan').classList.contains('active')) show('lobby'); } // 図鑑を開いているあいだはそのまま
         else if (m.state === 'battle') show('game');
         break;
@@ -1572,8 +1573,10 @@
       $('btnAgain').textContent = serverUpdating ? 'サーバー更新のためタイトルへ' : 'タイトルへもどる';
       return;
     }
-    $('btnAgain').disabled = !(me && me.host);
-    $('btnAgain').textContent = me && me.host ? 'ロビーへもどる' : 'ホストを待っています…';
+    if (!result.viewedSent && ws) { result.viewedSent = true; send({ t: 'viewed' }); } // ガチャを引き終わったことをみんなに知らせる
+    const waiting = (lobby && lobby.players || []).filter(p => p.gw && p.id !== myId);
+    $('btnAgain').disabled = !(me && me.host) || waiting.length > 0;
+    $('btnAgain').textContent = waiting.length ? `ガチャ中のなかまを待っています…（${waiting.map(p => p.name).join('・')}）` : me && me.host ? 'ロビーへもどる' : 'ホストを待っています…';
   }
 
   function goFullscreen() {

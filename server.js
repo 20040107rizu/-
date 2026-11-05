@@ -328,7 +328,7 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined })),
+      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined, gw: this.state === 'result' && !p.viewed && !p.away ? 1 : undefined })), // gw: まだガチャ中
     };
   }
 
@@ -1559,7 +1559,8 @@ class Room {
     const bn = this.bonusBoss, sh = this.shinBoss;
     this.lastResult = { t: 'result', players, team, luck: this.luckTeam || undefined, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
     this.broadcast(this.lastResult);
-    for (const p of this.players.values()) p.missedResult = !!p.away; // 通信が切れていた人には、つなぎ直したときに送る
+    for (const p of this.players.values()) { p.missedResult = !!p.away; p.viewed = false; } // 通信が切れていた人には、つなぎ直したときに送る。viewed: ガチャを引き終わって結果を見たか
+    this.broadcast(this.lobbyInfo());
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
     this.recordRanking(players);
   }
@@ -1796,8 +1797,11 @@ wss.on('connection', ws => {
           room.broadcast(room.lobbyInfo());
         }
         break;
-      case 'toLobby':
-        if (room && me && me.host && room.state === 'result') { room.state = 'lobby'; room.broadcast(room.lobbyInfo()); }
+      case 'viewed': // ガチャ（経験値・お守り）を選び終わって結果を見た
+        if (room && me && room.state === 'result' && !me.viewed) { me.viewed = true; room.broadcast(room.lobbyInfo()); }
+        break;
+      case 'toLobby': // みんながガチャを引き終わるまでロビーにはもどれない（通信が切れている人は待たない）
+        if (room && me && me.host && room.state === 'result' && ![...room.players.values()].some(p => !p.viewed && !p.away)) { room.state = 'lobby'; room.broadcast(room.lobbyInfo()); }
         break;
       case 'input':
         if (me) {
