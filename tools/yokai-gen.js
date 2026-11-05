@@ -14,6 +14,20 @@ const mix = (a, b, t) => toHex(hex(a).map((v, i) => v + (hex(b)[i] - v) * t));
 const dark = (c, t = 0.35) => mix(c, '#000000', t);
 const light = (c, t = 0.45) => mix(c, '#ffffff', t);
 const lum = c => { const [r, g, b] = hex(c); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+function toHsl(c) {
+  const [r, g, b] = hex(c).map(v => v / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+function hsl(h, s, l) {
+  h = ((h % 360) + 360) % 360; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  return toHex([0, 8, 4].map(n => (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))) * 255));
+}
+// キャラごとの「差し色」: 元の色から色相をずらした鮮やかな色
+const accentOf = (c, r) => { const [h, s] = toHsl(c); return hsl(h + [150, 180, 210, 120, 240, 60][Math.floor(r() * 6)], Math.max(0.5, Math.min(0.72, s + 0.15)), 0.42 + r() * 0.12); };
+const pick = (r, a) => a[Math.floor(r() * a.length)];
 // 影の色: 暗くして少し青紫に寄せる（アニメ塗り）
 const shade = (c, t = 0.38) => mix(dark(c, t), '#2a1a5a', 0.18);
 
@@ -256,28 +270,73 @@ const ROBE_HEM = (y0, l, r, n = 7, amp = 10) => { // ぎざぎざに裂けた裾
   return s;
 };
 
-// 人型の体（着物・袖・帯・爪のある手・脚）。頭は別に描く。
+// 人型の体。服の形（着物・袴・マント・袖なし・ずんぐり）と差し色・胸の紋をキャラごとに変えて見分けやすくする。頭は別に描く。
+const STYLES = { fighter: ['vest', 'hakama', 'kimono', 'cape', 'vest'], tank: ['stout', 'stout', 'hakama', 'cape'], healer: ['kimono', 'cape', 'kimono', 'hakama'], ranger: ['hakama', 'cape', 'vest', 'kimono'] };
+function crest(kind, x, y, c, bg) {
+  const r = 12;
+  const sym = {
+    tomoe: `<path d="M${x} ${y - 8} A8 8 0 1 1 ${x - 7} ${y + 4} Q${x - 2} ${y - 1} ${x} ${y - 8}Z" fill="${c}"/><circle cx="${x + 1}" cy="${y + 1}" r="2.6" fill="${bg}"/>`,
+    star: `<path d="M${x} ${y - 9} L${x + 2.6} ${y - 3} L${x + 9} ${y - 3} L${x + 4} ${y + 1.5} L${x + 6} ${y + 8} L${x} ${y + 4} L${x - 6} ${y + 8} L${x - 4} ${y + 1.5} L${x - 9} ${y - 3} L${x - 2.6} ${y - 3}Z" fill="${c}"/>`,
+    diamond: `<path d="M${x} ${y - 9} L${x + 8} ${y} L${x} ${y + 9} L${x - 8} ${y}Z" fill="${c}"/><path d="M${x} ${y - 4} L${x + 3.5} ${y} L${x} ${y + 4} L${x - 3.5} ${y}Z" fill="${bg}"/>`,
+    moon: `<path d="M${x + 3} ${y - 9} A9 9 0 1 0 ${x + 3} ${y + 9} A7 7 0 1 1 ${x + 3} ${y - 9}Z" fill="${c}"/>`,
+    flame: `<path d="M${x} ${y - 10} Q${x + 9} ${y} ${x + 5} ${y + 7} Q${x} ${y + 10} ${x - 5} ${y + 7} Q${x - 9} ${y} ${x - 2} ${y - 3} Q${x} ${y + 2} ${x} ${y - 10}Z" fill="${c}"/>`,
+    cross: `<path d="M${x - 8} ${y - 8} L${x + 8} ${y + 8} M${x + 8} ${y - 8} L${x - 8} ${y + 8}" stroke="${c}" stroke-width="4.5" stroke-linecap="round"/>`,
+    wheel: `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${c}" stroke-width="3"/>` + [0, 1, 2, 3].map(i => { const a = i * Math.PI / 4; return `<path d="M${x - Math.cos(a) * 9} ${y - Math.sin(a) * 9} L${x + Math.cos(a) * 9} ${y + Math.sin(a) * 9}" stroke="${c}" stroke-width="2.2"/>`; }).join(''),
+    leaf: `<path d="M${x - 8} ${y + 8} Q${x - 8} ${y - 8} ${x + 8} ${y - 8} Q${x + 8} ${y + 8} ${x - 8} ${y + 8}Z" fill="${c}"/><path d="M${x - 8} ${y + 8} L${x + 4} ${y - 4}" stroke="${bg}" stroke-width="2"/>`,
+  }[kind] || '';
+  return `<circle cx="${x}" cy="${y}" r="${r}" fill="${bg}" ${THIN}/>${sym}`;
+}
 function humanoidBody(kit, L, c, rnd, o) {
   const robe = o.robe, trim = o.trim, skin = o.skin;
-  const legs = both(`M104 214 L100 236 L120 236 L122 214Z`, d => kit.cel(d, o.legC || '#1e1a26', { dx: 3, dy: 2, thin: true }));
-  const torso = `M96 128 Q128 118 160 128 L176 216${ROBE_HEM(216, 80, 176, 6, 12)} L80 216Z`;
-  const sleeveL = `M98 132 Q70 136 58 178 L54 206 L68 194 L74 210 L84 196 Q92 172 104 156Z`;
+  const vr = seeded((L.id || '') + ':look'); // 見た目のばらつき専用（他の抽選に影響しない）
+  const acc = o.accent || accentOf(o.accentBase || c, vr);
+  const style = L.style || pick(vr, STYLES[L.role] || STYLES.fighter);
+  const crestK = pick(vr, ['tomoe', 'star', 'diamond', 'moon', 'flame', 'cross', 'wheel', 'leaf']);
+  const band = vr() < 0.6; // 裾の太い帯
+  const obiC = o.obi || acc;
+  const legC = o.legC || '#1e1a26';
+  const legs = both(`M104 214 L100 236 L120 236 L122 214Z`, d => kit.cel(d, legC, { dx: 3, dy: 2, thin: true }));
+  const hemL = style === 'stout' ? 68 : 80, hemR = 256 - hemL;
+  const torso = style === 'hakama' ? `M96 128 Q128 118 160 128 L166 184 L90 184Z`
+    : style === 'stout' ? `M92 126 Q128 114 164 126 Q200 160 ${hemR} 216${ROBE_HEM(216, hemL, hemR, 7, 10)} L${hemL} 216 Q56 160 92 126Z`
+      : `M96 128 Q128 118 160 128 L176 216${ROBE_HEM(216, 80, 176, 6, 12)} L80 216Z`;
+  const sleeveL = style === 'vest' ? `M100 132 Q80 138 72 170 L66 196 L82 198 Q86 176 104 156Z`
+    : style === 'stout' ? `M96 130 Q62 134 50 180 L46 206 L62 194 L68 210 L80 196 Q86 172 100 156Z`
+      : `M98 132 Q70 136 58 178 L54 206 L68 194 L74 210 L84 196 Q92 172 104 156Z`;
+  const sleeveC = style === 'vest' ? skin : robe;
+  const hx = style === 'vest' ? 74 : style === 'stout' ? 58 : 66;
   const claws = (x, y, s) => `<path d="M${x - 8} ${y} L${x - 10} ${y + 12} L${x - 4} ${y + 5} L${x} ${y + 15} L${x + 4} ${y + 5} L${x + 10} ${y + 12} L${x + 8} ${y}Z" fill="${skin}" ${THIN}/>`;
-  const scarf = L.scarf || o.scarf || (L.role === 'ranger' && !o.noScarf) || (L.role === 'fighter' && rnd() < 0.4) ? kit.cel(`M146 126 C186 112 206 140 244 120 C232 142 212 152 190 146 C210 160 222 164 238 170 C204 180 176 162 158 140Z`, o.scarfC || '#c8242a', { dx: 5, dy: 4 }) : '';
+  const scarf = L.scarf || o.scarf || (L.role === 'ranger' && !o.noScarf && style !== 'cape') || (L.role === 'fighter' && rnd() < 0.4) ? kit.cel(`M146 126 C186 112 206 140 244 120 C232 142 212 152 190 146 C210 160 222 164 238 170 C204 180 176 162 158 140Z`, o.scarfC || '#c8242a', { dx: 5, dy: 4 }) : '';
+  // 服の形ごとの追加パーツ
+  let back = scarf, extra = '', lower = legs;
+  if (style === 'cape') {
+    back = kit.cel(`M94 124 Q58 160 46 236 L84 226 L104 238 L128 226 L152 238 L172 226 L210 236 Q198 160 162 124Z`, acc, { dx: 8, dy: 6 }) + back;
+    extra += both('M98 128 L80 104 L92 102 L108 124Z', d => kit.cel(d, acc, { dx: 3, dy: 3, thin: true })) +
+      `<path d="M96 134 L160 134" stroke="#ffcc33" stroke-width="3"/><circle cx="128" cy="134" r="5" fill="#ffcc33" ${THIN}/>`;
+  }
+  if (style === 'hakama') {
+    lower = both(`M108 226 L102 238 L122 238 L122 226Z`, d => kit.cel(d, legC, { dx: 2, dy: 2, thin: true })) +
+      kit.cel(`M88 176 L168 176 L188 230 L136 230 L128 196 L120 230 L68 230Z`, acc, { dx: 6, dy: 4 }) +
+      `<path d="M104 182 L92 228 M152 182 L164 228 M116 182 L112 210 M140 182 L144 210" stroke="${shade(acc, 0.35)}" stroke-width="3"/>`;
+  }
+  if (style === 'vest') extra += both('M70 168 L84 172 L82 182 L66 178Z', d => kit.cel(d, acc, { dx: 2, dy: 2, thin: true })); // 手甲
+  const torsoClip = 'tc' + kit.defs.length; kit.defs.push(`<clipPath id="${torsoClip}"><path d="${torso}"/></clipPath>`);
+  const hemBand = band && style !== 'hakama' ? `<g clip-path="url(#${torsoClip})"><path d="M40 202 L216 202 L216 250 L40 250Z" fill="${acc}"/><path d="M40 202 L216 202" stroke="${INK}" stroke-width="3"/><path d="M40 208 L216 208" stroke="#fff" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="6 6"/></g>` : '';
   return {
-    back: scarf,
-    body: `${legs}
-      ${kit.cel(sleeveL, robe, { dx: 6, dy: 5 })}${kit.cel(mirrorX(sleeveL), robe, { dx: 6, dy: 5 })}
-      ${claws(66, 198)}${claws(190, 198)}
-      ${kit.cel(torso, robe)}
+    back,
+    body: `${lower}
+      ${kit.cel(sleeveL, sleeveC, { dx: 6, dy: 5 })}${kit.cel(mirrorX(sleeveL), sleeveC, { dx: 6, dy: 5 })}
+      ${claws(hx, 198)}${claws(256 - hx, 198)}
+      ${kit.cel(torso, robe)}${hemBand}
       <path d="M108 128 L128 170 L148 128" stroke="${trim}" stroke-width="7" fill="none"/>
       <path d="M108 128 L128 170 L148 128" fill="none" ${THIN}/>
       ${pattern(L.pat, 128, 188, 40, 26, robe)}
-      ${kit.cel('M90 166 L166 166 L168 182 L88 182Z', o.obi || shade(trim, 0.2), { dx: 3, dy: 3, thin: true })}
-      <path d="M134 182 L142 204 L150 182Z" fill="${o.obi || shade(trim, 0.2)}" ${THIN}/>
+      ${kit.cel('M90 166 L166 166 L168 182 L88 182Z', obiC, { dx: 3, dy: 3, thin: true })}
+      ${style === 'hakama' ? '' : `<path d="M134 182 L142 204 L150 182Z" fill="${obiC}" ${THIN}/>`}
       ${roleGear(kit, L.role, robe, trim, rnd)}
-      ${o.fur ? kit.cel('M94 126 L98 142 L110 134 L118 148 L128 136 L138 148 L146 134 L158 142 L162 126 Q128 116 94 126Z', o.fur, { dx: 3, dy: 3, thin: true }) : ''}`,
-    hand: { x: 190, y: 196 },
+      ${o.fur ? kit.cel('M94 126 L98 142 L110 134 L118 148 L128 136 L138 148 L146 134 L158 142 L162 126 Q128 116 94 126Z', o.fur, { dx: 3, dy: 3, thin: true }) : ''}
+      ${extra}${L.role === 'healer' ? '' : crest(crestK, 128, 174, lum(acc) > 0.55 ? dark(acc, 0.6) : acc, '#fbf4e2')}`,
+    hand: { x: 256 - hx, y: 196 },
   };
 }
 
@@ -330,7 +389,8 @@ const BODY = {
   human(kit, L, c, rnd) {
     const pale = L.skin === 'pale';
     const skin = L.skin === 'c' ? light(c, 0.1) : pale ? '#eef4f8' : ['#f2dcc8', '#e8c8a8', '#c89068', '#9a6a4a'][Math.floor(rnd() * 4)];
-    const hc = L.beard ? '#eceaf4' : pale ? '#1a1a2a' : lum(c) > 0.75 ? '#1e1626' : ['#1e1626', '#3a2420', dark(c, 0.55), '#e8e4f0'][Math.floor(rnd() * 4)];
+    const hv = seeded(L.id + ':hair'), [hh] = toHsl(c);
+    const hc = L.beard ? '#eceaf4' : pale ? '#1a1a2a' : pick(hv, ['#1e1626', '#3a2420', '#e8e4f0', '#d8a030', hsl(hh + 30, 0.65, 0.32), hsl(hh + 190, 0.6, 0.5), hsl(hh - 40, 0.7, 0.62), '#9aa4b8']);
     const robe = L.skin === 'c' ? dark(c, 0.55) : pale ? '#f2f8ff' : c;
     const trim = pale ? '#8ad8ff' : lum(robe) > 0.6 ? '#2a1a2a' : '#f4ecd8';
     const bodyP = humanoidBody(kit, L, c, rnd, { robe, trim, skin, scarfC: lum(c) > 0.5 ? '#c8242a' : light(c, 0.3), obi: pale ? '#6ab8ff' : undefined });
@@ -351,7 +411,8 @@ const BODY = {
 
   beast(kit, L, c, rnd) {
     const c2 = light(c, 0.55);
-    const robe = mix(c, ['#1a1426', '#4a1420', '#14284a', '#1e3a24', '#e8e0d0'][Math.floor(rnd() * 5)], 0.7);
+    const bv = seeded(L.id + ':robe'), [bh] = toHsl(c);
+    const robe = pick(bv, [hsl(bh + 180, 0.55, 0.38), hsl(bh + 150, 0.6, 0.45), hsl(bh + 210, 0.55, 0.4), '#2a2236', '#efe6d4', hsl(bh + 100, 0.5, 0.4)]);
     const bodyP = humanoidBody(kit, L, c, rnd, { robe, trim: c, skin: c, fur: c2, scarfC: '#c8242a', legC: dark(c, 0.3), noScarf: true });
     const earD = {
       cat: `M98 62 L92 22 L120 46Z`, fox: `M100 60 L86 10 L122 44Z`, dog: `M98 54 Q70 50 74 104 Q86 92 100 74Z`,
@@ -579,7 +640,7 @@ const BODY = {
 
 function drawYokai(y) {
   const L = parseLook(y.look);
-  L.role = y.role;
+  L.role = y.role; L.id = y.id;
   const rnd = seeded(y.id);
   const c = y.color;
   const kit = makeKit();
