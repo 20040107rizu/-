@@ -8,15 +8,14 @@
 
   // 通常攻撃: range は自動で狙う距離、cd は間隔（秒）、dmg はタイプの攻撃力に掛ける倍率
   const NORMAL = {
-    slash:      { label: '斬撃',       range: 85,  cd: 0.35, dmg: 1.0 },
-    javelin: { label: '槍投げ', range: 400, cd: 0.5, dmg: 1.25 }, // オーディン専用
-    thrust:     { label: '突き',       range: 130, cd: 0.45, dmg: 1.25 },
+    slash:      { label: '斬撃',       range: 140,  cd: 0.35, dmg: 1.0 },
+    thrust:     { label: '突き',       range: 190, cd: 0.45, dmg: 1.25 },
     javelin:    { label: '槍投げ',     range: 400, cd: 0.5,  dmg: 1.25 }, // オーディン専用（つらぬく）
-    combo:      { label: '三連撃',     range: 80,  cd: 0.26, dmg: 0.5 },  // 3回目が2倍
-    spin:       { label: '回転斬り',   range: 95,  cd: 0.5,  dmg: 1.2 },
-    wave:       { label: '衝撃波',     range: 160, cd: 0.7,  dmg: 1.1 },
-    drainHit:   { label: '吸血斬り',   range: 85,  cd: 0.4,  dmg: 0.9 },  // 与えたダメージの15%回復
-    slam:       { label: '叩きつけ',   range: 110, cd: 0.6,  dmg: 1.45 },
+    combo:      { label: '三連撃',     range: 130,  cd: 0.26, dmg: 0.5 },  // 3回目が2倍
+    spin:       { label: '回転斬り',   range: 150,  cd: 0.5,  dmg: 1.2 },
+    wave:       { label: '衝撃波',     range: 230, cd: 0.7,  dmg: 1.1 },
+    drainHit:   { label: '吸血斬り',   range: 140,  cd: 0.4,  dmg: 0.9 },  // 与えたダメージの15%回復
+    slam:       { label: '叩きつけ',   range: 150, cd: 0.6,  dmg: 1.45 },
     bolt:       { label: '弾',         range: 520, cd: 0.3,  dmg: 1.0 },
     spread:     { label: '散弾',       range: 300, cd: 0.55, dmg: 0.7 },
     orb:        { label: '貫通弾',     range: 450, cd: 0.7,  dmg: 1.4 },
@@ -90,7 +89,7 @@
 
   // スキルボタン（タイプごと）
   const SKILL = {
-    fighter: { key: 'dodge',  label: '回避',   cd: 2.5, desc: '素早くステップ。その間は攻撃を受けない' },
+    fighter: { key: 'dodge',  label: '回避',   cd: 1.4, desc: '素早くステップ。その間は攻撃を受けない' },
     healer:  { key: 'buff',   label: '強化',   cd: 16,  desc: '近くの仲間の攻撃力と速さを8秒アップ（重ねがけなし）' },
     tank:    { key: 'shield', label: 'シールド', cd: 10, desc: '4秒間、受けるダメージを大きく減らす（重ねがけなし）' },
     ranger:  { key: 'bomb',   label: '爆弾',   cd: 7,   desc: '狙った方向に爆弾を投げる（仲間は巻き込まない）' },

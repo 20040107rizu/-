@@ -145,7 +145,7 @@ function normal(room, p, aim, target) {
     case 'spin': hitCircle(room, p, p.x, p.y, K.range, base, el); room.events.push({ k: 'ring', x: R(p.x), y: R(p.y), r: K.range, c }); break;
     case 'wave': hitArc(room, p, aim, K.range, 0.6, base, el); room.events.push({ k: 'cone', x: R(p.x), y: R(p.y), a: +aim.toFixed(2), r: K.range, c }); break;
     case 'drainHit': { const f = front(); const d = hitCircle(room, p, f.x, f.y, K.range * 0.55, base, el); if (d) room.healPlayer(p, d * 0.15); room.events.push({ k: 'slash', x: R(f.x), y: R(f.y), a: +aim.toFixed(2), c: '#ff3a6a' }); break; }
-    case 'slam': { const f = front(0.7); hitCircle(room, p, f.x, f.y, 70, base, el); room.events.push({ k: 'boom', x: R(f.x), y: R(f.y), r: 70, c }); break; }
+    case 'slam': { const f = front(0.7); hitCircle(room, p, f.x, f.y, 95, base, el); room.events.push({ k: 'boom', x: R(f.x), y: R(f.y), r: 95, c }); break; }
     case 'bolt': shoot(room, p, aim, 650, base, K.range / 650, 10, el); break;
     case 'spread': for (const k of [-1, 0, 1]) shoot(room, p, aim + k * 0.22, 600, base, 0.5, 9, el); break;
     case 'orb': shoot(room, p, aim, 380, base, K.range / 380, 18, el, { pierce: true }); break;
@@ -343,8 +343,9 @@ function ultimate(room, p, aim) {
       room.revealT = 15; p.skyT = 15;
       break;
     case 'timestop': // 時の停止: 5秒、ボスと見回り鬼が止まる
-      for (const b of [room.boss, room.boss2]) if (b && b.hp > 0) { b.stunT = Math.max(b.stunT || 0, 5); b.stunReadyAt = room.time + 8; }
-      for (const e of room.patrols) if (e.hp > 0) e.stunT = Math.max(e.stunT || 0, 5);
+      for (const b of [room.boss, room.boss2]) if (b && b.hp > 0) { b.stunT = Math.max(b.stunT || 0, 9); b.stunReadyAt = room.time + 12; }
+      for (const e of room.patrols) if (e.hp > 0) e.stunT = Math.max(e.stunT || 0, 9);
+      room.timeStopT = 9; // 画面を灰色にする演出用
       break;
     case 'tsunami': // 大津波: 見回り鬼を押し流す＋ボスに大ダメージ
       for (const e of room.patrols) if (e.hp > 0 && dist(e, p) < 1600) { knock(room, e, p, 420); e.stunT = Math.max(e.stunT || 0, 2); if (e.state === 'alert') room.calmPatrol(e); }
@@ -352,7 +353,7 @@ function ultimate(room, p, aim) {
       break;
     case 'fortune': // 障害をとりのぞく: 見回り鬼を吹き飛ばす＋状態異常を消す＋鬼玉を引きよせる
       for (const e of room.patrols) if (e.hp > 0 && dist(e, p) < 520) { knock(room, e, p, 320); if (e.state === 'alert') room.calmPatrol(e); }
-      for (const q of room.activePlayers()) { q.curseT = 0; q.charmT = 0; q.revT = 0; }
+      for (const q of room.activePlayers()) { q.curseT = 0; q.charmT = 0; q.revT = 0; room.healPlayer(q, q.maxHp * 0.4); }
       for (const d of room.dama) if (!d.taken && dist(d, p) < 1200) { d.x = p.x + (Math.random() - 0.5) * 40; d.y = p.y + (Math.random() - 0.5) * 40; room.events.push({ k: 'da', id: d.id, x: R(d.x), y: R(d.y), v: d.v }); }
       break;
     case 'nuboko': // 天沼矛: まわりに光のうず

@@ -786,6 +786,27 @@
   const bubbles = new Map(); // 見回り鬼の笛表示 id -> 残り時間
   let shake = 0;
   let banner = null;
+  let godFlash = null; // 神の必殺技: 画面が一瞬その色に光る
+  // 神の必殺技の演出（カットインは出さず、その場で大きく光る）
+  const GOD_ULT = {
+    hellsweep: ['#ff3a1a', '🔥'], tenrai: ['#fff27a', '⚡'], gungnir: ['#7ad8ff', '🔱'], sunboat: ['#ffd23a', '☀️'], mend: ['#7dffd8', '🪨'], tandava: ['#8a6aff', '💃'],
+    tsukiyo: ['#b0b0ff', '🌙'], mirror: ['#7aff9a', '🪞'], hadesgate: ['#b07aff', '💀'], peach: ['#ff9ac8', '🍑'], skyeye: ['#ffe680', '👁'], timestop: ['#bfe6ff', '⏱'],
+    tsunami: ['#3ab0ff', '🌊'], fortune: ['#ffd23a', '🐘'], nuboko: ['#fff2a0', '🌀'], yomigaeri: ['#c85aff', '🕯'],
+  };
+  function godUltFx(ev) {
+    const g = GOD_ULT[ev.kind];
+    if (!g) return;
+    const [c, icon] = g;
+    banner = { text: `${icon} ${ev.name}`, sub: (snap && snap.players.find(p => p.id === ev.id) || {}).name || '', t: 2.4, c };
+    godFlash = { c, t: 0.6, max: 0.6 };
+    shake = Math.max(shake, 0.7);
+    fx.push({ k: 'shock', x: ev.x, y: ev.y, r: 520, c, t: 1.0, max: 1.0 });
+    for (let k = 0; k < 4; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 300 + k * 180, c: k % 2 ? '#fff' : c, t: 0.8 + k * 0.2, max: 0.8 + k * 0.2 });
+    fx.push({ k: 'pillar', x: ev.x, y: ev.y, c, t: 1.2, max: 1.2 });
+    if (ev.kind === 'tsunami') fx.push({ k: 'tsunami', x: ev.x, y: ev.y, r: 1600, t: 1.6, max: 1.6 });
+    if (ev.kind === 'tenrai') for (let k = 0; k < 10; k++) fx.push({ k: 'bolt', x: ev.x + (Math.random() - 0.5) * 1400, y: ev.y + (Math.random() - 0.5) * 900, c: '#fff27a', t: 0.5 + k * 0.05, max: 0.5 + k * 0.05 });
+    beep(110, 0.8, 'sawtooth', 0.09, 300); setTimeout(() => beep(880, 0.5, 'triangle', 0.08, 1400), 200);
+  }
   let myPred = null;
   let bossType = 'red';
   let stage = 'oni';
@@ -1635,6 +1656,7 @@
         beep(220, 0.5, 'sawtooth', 0.08, 600); setTimeout(() => beep(660, 0.4, 'triangle', 0.07, 900), 120);
         if (ev.kind === 'roar') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 480 * (0.5 + k * 0.25), c: ['#ff4a4a', '#ffb83a', '#fff'][k], t: 0.7 + k * 0.15, max: 0.7 + k * 0.15 });
         if (ev.kind === 'dragon') fx.push({ k: 'dragon', x: ev.x, y: ev.y, a: ev.a, t: 1.0, max: 1.0 });
+        godUltFx(ev);
         if (ev.kind === 'tenrai') { shake = Math.max(shake, 0.6); for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 500 * (0.5 + k * 0.3), c: ['#fff27a', '#7ab8ff', '#fff'][k], t: 0.5 + k * 0.15, max: 0.5 + k * 0.15 }); }
         if (ev.kind === 'mend' || ev.kind === 'sunboat') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 260 * (0.5 + k * 0.3), c: ev.kind === 'mend' ? ['#7dffd8', '#bfffe8', '#fff'][k] : ['#ffd23a', '#ff9a2a', '#fff'][k], t: 0.6 + k * 0.15, max: 0.6 + k * 0.15 });
         if (ev.kind === 'gungnir') shake = Math.max(shake, 0.5);
@@ -2544,6 +2566,15 @@
     const dark = snap.boss && snap.boss.type === 'nue';
     if (dark) drawNueDark(me, now);
     if (snap.players.some(p => p.crit)) { ctx.fillStyle = 'rgba(20,20,80,0.28)'; ctx.fillRect(0, 0, W, H); } // ツクヨミの月夜の帳
+    if (snap.tstop) { // クロノスの時の停止: 画面が灰色に
+      ctx.fillStyle = 'rgba(160,180,200,0.22)'; ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = 'center'; ctx.font = 'bold 26px sans-serif'; ctx.lineWidth = 5; ctx.strokeStyle = '#000'; ctx.strokeText('⏱ 時が止まっている…', W / 2, 170); ctx.fillStyle = '#bfe6ff'; ctx.fillText('⏱ 時が止まっている…', W / 2, 170);
+    }
+    if (godFlash) { // 神の必殺技: 画面が一瞬光る
+      godFlash.t -= 1 / 60;
+      if (godFlash.t <= 0) godFlash = null;
+      else { ctx.globalAlpha = 0.5 * godFlash.t / godFlash.max; ctx.fillStyle = godFlash.c; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    }
     if (me && S.YOKAI_BY_ID[me.yokai]?.passive === 'falcon' && myPred) { // ホルスの天の見張り: 近くの見回り鬼の方向
       const scale = H / 640;
       for (const e of snap.patrols) {
@@ -3007,6 +3038,25 @@
       if (e.k === 'slash') {
         ctx.strokeStyle = e.c || '#fff'; ctx.lineWidth = e.big ? 14 : 8; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 1.1, e.a + 1.1); ctx.stroke();
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 0.9, e.a + 0.9); ctx.stroke();
+      }
+      else if (e.k === 'shock') { // 神の必殺技: 光の波が広がる
+        const r = e.r * (1 - a * a);
+        const g = ctx.createRadialGradient(e.x, e.y, r * 0.2, e.x, e.y, r);
+        g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.75, e.c + '55'); g.addColorStop(1, e.c + 'cc');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.fill();
+      }
+      else if (e.k === 'pillar') { // 神の必殺技: 天にのびる光の柱
+        const w = 70 * (0.4 + a), g = ctx.createLinearGradient(e.x - w, 0, e.x + w, 0);
+        g.addColorStop(0, e.c + '00'); g.addColorStop(0.5, '#ffffff'); g.addColorStop(1, e.c + '00');
+        ctx.fillStyle = g; ctx.fillRect(e.x - w, e.y - 900, w * 2, 940);
+      }
+      else if (e.k === 'tsunami') { // ポセイドンの大津波: 水の壁が町じゅうに広がる
+        const r = e.r * (1 - a);
+        for (let k = 0; k < 3; k++) {
+          ctx.strokeStyle = ['#1a6ab0', '#3ab0ff', '#e0ffff'][k]; ctx.lineWidth = 60 - k * 18;
+          ctx.beginPath(); ctx.arc(e.x, e.y, Math.max(1, r - k * 30), 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.fillStyle = '#3ab0ff33'; ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.fill();
       }
       else if (e.k === 'dragon') { // 竜の泉: 水の竜がうねりながら進む
         const L = 760 * Math.min(1, (1 - a) * 2.2);

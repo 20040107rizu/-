@@ -456,7 +456,7 @@ class Room {
       this.mainBoss = this.boss;
     }
     this.boss2 = null; this.shades = []; this.decoys = [];
-    this.curseCleared = 0; this.rewound = 0; this.twinFin = {}; this.revealT = 0;
+    this.curseCleared = 0; this.rewound = 0; this.twinFin = {}; this.revealT = 0; this.timeStopT = 0;
     this.luckTeam = [...this.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].passive === 'luckgod'); // ガネーシャ
     if ([...this.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].passive === 'chronos')) { this.timeLimit += 30; this.timeLeft += 30; } // クロノス: 制限時間 +30秒
     if (kind.gimmick) this.gimmickSetup(this.boss);
@@ -1410,9 +1410,10 @@ class Room {
     if (inp.item && !p.prevItem && p.item) this.useItem(p, aim);
     p.prevItem = inp.item;
 
-    // 拾う
+    // 拾う（ガネーシャは幸運の神: まわりの鬼玉を遠くから引きよせて拾う）
+    const reach = p.passive === 'luckgod' ? 900 : 32;
     for (const d of this.dama) {
-      if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < 32) {
+      if (!d.taken && Math.hypot(d.x - p.x, d.y - p.y) < reach) {
         d.taken = true;
         { const mul = (this.luckTeam ? 1.2 : 1) * (p.ch ? 1 + p.ch.orb : 1); p.orbFrac += d.v * mul; const n = Math.floor(p.orbFrac); p.orbFrac -= n; p.dama += n; } // ガネーシャ（幸運の神）・お守り（鬼玉）
         if (p.passive === 'orbHeal') this.healPlayer(p, 3 * Math.min(d.v, 8)); // クルピラ: 鬼玉で少し回復（1個3・どデカい鬼玉24まで）
@@ -1519,6 +1520,7 @@ class Room {
     this.time += DT;
     this.timeLeft -= DT;
     if (this.revealT > 0) this.revealT -= DT;
+    if (this.timeStopT > 0) this.timeStopT -= DT;
     if (DEMO_AI) for (const p of this.players.values()) this.demoInput(p);
     for (const p of this.players.values()) this.updatePlayer(p);
     this.updateRevive();
@@ -1539,7 +1541,7 @@ class Room {
     Combat.updateProjectiles(this);
     Combat.updateEffects(this);
     // 全員が脱出 or 倒れた、または時間切れで終了
-    const remaining = [...this.players.values()].filter(p => !p.escaped && !p.down);
+    const remaining = [...this.players.values()].filter(p => !p.escaped && (!p.down || p.autoRevT > 0)); // イザナミ・ジョカの石で起きる人がいれば、まだ終わらない
     if (this.timeLeft <= 0 || remaining.length === 0) this.finish();
   }
 
@@ -1585,7 +1587,7 @@ class Room {
     }
     // 追加の10柱（相手は鬼神のあとの8体）
     if (won && t === 'nue' && !this.anyDownAtKill) trials.push('tsukuyomi');
-    if (won && t === 'amanojaku' && p.mimicDodge >= 3) trials.push('loki');
+    if (won && t === 'amanojaku' && !p.downs) trials.push('loki'); // 天邪鬼の戦いで一度も倒れなかった
     if (won && t === 'kage' && p.ownShade > 0) trials.push('hades');
     if (won && t === 'yakubyo' && this.curseCleared >= 5) trials.push('seioubo');
     if (won && t === 'kyubi' && p.decoyHits <= 5) trials.push('horus'); // 偽者を5体までしか攻撃せずに
@@ -1638,7 +1640,7 @@ class Room {
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? this.bossSnap(b) : null,
       boss2: this.boss2 && this.boss2.hp > 0 ? this.bossSnap(this.boss2) : undefined,
-      reveal: this.revealT > 0 || undefined, falcon: this.hasPassive('falcon') || undefined,
+      reveal: this.revealT > 0 || undefined, tstop: this.timeStopT > 0 || undefined, falcon: this.hasPassive('falcon') || undefined,
       shades: this.shades.length ? this.shades.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), yokai: e.yokai, of: e.of, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 || undefined })) : undefined,
       decoys: this.decoys.length ? this.decoys.map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2) })) : undefined,
       ring: this.ring ? { x: Math.round(this.ring.x), y: Math.round(this.ring.y), r: Math.round(this.ring.r) } : null,

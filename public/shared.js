@@ -60,7 +60,7 @@
   // ---------- お守り（ランダムなスキルがつく装備。ふつうは1体に1つ、神は2つまで） ----------
   const CHARM_SKILLS = {
     drain: { name: '吸血',     per: 0.01,  max: 0.1,  text: v => `攻撃したダメージの${Math.round(v * 100)}%回復` },
-    regen: { name: '自然回復', per: 0.002, max: 0.02, text: v => `1秒ごとに最大体力の${(v * 100).toFixed(1)}%回復` },
+    regen: { name: '自然回復', per: 0.0006, max: 0.005, text: v => `1秒ごとに最大体力の${(v * 100).toFixed(1)}%回復` },
     guard: { name: '鉄壁',     per: 0.03,  max: 0.3,  text: v => `受けるダメージ -${Math.round(v * 100)}%` },
     hp:    { name: '体力',     per: 0.04,  max: 0.4,  text: v => `最大体力 +${Math.round(v * 100)}%` },
     atk:   { name: '攻撃',     per: 0.03,  max: 0.4,  text: v => `攻撃力 +${Math.round(v * 100)}%` },
@@ -69,7 +69,7 @@
     guts:  { name: '根性',     per: 1,     max: 1,    text: () => '倒れるダメージを1回だけ耐える', once: true },
     orb:   { name: '鬼玉',     per: 0.04,  max: 0.4,  text: v => `拾う鬼玉 +${Math.round(v * 100)}%` },
   };
-  const CHARM_WEIGHT = { drain: 10, regen: 10, guard: 12, hp: 12, atk: 12, haste: 10, ult: 8, guts: 4, orb: 8 };
+  const CHARM_WEIGHT = { drain: 10, regen: 6, guard: 12, hp: 12, atk: 12, haste: 10, ult: 8, guts: 4, orb: 8 };
   // レア度: 白・青・赤・金・虹（n: スキルの数、lv: スキルの強さの範囲）
   const CHARM_RARITY = [
     { name: '白', color: '#e8e8f0', n: 1, lv: [1, 2], exp: 50 },
