@@ -28,6 +28,22 @@
   // view: {l, r, t, b} 画面に見えている範囲
   function drawGround(ctx, map, view, stage, pattern) {
     const th = theme(stage);
+    const roadPat = pattern(`scene/${stage}/road`);
+    if (roadPat) { // 生成AIの地面のタイル
+      ctx.fillStyle = roadPat; ctx.fillRect(0, 0, map.w, map.h);
+      const walkPat = pattern(`scene/${stage}/walk`);
+      const i0 = Math.max(0, Math.floor((view.l - STREET) / PITCH)), i1 = Math.floor((view.r - STREET) / PITCH);
+      const j0 = Math.max(0, Math.floor((view.t - STREET) / PITCH)), j1 = Math.floor((view.b - STREET) / PITCH);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const x = STREET + i * PITCH, y = STREET + j * PITCH, m = 14;
+        if (x + BLOCK > map.w || y + BLOCK > map.h) continue;
+        rect(ctx, x - m, y - m, BLOCK + m * 2, BLOCK + m * 2, '#00000040'); // 縁石の影
+        ctx.fillStyle = walkPat || th.walk; ctx.fillRect(x - m + 3, y - m + 3, BLOCK + m * 2 - 6, BLOCK + m * 2 - 6);
+      }
+      if (stage !== 'oni') drawRoadMarks(ctx, map, view, stage, th);
+      ctx.strokeStyle = th.border; ctx.lineWidth = 10; ctx.strokeRect(0, 0, map.w, map.h);
+      return;
+    }
     if (stage === 'oni' || !THEME[stage]) {
       ctx.fillStyle = pattern('scene/ground') || th.road;
       ctx.fillRect(0, 0, map.w, map.h);
@@ -153,6 +169,17 @@
       return;
     }
     rect(ctx, b.x, b.y + 14, b.w, b.h, th.wall); // 壁（手前に見える面）
+    const roofPat = pattern(`scene/${stage}/roof${1 + (b.hue % 3)}`);
+    if (roofPat) { // 生成AIの屋根のタイル
+      const H = b.h - 6;
+      ctx.fillStyle = roofPat; ctx.fillRect(b.x, b.y, b.w, H);
+      ctx.fillStyle = '#ffffff1a'; ctx.fillRect(b.x, b.y, b.w, 5); // 上のふちの光
+      ctx.fillStyle = '#00000033'; ctx.fillRect(b.x, b.y + H - 6, b.w, 6); // 下のふちの影
+      ctx.strokeStyle = '#000000aa'; ctx.lineWidth = 3; ctx.strokeRect(b.x + 1.5, b.y + 1.5, b.w - 3, H - 3);
+      if (stage === 'china' && layer !== 'static') chinaLanterns(ctx, b, now);
+      else if (stage === 'usa' && layer !== 'static') usaBlink(ctx, b, hashRand(b.x * 7 + b.y * 13 + b.w), now);
+      return;
+    }
     switch (stage) {
       case 'japan': return japanRoof(ctx, b, R, now);
       case 'france': return franceRoof(ctx, b, R, now);
@@ -351,8 +378,14 @@
   }
 
   // ---------- 広場の名所 ----------
-  function drawPlaza(ctx, pl, stage, now) {
+  function drawPlaza(ctx, pl, stage, now, art) {
     const cx = pl.x + pl.w / 2, cy = pl.y + pl.h / 2, v = pl.v || 0;
+    const img = art && (art(`scene/${stage}/landmark${1 + (v % 2)}`) || art(`scene/${stage}/landmark1`));
+    if (img) { // 生成AIの名所の絵（広場の四角に合わせる）
+      const s = pl.w * 1.14;
+      ctx.drawImage(img, cx - s / 2, cy - s / 2 - pl.h * 0.04, s, s);
+      return;
+    }
     switch (stage) {
       case 'japan': return v % 2 ? shrine(ctx, cx, cy, now) : sakuraPark(ctx, pl, now);
       case 'france': return v % 2 ? eiffel(ctx, cx, cy, now) : fountain(ctx, cx, cy, now);

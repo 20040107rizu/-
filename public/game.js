@@ -2132,7 +2132,10 @@
       if (key in pats) return pats[key];
       const img = art(key);
       if (!img && MANIFEST[key]) incomplete = true; // 絵がまだ読み込み中なら、あとで描き直す
-      return (pats[key] = img ? g.createPattern(img, 'repeat') : null);
+      const p = img ? g.createPattern(img, 'repeat') : null;
+      // 屋根・地面のタイル画像は、ワールドの大きさに合わせて縮める（道・地面は256、屋根は200の大きさで1枚）
+      if (p && /^scene\/\w+\/(road|walk|roof)/.test(key) && p.setTransform) { const k = (/roof/.test(key) ? 200 : 256) / img.width; p.setTransform(new DOMMatrix([k, 0, 0, k, 0, 0])); }
+      return (pats[key] = p);
     };
     const m = 60; // 壁・灯りが区画の外にはみ出す分
     Stages.drawGround(g, map, { l: x0 - m, r: x0 + size + m, t: y0 - m, b: y0 + size + m }, stage, pat);
@@ -2172,7 +2175,7 @@
     drawTown(cam);
     for (const pl of map.plazas || []) {
       if (pl.x > v.r + 150 || pl.x + pl.w < v.l - 150 || pl.y > v.b + 300 || pl.y + pl.h < v.t - 150) continue;
-      Stages.drawPlaza(ctx, pl, stage, performance.now() / 1000);
+      Stages.drawPlaza(ctx, pl, stage, performance.now() / 1000, art);
     }
   }
   function drawBuildings(cam) {

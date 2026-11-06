@@ -24,7 +24,7 @@ const RULES = {
   fx: ['fx', 256, 'center'],
   oni_fx: ['oni_fx', 256, 'center'],
   icon: ['icon', 128, 'center'],
-  'scene/tile': ['scene', 256, 'tile'],
+  'scene/tile': ['scene', 512, 'tile'],
   'scene/landmark': ['scene', 512, 'center'],
   title: ['title', 0, 'keep'],
   gacha: ['gacha', 0, 'keep'],
@@ -81,14 +81,14 @@ async function place(buf, size, mode) {
     const src = fs.readFileSync(path.join(SRC, rel));
     let out;
     if (mode === 'feet' || mode === 'center') out = await place(src, size, mode);
-    else if (mode === 'tile') out = await sharp(src).resize(size, size, { kernel: 'lanczos3' }).png({ compressionLevel: 9, palette: true, quality: 92 }).toBuffer();
+    else if (mode === 'tile') out = await sharp(src).resize(size, size, { kernel: 'lanczos3' }).jpeg({ quality: 84 }).toBuffer(); // 屋根・地面は不透明なので JPEG（軽い）
     else if (mode === 'cover') out = await sharp(src).resize(size, Math.round(size / 2), { fit: 'cover' }).jpeg({ quality: 82 }).toBuffer();
     else { // keep: 大きいものだけ縮める
       const m = await sharp(src).metadata();
       const target = size || Math.min(m.width, 768);
       out = await sharp(src).resize({ width: Math.min(m.width, target), withoutEnlargement: true }).png({ compressionLevel: 9, palette: true, quality: 92 }).toBuffer();
     }
-    const ext = mode === 'cover' ? '.jpg' : '.png';
+    const ext = mode === 'cover' || mode === 'tile' ? '.jpg' : '.png';
     const dest = path.join(ART, key + ext);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     // 同じ名前の .png/.jpg がもう一方にあれば消す（manifest が2つにならないように）
