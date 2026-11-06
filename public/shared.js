@@ -330,6 +330,9 @@
               rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
     shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
   };
+  // 全部の鬼を少し強く（体力 +15%・攻撃 +12%）。上の表の数字はそのままにして、ここでまとめてかける
+  const ONI_BUFF = { hp: 1.15, dmg: 1.12 };
+  for (const k of Object.values(BOSSES)) { k.hp *= ONI_BUFF.hp; k.dmg *= ONI_BUFF.dmg; }
   // BOSS_ORDER はセーブ（倒したボスのビット）の並び。新しいボスは必ず末尾に足す。ボス選びの並びは BOSS_LIST
   const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku'];
   const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki'];

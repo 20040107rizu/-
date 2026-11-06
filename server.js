@@ -491,7 +491,7 @@ class Room {
   spawnPatrol(awayFrom) {
     const p = this.farFromAll(this.gridS, awayFrom, 700);
     this.patrols.push({
-      id: genId(), x: p.x, y: p.y, face: rand(0, Math.PI * 2), hp: 100, maxHp: 100,
+      id: genId(), x: p.x, y: p.y, face: rand(0, Math.PI * 2), hp: 120, maxHp: 120, // 見回り鬼の体力（少し強く: 100→120）
       state: 'patrol', target: null, lostT: 0, wanderTo: null, path: null, whistleT: 0, hitFlash: 0,
     });
   }
