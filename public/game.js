@@ -816,7 +816,11 @@
     const s = e.size * sc; ctx.drawImage(img, -s / 2, -s / 2, s, s);
     ctx.restore();
   }
-  function preloadFx() { for (const k of Object.keys(MANIFEST)) if (/^(fx|oni_fx|ult)\//.test(k)) art(k); }
+  // エフェクトの絵を先に読んでおく（必殺ポーズは、このバトルにいるキャラのぶんだけ）
+  function preloadFx(ids = []) {
+    for (const k of Object.keys(MANIFEST)) if (/^(fx|oni_fx)\//.test(k)) art(k);
+    for (const id of ids) if (MANIFEST['ult/' + id]) art('ult/' + id);
+  }
   // キャラの動き（ふみこみ・歩くはずみ・必殺ポーズ）: id -> 状態
   const motion = new Map();
   function motionOf(id) { let m = motion.get(id); if (!m) motion.set(id, m = { px: null, py: null, walk: 0, mv: 0, atk: 0, st: 0, lunge: 0, la: 0, sq: 0, hurt: 0, pose: 0, poseMax: 1 }); return m; }
@@ -1185,7 +1189,7 @@
         timeLimit = m.timeLimit;
         dama = new Map(m.dama.map(d => [d.id, d]));
         snap = null; myPred = null; result = null;
-        ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear(); motion.clear(); preloadFx();
+        ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear(); motion.clear(); preloadFx((lobby && lobby.players || []).map(p => p.yokai));
         bossType = m.boss;
         stage = S.STAGES[m.stage] ? m.stage : 'oni';
         spectateId = null;
