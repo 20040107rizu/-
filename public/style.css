@@ -587,3 +587,38 @@ html.rot .gacha-next { right: max(16px, env(safe-area-inset-bottom)); bottom: 14
 #yokaiInfo .pv { max-height: 100%; overflow-y: auto; align-self: stretch; display: flex; flex-direction: column; justify-content: safe center; }
 .lb-charms { font-size: 10px; line-height: 1.35; }
 .lb-charms .charm-tag { font-size: 11px; }
+
+/* ---- 生成AIのボタン・背景（絵が読みこめたら html に art-ui がつく） ---- */
+html.art-ui button.big, html.art-ui button.mid, html.art-ui button.small { background: transparent; box-shadow: none; border-style: solid; border-color: transparent; border-radius: 0; text-shadow: 0 2px 0 #0009, 0 0 6px #0008; }
+html.art-ui button.big { border-width: 0 26px; border-image: var(--art-ui-btn_orange) 0 100 fill / 0 26px stretch; padding: 14px 10px 16px; }
+html.art-ui button.big.alt { border-image-source: var(--art-ui-btn_blue); }
+html.art-ui button.big:active, html.art-ui button.mid:active { transform: translateY(2px) scale(.98); box-shadow: none; }
+html.art-ui .seal-btn { border-image-source: var(--art-ui-btn_purple) !important; background: transparent !important; }
+html.art-ui .pick-btn { border-image-source: var(--art-ui-btn_pink) !important; background: transparent !important; }
+html.art-ui .charm-btn { border-image-source: var(--art-ui-btn_gold) !important; background: transparent !important; }
+html.art-ui button.mid { border-width: 0 20px; border-image: var(--art-ui-btn_purple) 0 100 fill / 0 20px stretch; padding: 10px 6px 12px; }
+html.art-ui button.rank-btn { border-image-source: var(--art-ui-btn_blue); }
+html.art-ui button.ticket-btn { border-image-source: var(--art-ui-btn_gold); }
+html.art-ui button.small { border-width: 0 12px; border-image: var(--art-ui-btn_small) 0 64 fill / 0 12px stretch; padding: 6px 4px 7px; }
+img.ico { width: 1.4em; height: 1.4em; vertical-align: -0.35em; margin-right: 4px; object-fit: contain; }
+html.art-ui #lobby { background: linear-gradient(#0b0514a8, #0b0514d8), var(--art-bg-lobby) center/cover no-repeat; }
+html.art-ui #zukan { background: linear-gradient(#0b0514b0, #0b0514e0), var(--art-bg-zukan) center/cover no-repeat; }
+html.art-ui #result { background: linear-gradient(#0b051490, #0b0514d0), var(--art-bg-result_win) center/cover no-repeat; }
+html.art-ui #result.lose { background: linear-gradient(#0b051490, #0b0514d0), var(--art-bg-result_lose) center/cover no-repeat; }
+html.art-ui #choiceScreen, html.art-ui #rewardScreen { background: linear-gradient(#0b0514b8, #0b0514e0), var(--art-gacha-bg) center/cover no-repeat; }
+.charm-big img { width: 120px; height: 120px; object-fit: contain; }
+.logo-img { display: block; width: 100%; max-height: calc(40 * var(--vh, 1vh)); object-fit: contain; animation: logoPop .9s cubic-bezier(.2, 1.6, .4, 1) both, logoFloat 4s 1s ease-in-out infinite; filter: drop-shadow(0 6px 14px #000a); }
+@keyframes logoPop { from { transform: scale(.4) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes logoFloat { 50% { transform: translateY(-6px); } }
+#title > .oni-peek { position: absolute; left: -2%; bottom: -3%; width: min(30vw, calc(42 * var(--vh, 1vh))); z-index: 0; pointer-events: none; animation: oniPeek 6s ease-in-out infinite; transform-origin: 20% 100%; }
+@keyframes oniPeek { 0%, 100% { transform: translate(-12%, 6%) rotate(-4deg); } 45%, 60% { transform: translate(0, 0) rotate(3deg); } }
+/* ガチャ（生成AIの絵） */
+.gs-mimg { position: absolute; inset: -18% -30% -6%; width: 160%; height: 124%; object-fit: contain; filter: drop-shadow(0 8px 18px #000a); }
+.gs-turning .gs-machine { animation: gsJiggle .25s infinite; }
+html.art-ui .gs-bg { background: linear-gradient(#0b051460, #0b0514b0), var(--art-gacha-bg) center/cover no-repeat; }
+html.art-ui .gs-ball.burn .gs-ballcore, html.art-ui .gs-ball.glow .gs-ballcore { background: var(--ballimg, radial-gradient(circle at 35% 30%, #fff 0 10%, var(--ball) 45%)) center/contain no-repeat; border: none; box-shadow: none; filter: drop-shadow(0 0 22px var(--ball)) drop-shadow(0 0 40px var(--ball)); }
+html.art-ui .gs-ofuda { background: var(--art-gacha-ofuda) center/100% 100% no-repeat; border: none; box-shadow: 0 2px 8px #0008; }
+html.art-ui .gs-ofuda span { opacity: 0; }
+html.art-ui .gs-charabox::before { background: var(--art-gacha-burst) center/contain no-repeat; inset: -45%; border-radius: 0; opacity: .85; animation: gsSpin 12s linear infinite; }
+html.art-ui .gs-t3 .gs-charabox::before, html.art-ui .gs-t4 .gs-charabox::before { background-image: var(--art-gacha-burst_rainbow); }
+@keyframes gsSpin { to { transform: rotate(360deg); } }

@@ -124,6 +124,8 @@
       </div>`;
     const $ = s => root.querySelector(s);
     const g = $('.gs'), hint = $('.gs-hint');
+    const au = window.artUrl || (() => null);
+    if (au('gacha/machine')) $('.gs-machine').innerHTML = `<img class="gs-mimg" src="${au('gacha/machine')}" alt="">`; // 生成AIのガチャの機械
     const tap = text => new Promise(res => {
       hint.textContent = text; hint.hidden = false;
       const h = e => { e.preventDefault(); g.removeEventListener('pointerdown', h); hint.hidden = true; res(); };
@@ -174,6 +176,7 @@
     // 4) 玉が出てくる（お札でくるまれていて色はまだわからない）
     const ball = $('.gs-ball');
     ball.style.setProperty('--ball', o.ball.color);
+    if (au('gacha/ball_' + o.ball.key)) ball.style.setProperty('--ballimg', `url("${au('gacha/ball_' + o.ball.key)}")`);
     ball.hidden = false;
     $('.gs-machine').classList.add('back');
     ball.classList.add('drop');

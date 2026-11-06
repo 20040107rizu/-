@@ -157,11 +157,27 @@
   const bg = buildBackground();
   title.prepend(bg);
   // 生成AIの背景画像があれば差し替える
+  const logo = document.getElementById('logo');
+  const svgLogo = buildLogo();
+  logo.appendChild(svgLogo);
   fetch('art/manifest.json').then(r => (r.ok ? r.json() : {})).then(m => {
-    if (!m['scene/title-bg']) return;
-    const img = new Image();
-    img.onload = () => { title.style.background = `#0b0514 url(art/${m['scene/title-bg']}) center/cover no-repeat`; bg.style.display = 'none'; };
-    img.src = 'art/' + m['scene/title-bg'];
+    const bgKey = m['title/bg'] || m['scene/title-bg'];
+    if (bgKey) {
+      const img = new Image();
+      img.onload = () => { title.style.background = `#0b0514 url(art/${bgKey}) center/cover no-repeat`; bg.style.display = 'none'; };
+      img.src = 'art/' + bgKey;
+    }
+    if (m['title/logo']) { // 生成AIのロゴ
+      const img = new Image();
+      img.className = 'logo-img'; img.alt = '鬼バスターズ';
+      img.onload = () => { svgLogo.style.display = 'none'; logo.appendChild(img); };
+      img.src = 'art/' + m['title/logo'];
+    }
+    if (m['title/oni_peek']) { // 画面のはしからのぞく赤鬼
+      const img = new Image();
+      img.className = 'oni-peek'; img.alt = '';
+      img.src = 'art/' + m['title/oni_peek'];
+      title.appendChild(img);
+    }
   }).catch(() => {});
-  document.getElementById('logo').appendChild(buildLogo());
 })();

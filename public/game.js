@@ -910,9 +910,27 @@
   let MANIFEST = {};
   fetch('art/manifest.json').then(r => (r.ok ? r.json() : {})).then(m => {
     MANIFEST = m;
+    applyUiArt();
     if (lobby && $('lobby').classList.contains('active')) renderLobby();
   }).catch(() => {});
   const artUrl = key => (MANIFEST[key] ? 'art/' + MANIFEST[key] : null);
+  window.artUrl = artUrl; // ガチャの演出（gacha.js）からも使う
+  // 生成AIのボタン・背景・アイコンの絵を CSS で使えるようにする（--art-ui-btn_orange など）。絵がそろったら html に art-ui をつける
+  function applyUiArt() {
+    const root = document.documentElement;
+    let n = 0;
+    for (const k of Object.keys(MANIFEST)) if (/^(ui|bg|gacha|icon|title)\//.test(k)) { root.style.setProperty('--art-' + k.replace(/\//g, '-'), `url("art/${MANIFEST[k]}")`); n++; }
+    if (!MANIFEST['ui/btn_orange']) return;
+    root.classList.add('art-ui');
+    // メニューのボタンの絵文字をアイコンの絵に
+    for (const [id, key] of [['btnBuddies', 'icon/friends'], ['btnZukan', 'icon/zukan'], ['btnSave', 'icon/save'], ['btnHistory', 'icon/history']]) {
+      const b = $(id), u = artUrl(key);
+      if (!b || !u || b.querySelector('img.ico')) continue;
+      const t = b.firstChild;
+      if (t && t.nodeType === 3) t.textContent = t.textContent.replace(/^\S+\s*/, '');
+      b.insertAdjacentHTML('afterbegin', `<img class="ico" src="${u}" alt="">`);
+    }
+  }
   // 読み込み済みならその絵、まだなら読み込みを始めて null（その間は図形で描く）
   function art(key) {
     if (ART[key]) return ART[key];
@@ -1552,7 +1570,7 @@
     $('rewardWeek').textContent = '🧿 お守りガチャ';
     $('rewardTitle').innerHTML = `<span style="color:${charmColor(c)}">${S.charmName(c)}</span>が出た！`;
     $('rewardSub').textContent = line;
-    $('rewardPrizes').innerHTML = `<div class="charm-big r${c.r}" style="--cc:${charmColor(c)}">🧿</div><div class="charm-lines">${c.s.map(([k, lv]) => `<div><b>${S.CHARM_SKILLS[k].name}${S.CHARM_SKILLS[k].once ? '' : '+' + lv}</b>　${S.CHARM_SKILLS[k].text(S.CHARM_SKILLS[k].per * lv)}</div>`).join('')}</div>`;
+    $('rewardPrizes').innerHTML = `<div class="charm-big r${c.r}" style="--cc:${charmColor(c)}">${artUrl('icon/charm_' + (c.r + 1)) ? `<img src="${artUrl('icon/charm_' + (c.r + 1))}" alt="">` : '🧿'}</div><div class="charm-lines">${c.s.map(([k, lv]) => `<div><b>${S.CHARM_SKILLS[k].name}${S.CHARM_SKILLS[k].once ? '' : '+' + lv}</b>　${S.CHARM_SKILLS[k].text(S.CHARM_SKILLS[k].per * lv)}</div>`).join('')}</div>`;
     if (inBattle && result) { result.myChoice = 'charm'; result.expNote = `🧿 お守りガチャ：${S.charmName(c)}（${S.charmText(c)}）`; }
     $('btnRewardOk').onclick = () => { if (inBattle && result) { renderResult(); show('result', true); menuMusic(); } else show('title'); };
     show('rewardScreen', inBattle);
@@ -1672,6 +1690,7 @@
 
   function renderResult() {
     const anyEsc = result.players.some(p => p.escaped);
+    $('result').classList.toggle('lose', !anyEsc); // 背景: 脱出成功は朝日、失敗は暗い夜
     $('resTitle').textContent = anyEsc ? '鬼の世界から脱出！' : '全員脱出できなかった…';
     $('resTitle').textContent += `（みんなの鬼玉 ${result.team ?? 0}個）`;
     const notes = [];
@@ -2868,19 +2887,19 @@
       const bs = buttons();
       const st = S.ROLES[S.YOKAI_BY_ID[me.yokai].role];
       const atFusuma = myPred && Math.hypot(myPred.x - fusuma.x, myPred.y - fusuma.y) < 80;
-      drawButton(bs.atk, btnHold.atk !== null || input.atk, atFusuma ? 1 - me.ep : me.atkCd, atFusuma ? '#c8a020' : '#e2531f', atFusuma ? '脱出' : '攻撃', atFusuma ? '長押し' : null);
+      drawButton(bs.atk, btnHold.atk !== null || input.atk, atFusuma ? 1 - me.ep : me.atkCd, atFusuma ? '#c8a020' : '#e2531f', atFusuma ? '脱出' : '攻撃', atFusuma ? '長押し' : null, false, atFusuma ? 'icon/fusuma' : 'icon/attack');
       const at = Attacks.of(me.yokai), sk = Attacks.SKILL[S.YOKAI_BY_ID[me.yokai].role];
-      drawButton(bs.strong, input.strong, me.stCd, '#7a3fbf', '強攻撃', at.strongName.replace(/^.+?の/, ''));
-      drawButton(bs.skill, input.skill, me.skCd, { fighter: '#2a8a8a', healer: '#c8a020', tank: '#4a6ad8', ranger: '#a8402a' }[S.YOKAI_BY_ID[me.yokai].role], sk.label);
+      drawButton(bs.strong, input.strong, me.stCd, '#7a3fbf', '強攻撃', at.strongName.replace(/^.+?の/, ''), false, 'icon/strong');
+      drawButton(bs.skill, input.skill, me.skCd, { fighter: '#2a8a8a', healer: '#c8a020', tank: '#4a6ad8', ranger: '#a8402a' }[S.YOKAI_BY_ID[me.yokai].role], sk.label, null, false, 'icon/dodge');
       const it = me.item ? S.ITEMS[me.item] : null;
       const itImg = me.item ? art('item/' + me.item) : null;
       drawButton(bs.item, input.item, 0, it ? '#2f8a5a' : '#333', it ? (itImg ? '' : it.icon) : 'なし', it ? null : null, !!it);
       if (itImg) ctx.drawImage(itImg, bs.item.x - bs.item.r * 0.6, bs.item.y - bs.item.r * 0.6, bs.item.r * 1.2, bs.item.r * 1.2);
       ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fffc'; ctx.fillText(it ? it.name : 'アイテム', bs.item.x, bs.item.y + bs.item.r + 12);
-      drawButton(bs.dash, input.dash, 0, me.exh ? '#552222' : '#2f62d9', 'ダッシュ', me.inf ? '∞' : null);
+      drawButton(bs.dash, input.dash, 0, me.exh ? '#552222' : '#2f62d9', 'ダッシュ', me.inf ? '∞' : null, false, 'icon/dash');
       if (me.ult >= 0) { // レジェンドの必殺技（ゲージは虹色）
         const ub = bs.ult, full = me.ult >= 100;
-        drawButton(ub, input.ult, 0, full ? `hsl(${(now * 200) % 360},70%,45%)` : '#3a2a4a', '必殺', at.ultName, full);
+        drawButton(ub, input.ult, 0, full ? `hsl(${(now * 200) % 360},70%,45%)` : '#3a2a4a', '必殺', at.ultName, full, 'icon/ult');
         ctx.lineWidth = 6; ctx.strokeStyle = full ? '#fff' : `hsl(${(now * 120) % 360},90%,62%)`;
         ctx.beginPath(); ctx.arc(ub.x, ub.y, ub.r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * me.ult / 100); ctx.stroke();
       }
@@ -3023,7 +3042,7 @@
     ctx.restore();
   }
 
-  function drawButton(b, pressed, cd, color, label, sub, glow) {
+  function drawButton(b, pressed, cd, color, label, sub, glow, icon) {
     ctx.save();
     ctx.globalAlpha = 0.85;
     if (glow) { ctx.shadowColor = '#7dff9a'; ctx.shadowBlur = 16; }
@@ -3031,6 +3050,9 @@
     ctx.beginPath(); ctx.arc(b.x, b.y + (pressed ? 2 : 0), b.r * (pressed ? 0.93 : 1), 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+    const ic = icon && art(icon);
+    if (ic) { ctx.save(); ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.95, 0, Math.PI * 2); ctx.clip(); const s = b.r * 1.35; ctx.drawImage(ic, b.x - s / 2, b.y - s / 2 + (pressed ? 2 : 0), s, s); ctx.restore(); } // 後ろにうすくアイコンの絵
+    ctx.shadowColor = '#000'; ctx.shadowBlur = ic ? 6 : 0;
     if (cd > 0) {
       ctx.fillStyle = '#000a';
       ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.arc(b.x, b.y, b.r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cd); ctx.closePath(); ctx.fill();

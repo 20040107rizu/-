@@ -32,7 +32,7 @@ const RULES = {
   bg: ['bg', 1280, 'cover'],
 };
 const SKIP = new Set(['icon/orb.png']); // 鬼玉の絵は今のまま（プログラムで描く）
-const SIZE_OF = { 'oni/patrol': 256, 'title/logo': 800, 'title/bg': 1600, 'title/oni_peek': 512, 'gacha/bg': 1280, 'gacha/machine': 640 };
+const SIZE_OF = { 'oni/patrol': 256, 'title/logo': 800, 'title/bg': 1600, 'title/oni_peek': 512, 'gacha/bg': 1280, 'gacha/machine': 640, 'gacha/ofuda': 256 };
 
 async function trim(buf) {
   // 透明な所を切りとる（ほとんど透明なふちも切る）
@@ -73,6 +73,7 @@ async function place(buf, size, mode) {
     const parts = rel.split('/');
     let ruleKey = parts[0], outRel = rel;
     if (parts[0] === 'scene') { ruleKey = /landmark/.test(parts[2]) ? 'scene/landmark' : 'scene/tile'; }
+    if (rel === 'title/bg.png' || rel === 'gacha/bg.png') ruleKey = 'bg'; // 横長の背景は JPEG
     const rule = RULES[ruleKey];
     if (!rule) { console.log('? しらないフォルダ', rel); continue; }
     const [, defSize, mode] = rule;
@@ -85,7 +86,7 @@ async function place(buf, size, mode) {
     else if (mode === 'cover') out = await sharp(src).resize(size, Math.round(size / 2), { fit: 'cover' }).jpeg({ quality: 82 }).toBuffer();
     else { // keep: 大きいものだけ縮める
       const m = await sharp(src).metadata();
-      const target = size || Math.min(m.width, 768);
+      const target = size || Math.min(m.width, rel.startsWith('gacha/') ? 512 : 768);
       out = await sharp(src).resize({ width: Math.min(m.width, target), withoutEnlargement: true }).png({ compressionLevel: 9, palette: true, quality: 92 }).toBuffer();
     }
     const ext = mode === 'cover' || mode === 'tile' ? '.jpg' : '.png';
