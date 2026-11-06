@@ -106,7 +106,9 @@
     saveCharms();
   }
   const charmColor = c => (S.CHARM_RARITY[c.r].color === 'rainbow' ? '#ff9ae8' : S.CHARM_RARITY[c.r].color);
-  const charmTag = c => `<span class="charm-tag r${c.r}" style="--cc:${charmColor(c)}">🧿 ${S.charmName(c)}</span> <span class="charm-sk">${esc(S.charmText(c))}</span>`;
+  // お守りの絵（白・青・赤・金・虹のお守り袋）。絵がなければ 🧿
+  const charmIco = (r, cls = 'cico') => { const u = artUrl('icon/charm_' + (r + 1)); return u ? `<img class="${cls}" src="${u}" alt="">` : '🧿'; };
+  const charmTag = c => `<span class="charm-tag r${c.r}" style="--cc:${charmColor(c)}">${charmIco(c.r)} ${S.charmName(c)}</span> <span class="charm-sk">${esc(S.charmText(c))}</span>`;
   const lvOfId = id => S.lvOf(levels[id] || 0);
   const myLv = () => lvOfId(selYokai);
   function saveAll() {
@@ -420,7 +422,7 @@
       <div class="tbar"><i style="width:${pct}%"></i></div>
       <small>${max ? 'これ以上は上がりません' : `次のレベルまで ${need.toLocaleString('ja-JP')}`}</small>
       <div class="lv-btns"><button class="small" data-lv="1"${can ? '' : ' disabled'}>＋1Lv</button><button class="small" data-lv="10"${can ? '' : ' disabled'}>＋10Lv</button><button class="small alt wide" data-lv="all"${can ? '' : ' disabled'}>📈 ストックを全部</button></div>
-      <div class="charm-slots">${Array.from({ length: charmSlots(id) }, (_, i) => { const c = equippedOf(id)[i]; return `<button class="small charm-slot${c ? ' on' : ''}" data-slot="${i}" style="${c ? `--cc:${charmColor(c)}` : ''}">${c ? `🧿 ${esc(S.charmText(c))}` : '🧿 ＋お守り'}</button>`; }).join('')}</div></div>`;
+      <div class="charm-slots">${Array.from({ length: charmSlots(id) }, (_, i) => { const c = equippedOf(id)[i]; return `<button class="charm-slot${c ? ' on' : ''}" data-slot="${i}" style="${c ? `--cc:${charmColor(c)}` : ''}">${c ? `${charmIco(c.r)}<span>${esc(S.charmText(c))}</span>` : `${charmIco(0, 'cico empty')}<span>＋ お守りをつける</span>`}</button>`; }).join('')}</div></div>`;
   }
   // ---- お守りをえらぶ画面（図鑑から開く） ----
   function openCharmPick(id, slot, rerender) {
@@ -430,10 +432,10 @@
     const owner = cid => Object.entries(equips).find(([k, l]) => l.includes(cid))?.[0];
     const list = charms.slice().sort((a, b) => b.r - a.r || (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || b.id - a.id);
     box.hidden = false;
-    box.innerHTML = `<div class="cp-in"><div class="cp-head"><b>🧿 ${esc(y.name)}のお守り（${slot + 1}つ目）</b><small>持っているお守り ${charms.length}/${S.CHARM_MAX}</small>
+    box.innerHTML = `<div class="cp-in"><div class="cp-head"><b>${charmIco(3)} ${esc(y.name)}のお守り（${slot + 1}つ目）</b><small>持っているお守り ${charms.length}/${S.CHARM_MAX}</small>
       ${cur ? '<button class="small" data-act="off">はずす</button>' : ''}<button class="small alt" data-act="close">とじる</button></div>
       <div class="cp-list">${list.length ? list.map(c => { const o = owner(c.id), eff = S.charmEffects([c]);
-        return `<div class="cp-row${cur && cur.id === c.id ? ' on' : ''}"><div class="cp-main">${charmTag(c)}<small>${Object.entries(eff).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}${o ? `　（${esc(S.YOKAI_BY_ID[o].name)}がつけている）` : ''}</small></div>
+        return `<div class="cp-row${cur && cur.id === c.id ? ' on' : ''}" style="--cc:${charmColor(c)}">${charmIco(c.r, 'cp-ico')}<div class="cp-main">${charmTag(c)}<small>${Object.entries(eff).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}${o ? `　（${esc(S.YOKAI_BY_ID[o].name)}がつけている）` : ''}</small></div>
           <button class="small" data-act="eq" data-id="${c.id}">つける</button><button class="small fav${c.fav ? ' on' : ''}" data-act="fav" data-id="${c.id}">${c.fav ? '★' : '☆'}</button><button class="small del" data-act="del" data-id="${c.id}"${c.fav ? ' disabled' : ''}>📈+${S.CHARM_RARITY[c.r].exp}</button></div>`; }).join('')
         : '<p class="sub">まだお守りがありません。ボスを倒すとたまに落とします。バトルのあとの「🧿 お守りガチャ」でも手に入ります</p>'}</div></div>`;
     for (const b of box.querySelectorAll('button')) b.onclick = () => {

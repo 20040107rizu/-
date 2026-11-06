@@ -624,3 +624,22 @@ html.art-ui .gs-ofuda span { opacity: 0; }
 html.art-ui .gs-charabox::before { background: var(--art-gacha-burst) center/contain no-repeat; inset: -45%; border-radius: 0; opacity: .85; animation: gsSpin 12s linear infinite; }
 html.art-ui .gs-t3 .gs-charabox::before, html.art-ui .gs-t4 .gs-charabox::before { background-image: var(--art-gacha-burst_rainbow); }
 @keyframes gsSpin { to { transform: rotate(360deg); } }
+/* お守り（生成AIの絵のお守り袋） */
+.cico { width: 1.35em; height: 1.35em; object-fit: contain; vertical-align: -0.35em; }
+.cico.empty { filter: grayscale(1) brightness(.7); opacity: .7; }
+.cp-ico { width: 44px; height: 44px; object-fit: contain; flex: none; filter: drop-shadow(0 0 6px var(--cc)); }
+.charm-slot { display: flex; align-items: center; gap: 5px; justify-content: center; min-height: 34px; font-size: 12px !important; padding: 5px 8px !important; border-radius: 10px; color: #fff; }
+.charm-slot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.charm-slot .cico { width: 24px; height: 24px; flex: none; }
+.charm-slot.on { box-shadow: 0 0 10px var(--cc) inset; }
+html.art-ui .charm-pick .cp-in { background: linear-gradient(#3a2456, #1a1030); border: 3px solid #e8b84a; box-shadow: 0 0 30px #c85aff66; }
+html.art-ui .cp-row { background: #ffffff12; border: 1px solid #ffffff22; }
+html.art-ui .cp-row.on { outline: 2px solid #ffd84a; }
+/* 細かいボタン（レベル上げ・お守りの「つける」など）は、絵のボタンにしないで押しやすい形のままにする */
+html.art-ui .lv-btns button.small, html.art-ui .cp-row button.small, html.art-ui .cp-head button.small {
+  border-image: none; border: 2px solid #ffffff55; border-radius: 10px; background: linear-gradient(#7a4ab8, #4a2a7a); box-shadow: 0 3px 0 #2a1040; padding: 6px 10px; }
+html.art-ui .cp-row button.small[data-act="eq"] { background: linear-gradient(#ffb03a, #e2601f); box-shadow: 0 3px 0 #7a2a0a; }
+html.art-ui .lv-btns button.go { background: linear-gradient(#5fd38a, #2f9a58); box-shadow: 0 3px 0 #145a30; }
+html.art-ui .cp-row .del { background: linear-gradient(#5a3a6a, #3a2448) !important; }
+html.art-ui .cp-row .fav.on { color: #ffd23a; }
+.cp-row .charm-tag .cico { display: none; } /* 左に大きいお守りの絵があるので、名前の横の小さい絵は出さない */
