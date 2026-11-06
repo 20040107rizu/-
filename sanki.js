@@ -10,7 +10,7 @@ const SEAL = { gold: '金', white: '氷', fuurai: '雷', kishin: '神', yakubyo:
 // 三鬼奥義で、それぞれの鬼が足す効果
 const SIG = { gold: ['knock'], white: ['slow'], fuurai: ['shock'], kishin: [], yakubyo: ['curse'], kage: ['drain'], nue: ['dark'], kyubi: ['charm'], toki: ['slow'], gasha: ['knock'], amanojaku: ['rev'], gokuou: [], hyakki: ['curse'] };
 const SIG_HZ = { kishin: 'fire', gokuou: 'fire', yakubyo: 'poison', white: 'ice' };
-const HP_MUL = 1.5, DMG_MUL = 1.5; // 強さ: ふつうのボスの1.5倍
+const HP_MUL = 2.4, DMG_MUL = 2.0; // 強さ: ふつうのボスの体力2.4倍・攻撃2倍（神2体で倒せてしまったので強くした）
 
 // [名前, ならび方, 効果, 残るもの, 予告の見た目]
 // ならび方: cage=人を囲む檻（出口1か所） chase=鬼から人へ続く列 rain=まわりに降る spokes=鬼から放射状の光線 ring=鬼のまわりの輪

@@ -446,8 +446,13 @@ class Room {
     this.mainDown = false;
     this.drop = null;           // これから空から降ってくるボス（乱入・ボスラッシュの次・百鬼王・鬼神・真）
     this.bonusBoss = null; this.shinBoss = null;
-    this.oni3 = null; this.hazards = []; this.sankiAll = false; this.comboT = 10; this.triT = 25;
-    if (kind.sanki) {
+    this.oni3 = null; this.hazards = []; this.sankiAll = false; this.comboT = 10; this.triT = 25; this.tower = null;
+    if (kind.tower) {
+      // 鬼の塔: 1階から。ボスはスタート地点の近くに出る
+      this.tower = { f: 0, rest: 0, cleared: 0, mods: [], baseUlt: this.ultGainTeam || 1 };
+      this.mainBoss = null;
+      this.towerFloor(1, spawns[0]);
+    } else if (kind.sanki) {
       // 三鬼合戦: ちがう種類のボス鬼3体を、はなれた場所に出す（強さ1.5倍）
       const types = process.env.TEST_SANKI ? process.env.TEST_SANKI.split(',') : Sanki.pickTypes();
       const pts = [bp];
@@ -470,14 +475,14 @@ class Room {
     this.curseCleared = 0; this.rewound = 0; this.twinFin = {}; this.revealT = 0; this.timeStopT = 0;
     this.luckTeam = [...this.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].passive === 'luckgod'); // ガネーシャ
     if ([...this.players.values()].some(p => S.YOKAI_BY_ID[p.yokai].passive === 'chronos')) { this.timeLimit += 30; this.timeLeft += 30; } // クロノス: 制限時間 +30秒
-    if (kind.gimmick && !this.oni3) this.gimmickSetup(this.boss);
+    if (kind.gimmick && !this.oni3 && !this.tower) this.gimmickSetup(this.boss);
     this.firstBoss = this.boss;
     this.ring = null; // 鬼神の最後の形態: だんだんせまくなる安全な輪
     if (DEMO_AI) this.demoPlace(spawns[0]);
-    if (this.boss2) { this.boss2.x = this.boss.x + 170; this.boss2.y = this.boss.y; S.collide(this.map, this.boss2, BOSS_R); } // 双子鬼は2体ならんで出る
+    if (this.boss2 && !this.tower) { this.boss2.x = this.boss.x + 170; this.boss2.y = this.boss.y; S.collide(this.map, this.boss2, BOSS_R); } // 双子鬼は2体ならんで出る
 
     this.broadcast({
-      t: 'start', seed, stage: this.stage, timeLimit: this.timeLimit, challenge: !!this.challenge, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN, sanki: this.oni3 ? this.oni3.map(b => b.type) : undefined,
+      t: 'start', seed, stage: this.stage, timeLimit: this.timeLimit, challenge: !!this.challenge, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN, sanki: this.oni3 ? this.oni3.map(b => b.type) : undefined, tower: this.tower ? { f: 1, boss: this.boss.type, mods: this.tower.mods } : undefined,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v, b: d.b })),
     });
   }
@@ -591,6 +596,7 @@ class Room {
 
   healPlayer(p, amount) {
     if (p.down || p.escaped) return;
+    if (this.tower && this.tower.mods.includes('heal')) amount *= 0.5; // 塔のしばり: 回復半分
     if (p.curseT > 0) { p.curseT = 0; this.curseCleared = (this.curseCleared || 0) + 1; this.events.push({ k: 'curseOff', id: p.id }); } // 疫病鬼の呪いは回復で消える
     if (amount > 0 && this.activePlayers().some(q => q.passive === 'immortal' && dist(p, q) < 300)) p.atkUpT = Math.max(p.atkUpT || 0, 5); // 西王母: 桃の香り
     const before = p.hp;
@@ -787,6 +793,7 @@ class Room {
 
   killBoss(b = this.boss) {
     if (this.oni3) return this.killSanki(b);
+    if (this.tower) return this.towerKill(b);
     this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y) });
     if (b.type === 'shin') this.shinClean = !this.anyDown; // 神の試練: だれも倒れずに鬼神・真を倒したか
     if (b === this.mainBoss) {
@@ -825,9 +832,10 @@ class Room {
     if (b.type === 'yakubyo') for (const p of this.players.values()) p.curseT = 0;
     if (this.godLike(b)) this.ring = null;
     if (b.type === 'shin') this.shinClean = !this.anyDown;
-    if (b.type === 'kishin' && Math.random() < SHIN_RATE) this.drop = { type: 'shin', kind: 'shin', wait: 4, t: 3.6, sanki: true }; // 鬼神は覚醒することがある
+    if (b.type === 'kishin' && !this.tower && Math.random() < SHIN_RATE) this.drop = { type: 'shin', kind: 'shin', wait: 4, t: 3.6, sanki: true }; // 鬼神は覚醒することがある
     const alive = this.oni3.filter(o => o.hp > 0);
     if (b === this.boss && alive.length) this.boss = alive[0];
+    if (this.tower) { if (!alive.length) this.towerClear(); return; } // 鬼の塔の40階: 3体倒したらクリア
     if (!alive.length && !this.drop) {
       this.mainDown = true; this.sankiAll = true;
       this.bossKillT = this.time;
@@ -1344,7 +1352,7 @@ class Room {
       if (b && b.stunT > 0) continue; // しびれている間は止まる
       if (tg.follow && b) { tg.x = b.x; tg.y = b.y; }
       if (tg.track && tg.t > 0.6) { const tp = this.players.get(tg.track); if (tp && !tp.down && !tp.escaped) { tg.x = tp.x; tg.y = tp.y; } } // 合体技の「裁き」: 予告が決まるまで、その人を追う
-      tg.t -= DT * (this.activePlayers().some(q => q.passive === 'chronos' && dist(q, tg) < 320) ? 0.77 : 1); // クロノス: 未来視（予告が長い）
+      tg.t -= DT * (this.activePlayers().some(q => q.passive === 'chronos' && dist(q, tg) < 320) ? 0.77 : 1) * (this.tower && this.tower.mods.includes('quick') ? 1.35 : 1); // 塔のしばり: 予告が短い // クロノス: 未来視（予告が長い）
       if (tg.t > 0) continue;
       if (tg.then === 'charge') { if (b && b.hp > 0) { b.state = 'charging'; b.stateT = 0.85; } continue; }
       if (tg.clap && b && b.hp > 0 && !(b.weakT > 0)) { b.weakT = 5; this.events.push({ k: 'weak' }); } // がしゃどくろ王: 手をたたいたあとは弱点
@@ -1388,6 +1396,7 @@ class Room {
     for (const k of ['atkT', 'strongT', 'skillT', 'shieldT', 'invulT', 'staminaT', 'invisT', 'atkUpT', 'spdUpT', 'dragonT', 'raT', 'revT', 'charmT', 'critT', 'skyT', 'regenT', 'bondT', 'slowT', 'frozenT', 'darkT']) p[k] = Math.max(0, (p[k] || 0) - DT);
     if (p.down || p.escaped) return;
     this.updateCurse(p);
+    if (this.tower && this.tower.mods.includes('dark')) p.darkT = Math.max(p.darkT || 0, 0.3); // 塔のしばり: 真っ暗
     p.inDark = this.allBosses().some(b => b.type === 'nue' || b.bliz > 0) || p.critT > 0 || p.darkT > 0; // ツクヨミ: 暗い場所
     if (p.regenT > 0) this.healPlayer(p, p.maxHp * 0.04 * DT); // 西王母の不老の桃
     if (p.ch && p.ch.regen > 0) { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * p.ch.regen * DT); } // お守り: 自然回復（呪いは消えない）
@@ -1568,6 +1577,65 @@ class Room {
     }
   }
 
+  // ---- 鬼の塔 ----
+  towerFloor(f, near0) {
+    const T = S.TOWER, tw = this.tower, type = T.boss(f);
+    tw.f = f; tw.mods = T.mods(f, S.weekIndex());
+    this.telegraphs = []; this.hazards = []; this.shades = []; this.decoys = []; this.boss2 = null; this.ring = null; this.oni3 = null; this.drop = null;
+    this.patrols = this.patrols.filter(e => !e.towerExtra);
+    for (const p of this.players.values()) { p.judge = null; p.curseT = 0; p.charmT = 0; p.revT = 0; }
+    const anchor = near0 || this.activePlayers()[0] || [...this.players.values()][0];
+    const near = () => {
+      for (let k = 0; k < 2000; k++) { const q = this.gridB.randomFreePoint(); const d = dist(q, anchor); if (d > 480 && d < 820) return q; }
+      return this.gridB.randomFreePoint();
+    };
+    const dm = T.dmgMul(f);
+    if (type === 'sanki') {
+      this.oni3 = Sanki.pickTypes().map(t => this.makeBoss(t, near(), T.hpMul(f, t) / 2.2, dm));
+      this.boss = this.oni3[0];
+      for (const b of this.oni3) if (b.kind.gimmick) this.gimmickSetup(b);
+    } else {
+      this.boss = this.makeBoss(type, near(), T.hpMul(f, type), dm);
+      if (this.boss.kind.gimmick) this.gimmickSetup(this.boss);
+      if (this.boss2) { this.boss2.x = this.boss.x + 170; this.boss2.y = this.boss.y; S.collide(this.map, this.boss2, BOSS_R); }
+    }
+    const tgt = this.activePlayers()[0] || [...this.players.values()][0];
+    for (const b of this.allBosses()) { b.state = 'engage'; b.target = tgt && tgt.id; b.atkT = 2.5; if (tw.mods.includes('fast')) b.spdMul = (b.spdMul || 1) * 1.3; }
+    this.timeLeft = this.timeLimit = Math.round(T.time(f) * (tw.mods.includes('short') ? 0.75 : 1));
+    this.ultGainTeam = tw.baseUlt * (tw.mods.includes('ult') ? 0.5 : 1);
+    if (tw.mods.includes('patrol')) for (let k = 0; k < 8; k++) { this.spawnPatrol(this.activePlayers()); this.patrols[this.patrols.length - 1].towerExtra = true; }
+    this.events.push({ k: 'floor', f, boss: type, sanki: this.oni3 ? this.oni3.map(b => b.type) : undefined, mods: tw.mods, time: this.timeLeft });
+  }
+  towerKill(b) {
+    b.hp = 0;
+    this.events.push({ k: 'bossDown', x: Math.round(b.x), y: Math.round(b.y), name: b.name });
+    this.dropDama(b.x, b.y, 1, Math.round(b.kind.drop * 0.5), b.type);
+    this.towerClear();
+  }
+  towerClear() {
+    const tw = this.tower;
+    if (tw.rest > 0) return;
+    tw.cleared = tw.f; tw.rest = 8;
+    this.mainDown = true;
+    this.telegraphs = []; this.hazards = [];
+    for (const b of this.allBosses()) b.hp = 0;
+    for (const p of this.players.values()) {
+      p.judge = null; p.curseT = 0; p.charmT = 0; p.revT = 0;
+      if (p.escaped) continue;
+      if (p.down) { p.down = false; p.hp = p.maxHp * 0.3; p.reviveProg = 0; p.invulT = 3; this.events.push({ k: 'revive', id: p.id }); }
+      else this.healPlayer(p, p.maxHp * 0.25);
+    }
+    this.events.push({ k: 'floorClear', f: tw.f, medals: S.TOWER.medals(tw.f), total: S.TOWER.medalTotal(tw.f) });
+  }
+  towerTick() {
+    const tw = this.tower;
+    if (tw.rest > 0) { // 休憩中は時間が止まる
+      this.timeLeft += DT;
+      if ((tw.rest -= DT) <= 0) { tw.rest = 0; this.towerFloor(tw.f + 1); }
+      return;
+    }
+    if (tw.mods.includes('regen')) for (const b of this.allBosses()) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.004 * DT); // 塔のしばり: 鬼の体力が回復する
+  }
   otherBosses() { return this.oni3 ? this.oni3.filter(b => b !== this.boss && b.hp > 0) : this.boss2 && this.boss2.hp > 0 ? [this.boss2] : []; }
   // 三鬼合戦では、その種類のボスを this.boss にして呼ぶ（影・偽者・裁きは、その鬼のもの）
   withBoss(type, fn) {
@@ -1609,6 +1677,7 @@ class Room {
     if (this.introT > 0) { this.introT -= DT; return; }
     this.time += DT;
     this.timeLeft -= DT;
+    if (this.tower) this.towerTick();
     if (this.revealT > 0) this.revealT -= DT;
     if (this.timeStopT > 0) this.timeStopT -= DT;
     if (DEMO_AI) for (const p of this.players.values()) this.demoInput(p);
@@ -1652,7 +1721,7 @@ class Room {
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
     const bn = this.bonusBoss, sh = this.shinBoss;
-    this.lastResult = { t: 'result', players, team, luck: this.luckTeam || undefined, sanki: this.oni3 ? { all: this.sankiAll, types: this.oni3.map(b => b.type), down: this.oni3.filter(b => b.hp <= 0).length } : undefined, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
+    this.lastResult = { t: 'result', players, team, luck: this.luckTeam || undefined, sanki: this.oni3 && !this.tower ? { all: this.sankiAll, types: this.oni3.map(b => b.type), down: this.oni3.filter(b => b.hp <= 0).length } : undefined, tower: this.tower ? { cleared: this.tower.cleared, f: this.tower.f } : undefined, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
     this.broadcast(this.lastResult);
     for (const p of this.players.values()) { p.missedResult = !!p.away; p.viewed = false; } // 通信が切れていた人には、つなぎ直したときに送る。viewed: ガチャを引き終わって結果を見たか
     this.broadcast(this.lobbyInfo());
@@ -1734,6 +1803,7 @@ class Room {
       boss: b && b.hp > 0 ? this.bossSnap(b) : null,
       boss2: this.boss2 && this.boss2.hp > 0 ? this.bossSnap(this.boss2) : undefined,
       ex: this.oni3 ? this.otherBosses().map(o => this.bossSnap(o)) : undefined, // 三鬼合戦のほかの鬼
+      tw: this.tower ? { f: this.tower.f, rest: this.tower.rest > 0 ? Math.ceil(this.tower.rest) : undefined } : undefined, // 鬼の塔: 今の階・休憩
       hz: this.hazards.length ? this.hazards.map(h => ({ k: h.k, x: Math.round(h.x), y: Math.round(h.y), r: Math.round(h.r), t: +h.t.toFixed(1) })) : undefined,
       reveal: this.revealT > 0 || undefined, tstop: this.timeStopT > 0 || undefined, falcon: this.hasPassive('falcon') || undefined, orbMap: this.luckTeam || undefined,
       shades: this.shades.length ? this.shades.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), yokai: e.yokai, of: e.of, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 || undefined })) : undefined,

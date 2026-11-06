@@ -43,6 +43,7 @@
       <button id="btnSave" class="small">💾 セーブ</button>
       <button id="btnBgm" class="small">🔊 BGM ON</button>
       <button id="btnHistory" class="small">📜 更新履歴</button>
+      <button id="btnShop" class="small">🏅 交換所</button>
       <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
     </div>
     <p id="err" class="err"></p>
@@ -245,6 +246,15 @@
     <h2>🎉 アップデートしました！</h2>
     <ul id="whatsNewList" class="notes"></ul>
     <div class="row"><button id="btnWhatsNewHistory" class="small alt">📜 これまでの更新</button><button id="btnWhatsNewClose" class="big">OK</button></div>
+  </section>
+
+  <!-- 鬼の塔の交換所（メダル） -->
+  <section id="shopScreen" class="screen overlay">
+    <div class="ov-head"><h2>🏅 塔の交換所</h2><button id="btnShopClose" class="small">✕ とじる</button></div>
+    <p id="shopMedals" class="shop-medals"></p>
+    <div id="shopList" class="shop-list"></div>
+    <p id="shopMsg" class="sub"></p>
+    <p class="sub">メダルは「鬼の塔」で、階をクリアするともらえます（上の階ほどたくさん）</p>
   </section>
 
   <!-- アップデート履歴（public/changelog.json ＋ 今の whatsnew.json） -->

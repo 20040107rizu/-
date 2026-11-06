@@ -330,14 +330,79 @@
     hyakki: { name: '百鬼王', color: '#5a1a8a', hp: 5.5, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 400, need: 'gokuou', team: true, hidden: true, time: 480,
               rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
     shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
+    tower:  { name: '鬼の塔', color: '#c8a0ff', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 0, need: 'kishin', team: true, tower: true }, // 1階ずつボスを倒して登る（毎回1階から・終わりなし）
     sanki:  { name: '三鬼合戦', color: '#ff2a6a', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 600, need: 'amanojaku', team: true, sanki: true, time: 420 }, // ボス鬼3体が同時に出る（超高難易度）
   };
   // 全部の鬼を少し強く（体力 +15%・攻撃 +12%）。上の表の数字はそのままにして、ここでまとめてかける
   const ONI_BUFF = { hp: 1.15, dmg: 1.12 };
   for (const k of Object.values(BOSSES)) { k.hp *= ONI_BUFF.hp; k.dmg *= ONI_BUFF.dmg; }
+  // ---------- 鬼の塔 ----------
+  // 1階＝ボス1体を倒せばクリア。毎回1階から、終わりなし。目安: よく育てた神4体でギリギリ30階
+  const TOWER_CYCLE = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage']; // 1〜9階（11〜19階…も同じ順で強くなる）
+  const TOWER_CYCLE2 = ['nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gold', 'white', 'fuurai'];
+  const TOWER_GATE = ['gokuou', 'hyakki', 'shin', 'sanki']; // 10階ごとの門番（40階は三鬼合戦）
+  const TOWER = {
+    boss(f) { if (f % 10 === 0) return TOWER_GATE[(f / 10 - 1) % TOWER_GATE.length]; const c = Math.floor(f / 10) % 2 ? TOWER_CYCLE2 : TOWER_CYCLE; return c[(f % 10) - 1]; },
+    // 強さ（そのボスのふだんの強さにかける）。ボスごとの強さの差をならすため、もともと強いボスは少しおさえる
+    hpMul(f, type) { const base = (BOSSES[type] || BOSSES.red).hp, want = 0.55 * Math.pow(1.105, f - 1) * (f % 10 === 0 ? 1.5 : 1); return want * 4 / Math.max(1.5, base); },
+    dmgMul(f) { return 0.7 + 0.045 * (f - 1); },
+    time(f) { const t = TOWER.boss(f); return t === 'sanki' ? 300 : f % 10 === 0 ? 240 : f < 10 ? 120 : 150; },
+    // しばり: 5階から1つ・15階から2つ・30階から3つ（週ごとに出方が変わる）
+    MODS: {
+      dark: '真っ暗', heal: '回復半分', fast: '鬼が速い', short: '時間が短い', regen: '鬼の体力が回復する', quick: '予告が短い', ult: '必殺技がたまりにくい', patrol: '見回り鬼2倍',
+    },
+    mods(f, week = 0) {
+      const n = f >= 30 ? 3 : f >= 15 ? 2 : f >= 5 ? 1 : 0, keys = Object.keys(TOWER.MODS), r = rng(week * 1000 + f * 7919 + 13), out = [];
+      while (out.length < n) { const k = keys[Math.floor(r() * keys.length)]; if (!out.includes(k)) out.push(k); }
+      return out;
+    },
+    medals(f) { return Math.ceil(Math.pow(f, 1.5) / 2); }, // その階をクリアしたときのメダル（上ほど一気に増える）
+    medalTotal(n) { let s = 0; for (let f = 1; f <= n; f++) s += TOWER.medals(f); return s; },
+    // 節目のごほうび（届くたびに毎回）
+    milestones(n) {
+      const out = [];
+      if (n >= 5) out.push({ f: 5, k: 'exp', v: 3000 });
+      if (n >= 10) out.push({ f: 10, k: 'charm', v: 3 });
+      if (n >= 15) out.push({ f: 15, k: 'ticket', v: 'gold' });
+      if (n >= 20) out.push({ f: 20, k: 'frag', v: 3 });
+      if (n >= 25) out.push({ f: 25, k: 'ticket', v: 'black' });
+      if (n >= 30) { out.push({ f: 30, k: 'special', v: 1 }); out.push({ f: 30, k: 'charm', v: 4 }); }
+      for (let f = 35; f <= n; f += 5) out.push({ f, k: 'special', v: 1 });
+      return out;
+    },
+    SHOP: [
+      { id: 'exp', name: '経験値 5,000', price: 60 },
+      { id: 'charm', name: 'お守りガチャ（金以上確定）', price: 150 },
+      { id: 'frag', name: '神の欠片 ×1', price: 120 },
+      { id: 'gold', name: '金玉チケット', price: 200 },
+      { id: 'black', name: '黒玉チケット', price: 500 },
+      { id: 'special', name: 'スペシャルガチャチケット', price: 1200 },
+    ],
+  };
+  // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%
+  const SPECIAL_ODDS = { god: 0.001, legend: 0.03 };
+  function rollSpecial(rnd = Math.random) {
+    const x = rnd();
+    if (x < SPECIAL_ODDS.god) return { kind: 'god', y: GODS[Math.floor(rnd() * GODS.length)] };
+    if (x < SPECIAL_ODDS.god + SPECIAL_ODDS.legend) return { kind: 'legend', y: LEGENDS[Math.floor(rnd() * LEGENDS.length)] };
+    const pool = YOKAI.filter(y => y.rank === 'S');
+    return { kind: 'S', y: pool[Math.floor(rnd() * pool.length)] };
+  }
+  // お守りを決まったレア度で作る（交換所・塔のごほうび）
+  function makeCharm(r, rnd = Math.random) {
+    const R = CHARM_RARITY[r], s = [], used = new Set();
+    for (let k = 0; k < R.n; k++) {
+      const pool = Object.keys(CHARM_WEIGHT).filter(id => !used.has(id)), tot = pool.reduce((a, id) => a + CHARM_WEIGHT[id], 0);
+      let y = rnd() * tot, id = pool[0];
+      for (const q of pool) { if (y < CHARM_WEIGHT[q]) { id = q; break; } y -= CHARM_WEIGHT[q]; }
+      used.add(id);
+      s.push([id, CHARM_SKILLS[id].once ? 1 : R.lv[0] + Math.floor(rnd() * (R.lv[1] - R.lv[0] + 1))]);
+    }
+    return { r, s };
+  }
   // BOSS_ORDER はセーブ（倒したボスのビット）の並び。新しいボスは必ず末尾に足す。ボス選びの並びは BOSS_LIST
-  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'sanki'];
-  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki', 'sanki'];
+  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'sanki', 'tower'];
+  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki', 'sanki', 'tower'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {
@@ -501,5 +566,5 @@
     return true;
   }
 
-  return { CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, PICK_ANY, PICK_COPIES, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { TOWER, rollSpecial, makeCharm, SPECIAL_ODDS, CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, PICK_ANY, PICK_COPIES, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

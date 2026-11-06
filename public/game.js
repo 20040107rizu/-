@@ -5,7 +5,7 @@
 
   const $ = id => document.getElementById(id);
   let rotated = false; // スマホを縦に持っていて、画面を90度回して見せているか
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -13,7 +13,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -134,7 +134,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock,
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock, md: stats.medals || 0, tk: tickets,
       ...(S.GODS.some(g => friends[g.id]) || stats.gods.frag ? { gd: S.GODS.map(g => friends[g.id] || 0), gx: [stats.gods.frag, ...S.GODS.map(g => stats.gods.tr[g.id] || 0)], gl: S.GODS.map(g => levels[g.id] || 0) } : {}) };
     // お守りは、つけているものとお気に入りだけ入れる
     const keep = charms.filter(c => c.fav || Object.values(equips).some(l => l.includes(c.id)));
@@ -162,7 +162,7 @@
     const cm = Array.isArray(d.cm) ? d.cm.slice(0, S.CHARM_MAX).map((a, i) => ({ id: i + 1, r: Math.max(0, Math.min(4, a[0] | 0)), fav: !!a[1], s: [[a[2], a[3]], [a[4], a[5]]].filter(([k, lv]) => S.CHARM_SKILLS[k]).map(([k, lv]) => [k, Math.max(1, Math.min(5, lv | 0))]) })).filter(c => c.s.length) : [];
     const eq = {};
     if (d.eq && typeof d.eq === 'object') for (const [k, l] of Object.entries(d.eq)) if (S.YOKAI_BY_ID[k] && Array.isArray(l)) eq[k] = l.map(i => cm[i] && cm[i].id).filter(Boolean).slice(0, charmSlots(k));
-    return { cm, eq, gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
+    return { cm, eq, gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), medals: Math.max(0, Math.min(1e7, Math.floor(+d.md || 0))), tickets: Object.fromEntries(Object.entries(d.tk && typeof d.tk === 'object' ? d.tk : {}).filter(([k, v]) => ['green', 'blue', 'red', 'gold', 'black', 'special'].includes(k) && v > 0).map(([k, v]) => [k, Math.min(999, Math.floor(+v) || 0)])), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
       feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
   }
 
@@ -744,19 +744,51 @@
     open();
   }
 
+  // ---- 鬼の塔のごほうび・交換所・スペシャルガチャ ----
+  // m: { k: exp|charm|ticket|frag|special, v } → 文（もらったもの）
+  function giveTowerPrize(m) {
+    if (m.k === 'exp') { stats.expStock += m.v; return `📈 経験値 +${m.v.toLocaleString('ja-JP')}`; }
+    if (m.k === 'charm') { const c = S.makeCharm(Math.random() < 0.15 ? Math.min(4, m.v + 1) : m.v), got = addCharm(c); return got.full ? `🧿 ${S.charmName(c)}（いっぱいなので経験値 +${got.exp}）` : `🧿 ${S.charmName(c)}（${S.charmText(c)}）`; }
+    if (m.k === 'ticket') { tickets[m.v] = (tickets[m.v] || 0) + 1; return `🎫 ${S.BALLS.find(b => b.key === m.v).name}玉チケット`; }
+    if (m.k === 'frag') { stats.gods.frag += m.v; return `⚡ 神の欠片 ×${m.v}`; }
+    if (m.k === 'special') { tickets.special = (tickets.special || 0) + m.v; return `🌈 スペシャルガチャチケット ×${m.v}`; }
+    return '';
+  }
+  function renderShop() {
+    $('shopMedals').textContent = `🏅 ${(stats.medals || 0).toLocaleString('ja-JP')}枚　（最高 ${stats.towerBest || 0}階）`;
+    $('shopList').innerHTML = S.TOWER.SHOP.map(it => `<div class="shop-row"><div class="shop-name">${esc(it.name)}${it.id === 'special' ? '<small>S 96.9%・レジェンド 3%・神 0.1%</small>' : ''}</div><button class="small shop-buy" data-id="${it.id}"${(stats.medals || 0) >= it.price ? '' : ' disabled'}>🏅 ${it.price.toLocaleString('ja-JP')}</button></div>`).join('');
+    for (const b of document.querySelectorAll('#shopList .shop-buy')) b.onclick = () => {
+      const it = S.TOWER.SHOP.find(x => x.id === b.dataset.id);
+      if (!it || (stats.medals || 0) < it.price) return;
+      stats.medals -= it.price;
+      const msg = giveTowerPrize(it.id === 'exp' ? { k: 'exp', v: 5000 } : it.id === 'charm' ? { k: 'charm', v: 3 } : it.id === 'frag' ? { k: 'frag', v: 1 } : it.id === 'special' ? { k: 'special', v: 1 } : { k: 'ticket', v: it.id });
+      try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+      saveAll(); renderTicketButton(); beep(784, 0.12, 'triangle', 0.07);
+      $('shopMsg').textContent = `交換した：${msg}${it.id === 'special' || it.id === 'gold' || it.id === 'black' ? '（タイトル画面の「チケットガチャ」で引けます）' : ''}`;
+      renderShop();
+    };
+  }
+  $('btnShop').onclick = () => { $('shopMsg').textContent = ''; renderShop(); show('shopScreen'); };
+  $('btnShopClose').onclick = () => show('title');
   // チケットガチャ: その色のガチャ玉が必ず出る
   let ticketMode = false;
   $('btnTicket').onclick = () => {
-    const key = ['black', 'gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
+    const key = ['special', 'black', 'gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
     if (!key) return;
     tickets[key]--;
     if (!tickets[key]) delete tickets[key];
-    const ball = S.BALLS.find(b => b.key === key);
+    const ball = S.BALLS.find(b => b.key === (key === 'special' ? 'black' : key));
     let x = Math.random(), rank = ball.ranks[0][0];
     for (const [rk, w] of ball.ranks) { if (x < w) { rank = rk; break; } x -= w; }
-    const pool = S.YOKAI.filter(y => y.rank === rank), y = pool[Math.floor(Math.random() * pool.length)];
+    const pool = S.YOKAI.filter(y => y.rank === rank);
+    let y = pool[Math.floor(Math.random() * pool.length)], spNote = '';
+    if (key === 'special') { // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%
+      const sp = S.rollSpecial(); y = sp.y;
+      if (sp.kind === 'god' && friends[y.id]) { stats.gods.frag += (y.frag || S.GOD_FRAG); spNote = `（持っているので神の欠片 +${y.frag || S.GOD_FRAG}）`; }
+      if (sp.kind === 'legend' && friends[y.id]) { const sl = (stats.seals[y.id] = stats.seals[y.id] || { frag: 0 }); sl.frag += S.SEAL.gacha; spNote = `（持っているので封印の欠片 +${S.SEAL.gacha}）`; }
+    }
     const isNew = !friends[y.id];
-    const overExp = addFriend(y.id);
+    const overExp = (y.legend || y.god) ? (friends[y.id] ? 0 : (friends[y.id] = 1, 0)) : addFriend(y.id);
     try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
     saveAll(); updateFriendCount(); renderTicketButton(); helloAgain();
     ticketMode = true;
@@ -764,7 +796,7 @@
     $('btnToResult').hidden = true; $('btnToResult').textContent = 'ホームへ';
     $('gachaFail').hidden = true;
     GachaShow.run($('gachaStage'), {
-      team: 0, ticket: `${ball.name}玉チケット`,
+      team: 0, ticket: key === 'special' ? `🌈スペシャルガチャチケット${spNote}` : `${ball.name}玉チケット`,
       ball: { key: ball.key, name: ball.name, color: ball.color },
       yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' },
       isNew, overExp, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
@@ -852,6 +884,7 @@
   let myPred = null;
   let bossType = 'red';
   let sankiTypes = null; // 三鬼合戦で出てきた3体
+  let towerF = 0; // 鬼の塔: 今の階（塔でなければ 0）
   let stage = 'oni';
   let offline = false;        // 試合のあとで接続が切れた（結果はそのまま見られる）
   let watcher = false;        // フレンドのバトルを観戦している
@@ -896,7 +929,8 @@
     const n = Object.keys(data.friends).length;
     if (!confirm(`お友達${n}体のデータを読み込みます。\nこの端末の今のデータは上書きされます。よろしいですか？`)) return;
     friends = data.friends; stats = data.stats; stats.seals = data.seals; stats.gods = data.gods;
-    levels = data.levels; stats.expStock = data.expStock;
+    levels = data.levels; stats.expStock = data.expStock; stats.medals = data.medals;
+    tickets = data.tickets; try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {} renderTicketButton();
     charms = data.cm; equips = data.eq; charmSeq = Math.max(0, ...charms.map(c => c.id)); saveCharms();
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
     if (data.name) { $('name').value = data.name; try { localStorage.setItem('name', data.name); } catch {} }
@@ -1193,11 +1227,13 @@
         ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear(); motion.clear(); preloadFx((lobby && lobby.players || []).map(p => p.yokai));
         bossType = m.boss;
         sankiTypes = m.sanki || null;
+        towerF = m.tower ? m.tower.f : 0;
+        if (m.tower) bossType = m.tower.boss;
         stage = S.STAGES[m.stage] ? m.stage : 'oni';
         spectateId = null;
         introMovie = m.movie || 0; introCount = m.countdown || 0;
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0; cutin = null; dropAnim = 0;
-        banner = started ? { text: m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
+        banner = started ? { text: m.tower ? `🗼 鬼の塔 1階：${S.BOSSES[m.tower.boss].name}` : m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: m.tower ? 'ボスを倒せばクリア！ どこまで登れるかな' : '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
         if (m.rejoin) banner = { text: '📡 つなぎ直しました！', t: 1.6, c: '#7dff9a' };
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
@@ -1442,9 +1478,20 @@
     if (mine && result.bossDown && result.boss === 'hyakki') secret('hyakki', '百鬼王', 'black', 1);
     if (mine && result.shin && result.shin.down) secret('shin', '鬼神・真', 'black', 2);
     if (mine && result.sanki && result.sanki.all) secret('sanki', '三鬼', 'black', 3); // 三鬼合戦: はじめてなら黒玉チケット3枚
+    // 鬼の塔: メダルと、節目のごほうび（届くたびに毎回）
+    result.towerNotes = [];
+    if (mine && result.tower && result.tower.cleared > 0) {
+      const n = result.tower.cleared, md = S.TOWER.medalTotal(n);
+      stats.medals = (stats.medals || 0) + md;
+      stats.towerBest = Math.max(stats.towerBest || 0, n);
+      result.towerNotes.push(`🗼 鬼の塔 ${n}階までクリア！ 🏅 メダル +${md.toLocaleString('ja-JP')}（${stats.medals.toLocaleString('ja-JP')}枚）`);
+      for (const m of S.TOWER.milestones(n)) result.towerNotes.push(`${m.f}階のごほうび：` + giveTowerPrize(m));
+      try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+      renderTicketButton();
+    }
     if (mine && result.bossDown) {
       if (result.boss === 'kishin') stats.feats.kishin = true;
-      if (S.BOSSES[result.boss].team && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
+      if (S.BOSSES[result.boss].team && !S.BOSSES[result.boss].tower && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
     }
     result.newTitles = mine ? titlesDone().filter(id => !titlesBefore.includes(id)) : [];
     // レジェンドの封印の欠片
@@ -1715,6 +1762,7 @@
     if (result.sealNote) notes.push(esc(result.sealNote));
     if (result.godNote) notes.push(esc(result.godNote));
     if (result.charmNote) notes.push(esc(result.charmNote));
+    for (const t of result.towerNotes || []) notes.push(esc(t));
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
     $('resUnlock').hidden = !notes.length;
     $('resUnlock').innerHTML = notes.join('<br>');
@@ -1913,6 +1961,18 @@
         beep(ev.n === 3 ? 70 : 110, 0.9, 'sawtooth', 0.09, ev.n === 3 ? -30 : 200); setTimeout(() => beep(ev.n === 3 ? 140 : 220, 0.6, 'square', 0.06, -60), 200);
         break;
       }
+      case 'floor': { // 鬼の塔: 次の階がはじまった
+        towerF = ev.f; bossType = ev.boss === 'sanki' ? 'sanki' : ev.boss; sankiTypes = ev.sanki || null; timeLimit = ev.time;
+        ents.delete('boss'); ents.delete('boss2'); for (const k of [...ents.keys()]) if (k[0] === 'x') ents.delete(k);
+        const nm = ev.sanki ? ev.sanki.map(t => S.BOSSES[t].name).join('・') : S.BOSSES[ev.boss].name;
+        banner = { text: `🗼 ${ev.f}階 ${nm}${ev.f % 10 === 0 ? '（門番）' : ''}`, sub: ev.mods.length ? `しばり：${ev.mods.map(k => S.TOWER.MODS[k]).join('・')}` : 'ボスを倒せばクリア！', t: 3, c: ev.f % 10 === 0 ? '#ff5a3a' : '#c8a0ff' };
+        beep(330, 0.3, 'square', 0.06); setTimeout(() => beep(494, 0.4, 'square', 0.06), 160);
+        break;
+      }
+      case 'floorClear':
+        banner = { text: `${ev.f}階クリア！`, sub: `🏅 メダル +${ev.medals}（この挑戦で ${ev.total}枚）　8秒後に次の階へ`, t: 3.5, c: '#ffd84a' };
+        [523, 659, 784].forEach((f, i) => setTimeout(() => beep(f, 0.18, 'triangle', 0.08), i * 100));
+        break;
       case 'sankiAll': banner = { text: '三鬼殺し！', sub: '3体ぜんぶ倒した！ 特大のどデカい鬼玉が落ちた', t: 3.5, c: '#ff2a6a' }; shake = 0.8; [392, 523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, 'triangle', 0.09), i * 110)); break;
       case 'rev': if (ev.id === myId) banner = { text: '🔄 操作がさかさま！', t: 1.6, c: '#ff5ad8' }; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
@@ -2875,6 +2935,11 @@
     ctx.lineWidth = 5; ctx.strokeStyle = '#000';
     const tcol = tl < 30 ? (Math.sin(now * 8) > 0 ? '#ff4040' : '#fff') : '#fff';
     ctx.strokeText(`${mm}:${String(ss).padStart(2, '0')}`, W / 2, 42); ctx.fillStyle = tcol; ctx.fillText(`${mm}:${String(ss).padStart(2, '0')}`, W / 2, 42);
+    if (snap.tw) { // 鬼の塔: 今の階・休憩
+      ctx.font = `bold ${Math.round(Math.min(W, H) * 0.045)}px sans-serif`; ctx.lineWidth = 4;
+      ctx.strokeText(`🗼 ${snap.tw.f}階`, W / 2 - Math.min(W, H) * 0.2, 40); ctx.fillStyle = '#c8a0ff'; ctx.fillText(`🗼 ${snap.tw.f}階`, W / 2 - Math.min(W, H) * 0.2, 40);
+      if (snap.tw.rest) { ctx.font = `bold ${Math.round(Math.min(W, H) * 0.06)}px sans-serif`; ctx.lineWidth = 6; const t = `休憩中… ${snap.tw.rest}`; ctx.strokeText(t, W / 2, H * 0.62); ctx.fillStyle = '#7dff9a'; ctx.fillText(t, W / 2, H * 0.62); }
+    }
 
     // 鬼玉の数
     if (me) {
@@ -2998,7 +3063,7 @@
     } else if (p < 0.95) {
       ctx.globalAlpha = Math.min(1, (p - 0.4) * 6, (0.95 - p) * 8);
       ctx.font = `bold ${Math.round(Math.min(W, H) * 0.1)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
-      const arrive = sankiTypes ? `${sankiTypes.map(t => S.BOSSES[t].name).join('・')}が同時に到着…！` : `${kind.name}が${S.STAGES[stage].name}に到着した…！`;
+      const arrive = towerF ? `🗼 鬼の塔 ${towerF}階：${S.BOSSES[bossType].name}` : sankiTypes ? `${sankiTypes.map(t => S.BOSSES[t].name).join('・')}が同時に到着…！` : `${kind.name}が${S.STAGES[stage].name}に到着した…！`;
       ctx.strokeText(arrive, W / 2, H * 0.24); ctx.fillStyle = BOSS_UI[bossType]; ctx.fillText(arrive, W / 2, H * 0.24);
       ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`; ctx.lineWidth = 5;
       ctx.strokeText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09); ctx.fillStyle = '#fff'; ctx.fillText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09);
@@ -3122,7 +3187,7 @@
     const movieP = movieLeft > 0 && introMovie > 0 ? 1 - movieLeft / introMovie : 1; // 映像の進み具合 0→1
     if (intro <= 0 && !started) {
       started = true;
-      banner = { text: 'スタート！', sub: '鬼玉を集めて、襖から脱出しよう', t: 1.6, c: '#ffe36b' };
+      banner = { text: 'スタート！', sub: towerF ? 'ボスを倒せばクリア！' : '鬼玉を集めて、襖から脱出しよう', t: 1.6, c: '#ffe36b' };
       beep(1320, 0.35, 'square', 0.07);
       Music.play('normal');
     }
