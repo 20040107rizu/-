@@ -337,15 +337,15 @@
   const ONI_BUFF = { hp: 1.15, dmg: 1.12 };
   for (const k of Object.values(BOSSES)) { k.hp *= ONI_BUFF.hp; k.dmg *= ONI_BUFF.dmg; }
   // ---------- 鬼の塔 ----------
-  // 1階＝ボス1体を倒せばクリア。毎回1階から、終わりなし。目安: よく育てた神4体でギリギリ30階
+  // 1階＝ボス1体を倒せばクリア。毎回1階から、終わりなし。目安: 神3体で10階前後が限界
   const TOWER_CYCLE = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage']; // 1〜9階（11〜19階…も同じ順で強くなる）
   const TOWER_CYCLE2 = ['nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gold', 'white', 'fuurai'];
   const TOWER_GATE = ['gokuou', 'hyakki', 'shin', 'sanki']; // 10階ごとの門番（40階は三鬼合戦）
   const TOWER = {
     boss(f) { if (f % 10 === 0) return TOWER_GATE[(f / 10 - 1) % TOWER_GATE.length]; const c = Math.floor(f / 10) % 2 ? TOWER_CYCLE2 : TOWER_CYCLE; return c[(f % 10) - 1]; },
     // 強さ（そのボスのふだんの強さにかける）。ボスごとの強さの差をならすため、もともと強いボスは少しおさえる
-    hpMul(f, type) { const base = (BOSSES[type] || BOSSES.red).hp, want = 0.55 * Math.pow(1.105, f - 1) * (f % 10 === 0 ? 1.5 : 1); return want * 4 / Math.max(1.5, base); },
-    dmgMul(f) { return 0.7 + 0.045 * (f - 1); },
+    hpMul(f, type) { const base = (BOSSES[type] || BOSSES.red).hp, want = 1.0 * Math.pow(1.13, f - 1) * (f % 10 === 0 ? 1.5 : 1); return want * 4 / Math.max(1.5, base); },
+    dmgMul(f) { return 1.0 + 0.06 * (f - 1); }, // 目安: 神3体で10階前後が限界（前の19階の強さが10階くらい）
     time(f) { const t = TOWER.boss(f); return t === 'sanki' ? 300 : f % 10 === 0 ? 240 : f < 10 ? 120 : 150; },
     // しばり: 5階から1つ・15階から2つ・30階から3つ（週ごとに出方が変わる）
     MODS: {
