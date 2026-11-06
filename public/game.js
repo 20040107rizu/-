@@ -1480,6 +1480,21 @@
     if (mine && result.sanki && result.sanki.all) secret('sanki', '三鬼', 'black', 3); // 三鬼合戦: はじめてなら黒玉チケット3枚
     // 鬼の塔: メダルと、節目のごほうび（届くたびに毎回）
     result.towerNotes = [];
+    // 三鬼合戦のごほうび（毎回）: 倒した数に応じて。3体ぜんぶ倒すと豪華
+    if (mine && result.sanki && result.sanki.down > 0) {
+      const d = result.sanki.down, got = [];
+      got.push(giveTowerPrize({ k: 'exp', v: [0, 3000, 6000, 15000][Math.min(3, d)] }));
+      stats.medals = (stats.medals || 0) + [0, 100, 250, 600][Math.min(3, d)]; got.push(`🏅 メダル +${[0, 100, 250, 600][Math.min(3, d)]}`);
+      if (d >= 2) got.push(giveTowerPrize({ k: 'ticket', v: 'gold' }));
+      if (result.sanki.all) {
+        got.push(giveTowerPrize({ k: 'special', v: 1 }));
+        got.push(giveTowerPrize({ k: 'frag', v: 3 }));
+        got.push(giveTowerPrize({ k: 'charm', v: 4 }));
+      }
+      result.towerNotes.push(`👹 三鬼合戦のごほうび（${result.sanki.all ? '3体ぜんぶ撃破！' : `${d}体撃破`}）：${got.join('・')}`);
+      try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+      renderTicketButton();
+    }
     if (mine && result.tower && result.tower.cleared > 0) {
       const n = result.tower.cleared, md = S.TOWER.medalTotal(n);
       stats.medals = (stats.medals || 0) + md;
