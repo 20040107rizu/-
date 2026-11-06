@@ -1542,13 +1542,12 @@
     // 三鬼合戦のごほうび（毎回）: 倒した数に応じて。3体ぜんぶ倒すと豪華
     if (mine && result.sanki && result.sanki.down > 0) {
       const d = result.sanki.down, got = [];
-      got.push(giveTowerPrize({ k: 'exp', v: [0, 3000, 6000, 15000][Math.min(3, d)] }));
-      stats.medals = (stats.medals || 0) + [0, 100, 250, 600][Math.min(3, d)]; got.push(`🏅 メダル +${[0, 100, 250, 600][Math.min(3, d)]}`);
-      if (d >= 2) got.push(giveTowerPrize({ k: 'ticket', v: 'gold' }));
+      got.push(giveTowerPrize({ k: 'exp', v: [0, 2000, 4000, 8000][Math.min(3, d)] }));
+      stats.medals = (stats.medals || 0) + [0, 50, 120, 300][Math.min(3, d)]; got.push(`🏅 メダル +${[0, 50, 120, 300][Math.min(3, d)]}`);
       if (result.sanki.all) {
-        got.push(giveTowerPrize({ k: 'special', v: 1 }));
-        got.push(giveTowerPrize({ k: 'frag', v: 3 }));
-        got.push(giveTowerPrize({ k: 'charm', v: 4 }));
+        got.push(giveTowerPrize({ k: 'ticket', v: 'black' }));
+        got.push(giveTowerPrize({ k: 'frag', v: 2 }));
+        got.push(giveTowerPrize({ k: 'charm', v: 3 }));
       }
       result.towerNotes.push(`👹 三鬼合戦のごほうび（${result.sanki.all ? '3体ぜんぶ撃破！' : `${d}体撃破`}）：${got.join('・')}`);
       try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}

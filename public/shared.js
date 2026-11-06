@@ -356,18 +356,17 @@
       while (out.length < n) { const k = keys[Math.floor(r() * keys.length)]; if (!out.includes(k)) out.push(k); }
       return out;
     },
-    medals(f) { return Math.ceil(Math.pow(f, 1.5) / 2); }, // その階をクリアしたときのメダル（上ほど一気に増える）
+    medals(f) { return f * f * 3; }, // その階をクリアしたときのメダル（上ほど一気に増える。10階まで登ると合計1,155枚）
     medalTotal(n) { let s = 0; for (let f = 1; f <= n; f++) s += TOWER.medals(f); return s; },
     // 節目のごほうび（届くたびに毎回）
     milestones(n) {
       const out = [];
-      if (n >= 5) out.push({ f: 5, k: 'exp', v: 3000 });
-      if (n >= 10) out.push({ f: 10, k: 'charm', v: 3 });
-      if (n >= 15) out.push({ f: 15, k: 'ticket', v: 'gold' });
-      if (n >= 20) out.push({ f: 20, k: 'frag', v: 3 });
-      if (n >= 25) out.push({ f: 25, k: 'ticket', v: 'black' });
-      if (n >= 30) { out.push({ f: 30, k: 'special', v: 1 }); out.push({ f: 30, k: 'charm', v: 4 }); }
-      for (let f = 35; f <= n; f += 5) out.push({ f, k: 'special', v: 1 });
+      if (n >= 3) out.push({ f: 3, k: 'exp', v: 3000 });
+      if (n >= 5) out.push({ f: 5, k: 'charm', v: 3 });
+      if (n >= 7) out.push({ f: 7, k: 'ticket', v: 'gold' });
+      if (n >= 10) { out.push({ f: 10, k: 'special', v: 1 }); out.push({ f: 10, k: 'charm', v: 4 }); out.push({ f: 10, k: 'frag', v: 3 }); }
+      if (n >= 12) out.push({ f: 12, k: 'ticket', v: 'black' });
+      for (let f = 15; f <= n; f += 5) out.push({ f, k: 'special', v: 2 });
       return out;
     },
     SHOP: [
