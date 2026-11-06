@@ -137,6 +137,7 @@
     { id: 'all',    name: '妖怪マスター',       color: 'gold', count: 'all', desc: '170体ぜんぶ集める（名前が金色になる）' },
     // バトルでの手がら（feat）でもらえる称号
     { id: 'kishin', name: '鬼神殺し',           color: '#ff3a6a', feat: 'kishin', desc: '鬼神をたおす' },
+    { id: 'sanki',  name: '三鬼殺し',           color: '#ff2a6a', feat: 'sanki', desc: '三鬼合戦で、3体のボス鬼をぜんぶたおす' },
     { id: 'solo',   name: '孤高の鬼殺し',       color: '#ffb0d0', feat: 'solo', desc: '金鬼から先のボス鬼を、ひとりで出撃してたおす' },
     // 隠しボスの称号（hidden: 手に入れるまで称号の一覧に出さない）
     { id: 'gokuou', name: '獄王討伐',           color: '#ff3a1a', feat: 'gokuou', hidden: true, desc: '獄王をたおす' },
@@ -329,13 +330,14 @@
     hyakki: { name: '百鬼王', color: '#5a1a8a', hp: 5.5, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 400, need: 'gokuou', team: true, hidden: true, time: 480,
               rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
     shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
+    sanki:  { name: '三鬼合戦', color: '#ff2a6a', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 600, need: 'amanojaku', team: true, sanki: true, time: 420 }, // ボス鬼3体が同時に出る（超高難易度）
   };
   // 全部の鬼を少し強く（体力 +15%・攻撃 +12%）。上の表の数字はそのままにして、ここでまとめてかける
   const ONI_BUFF = { hp: 1.15, dmg: 1.12 };
   for (const k of Object.values(BOSSES)) { k.hp *= ONI_BUFF.hp; k.dmg *= ONI_BUFF.dmg; }
   // BOSS_ORDER はセーブ（倒したボスのビット）の並び。新しいボスは必ず末尾に足す。ボス選びの並びは BOSS_LIST
-  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku'];
-  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki'];
+  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'sanki'];
+  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki', 'sanki'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {

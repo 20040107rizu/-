@@ -643,3 +643,6 @@ html.art-ui .lv-btns button.go { background: linear-gradient(#5fd38a, #2f9a58); 
 html.art-ui .cp-row .del { background: linear-gradient(#5a3a6a, #3a2448) !important; }
 html.art-ui .cp-row .fav.on { color: #ffd23a; }
 .cp-row .charm-tag .cico { display: none; } /* 左に大きいお守りの絵があるので、名前の横の小さい絵は出さない */
+/* 三鬼合戦のボス選び */
+.boss-card.bk-sanki { background: linear-gradient(135deg, #a01a3a, #3a0a4a 50%, #c8902a); border-color: #ff2a6a; box-shadow: 0 0 12px #ff2a6a88; }
+.pboss.on.bk-sanki { background: #a01a3a; color: #fff; border: 1px solid #ff2a6a; }

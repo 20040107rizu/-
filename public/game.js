@@ -851,6 +851,7 @@
   }
   let myPred = null;
   let bossType = 'red';
+  let sankiTypes = null; // 三鬼合戦で出てきた3体
   let stage = 'oni';
   let offline = false;        // 試合のあとで接続が切れた（結果はそのまま見られる）
   let watcher = false;        // フレンドのバトルを観戦している
@@ -954,7 +955,7 @@
     return PATTERNS[key] || (PATTERNS[key] = ctx.createPattern(img, 'repeat'));
   }
   const BOSS_UI = { red: '#ff5050', blue: '#5a9aff', black: '#d0a8ff', gold: '#ffd23a', white: '#bfe6ff', fuurai: '#5af0c0', kishin: '#ff3a6a', gokuou: '#ff5a1a', hyakki: '#b07aff', shin: '#ff1a3a',
-    yakubyo: '#b8e04a', kage: '#c85aff', nue: '#8aff3a', twin: '#5af0c0', twin2: '#ffe14a', kyubi: '#ff8ac8', toki: '#7ab8ff', gasha: '#fff2c0', amanojaku: '#ff5ad8' };
+    sanki: '#ff2a6a', yakubyo: '#b8e04a', kage: '#c85aff', nue: '#8aff3a', twin: '#5af0c0', twin2: '#ffe14a', kyubi: '#ff8ac8', toki: '#7ab8ff', gasha: '#fff2c0', amanojaku: '#ff5ad8' };
   let view = { l: 0, r: 0, t: 0, b: 0 }; // 今画面に見えている範囲（ワールド座標）
   const inView = (x, y, m = 0) => x > view.l - m && x < view.r + m && y > view.t - m && y < view.b + m;
   let spectateId = null;
@@ -1191,11 +1192,12 @@
         snap = null; myPred = null; result = null;
         ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear(); motion.clear(); preloadFx((lobby && lobby.players || []).map(p => p.yokai));
         bossType = m.boss;
+        sankiTypes = m.sanki || null;
         stage = S.STAGES[m.stage] ? m.stage : 'oni';
         spectateId = null;
         introMovie = m.movie || 0; introCount = m.countdown || 0;
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0; cutin = null; dropAnim = 0;
-        banner = started ? { text: `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
+        banner = started ? { text: m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
         if (m.rejoin) banner = { text: '📡 つなぎ直しました！', t: 1.6, c: '#7dff9a' };
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
@@ -1439,6 +1441,7 @@
     if (mine && result.bossDown && result.boss === 'gokuou') secret('gokuou', '獄王', 'gold', 1);
     if (mine && result.bossDown && result.boss === 'hyakki') secret('hyakki', '百鬼王', 'black', 1);
     if (mine && result.shin && result.shin.down) secret('shin', '鬼神・真', 'black', 2);
+    if (mine && result.sanki && result.sanki.all) secret('sanki', '三鬼', 'black', 3); // 三鬼合戦: はじめてなら黒玉チケット3枚
     if (mine && result.bossDown) {
       if (result.boss === 'kishin') stats.feats.kishin = true;
       if (S.BOSSES[result.boss].team && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
@@ -1457,7 +1460,7 @@
     result.charmNote = null;
     if (mine && result.bossDown) {
       const i = Math.max(0, S.BOSS_LIST.indexOf(result.boss)), k = S.BOSSES[result.boss];
-      if (Math.random() < Math.min(0.5, 0.15 + 0.025 * i)) {
+      if (result.sanki ? result.sanki.all : Math.random() < Math.min(0.5, 0.15 + 0.025 * i)) { // 三鬼合戦で3体ぜんぶ倒したら必ず落とす
         const c = S.rollCharm((k ? k.drop : 50) * 1.4, Math.random, result.luck ? 1 : 0), got = addCharm(c); // ガネーシャ: 1つ上の色が出やすい
         result.charmNote = got.full ? `🧿 ${S.charmName(c)}を拾ったけど、いっぱいなので📈 経験値 +${got.exp} に変わった` : `🧿 ボスが${S.charmName(c)}を落とした！（${S.charmText(c)}）`;
       }
@@ -1858,7 +1861,7 @@
         fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 420, c: '#ff3a6a', t: 0.9, max: 0.9 }); shake = 0.8; beep(60, 0.9, 'sawtooth', 0.12, -20);
         break;
       case 'sweep': banner = { text: '⚠ 地獄の大なぎ払い！', sub: '建物のうしろにかくれろ！（回避でもよけられる）', t: 2.2, c: '#ff3a6a' }; beep(120, 1.2, 'sawtooth', 0.08, 300); break;
-      case 'rage': banner = { text: `${S.BOSSES[bossType].name}が怒った！`, sub: bossType === 'gold' ? '金の鎧！正面からの攻撃はほとんど効かない。うしろに回りこめ！' : '攻撃がはげしくなるぞ', t: bossType === 'gold' ? 3 : 2.2, c: bossType === 'gold' ? '#ffd23a' : '#ff4a3a' }; shake = 0.5; break;
+      case 'rage': banner = { text: `${sankiTypes ? '鬼' : S.BOSSES[bossType].name}が怒った！`, sub: bossType === 'gold' ? '金の鎧！正面からの攻撃はほとんど効かない。うしろに回りこめ！' : '攻撃がはげしくなるぞ', t: bossType === 'gold' ? 3 : 2.2, c: bossType === 'gold' ? '#ffd23a' : '#ff4a3a' }; shake = 0.5; break;
       case 'bonusBoss': // 乱入ボス: カットインのあと、空から降ってくる
         cutin = { type: ev.type, mode: ev.mode, t: 3.2, max: 3.2 }; banner = null; shake = 0.4;
         Music.stop();
@@ -1902,7 +1905,16 @@
       case 'charm': if (ev.id === myId) banner = { text: '💗 魅了された！', sub: '仲間にふれてもらうと目がさめる', t: 1.6, c: '#ff8ac8' }; break;
       case 'charmFree': if (ev.id === myId) banner = { text: '目がさめた！', t: 1.2, c: '#7dff9a' }; break;
       case 'poof': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 110, c: '#ff8ac8', t: 0.5, max: 0.5 }); break;
-      case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
+      case 'bossDown': banner = { text: `${ev.name || S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
+      case 'combo': { // 三鬼合戦の合体技: 名前を大きく出す
+        banner = { text: `${ev.n === 3 ? '👹' : ''}${ev.name}`, sub: ev.n === 3 ? '三鬼奥義！ 三角形のまん中か、建物のうしろへ！' : `二鬼合体技！（${ev.types.map(t => S.BOSSES[t].name).join('＋')}）`, t: 2.6, c: ev.n === 3 ? '#ff2a6a' : '#ffb03a' };
+        shake = Math.max(shake, ev.n === 3 ? 0.5 : 0.25);
+        fxImg(ev.n === 3 ? 'oni_fx/awaken' : 'oni_fx/rage_aura', ev.x, ev.y, { size: ev.n === 3 ? 700 : 420, t: 1.0, s0: 0.3, s1: 1.2, add: true, under: true, alpha: 0.8 });
+        beep(ev.n === 3 ? 70 : 110, 0.9, 'sawtooth', 0.09, ev.n === 3 ? -30 : 200); setTimeout(() => beep(ev.n === 3 ? 140 : 220, 0.6, 'square', 0.06, -60), 200);
+        break;
+      }
+      case 'sankiAll': banner = { text: '三鬼殺し！', sub: '3体ぜんぶ倒した！ 特大のどデカい鬼玉が落ちた', t: 3.5, c: '#ff2a6a' }; shake = 0.8; [392, 523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, 'triangle', 0.09), i * 110)); break;
+      case 'rev': if (ev.id === myId) banner = { text: '🔄 操作がさかさま！', t: 1.6, c: '#ff5ad8' }; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
       case 'revive': { const p = snap && snap.players.find(q => q.id === ev.id); if (p) fxImg('fx/revive', p.x, p.y - 60, { size: 200, t: 0.9, s0: 0.6, s1: 1.1, add: true, hold: 0.5 }); }
         if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
@@ -2486,7 +2498,8 @@
     ctx.globalAlpha = p.down ? 0.5 : p.invis ? (me ? 0.35 : 0.15) : p.dodge ? 0.55 : 1;
     ctx.fillStyle = '#0005'; ctx.beginPath(); ctx.ellipse(0, 16, 18 * (1 - (p.jump || 0) * 0.5), 6, 0, 0, Math.PI * 2); ctx.fill();
     if (p.jump) ctx.translate(0, -p.jump * 70); // 大ジャンプ中は浮く
-    const icon = p.charm ? '💗' : p.rev ? '🔄' : p.curse ? '☠️' : '';
+    const icon = p.charm ? '💗' : p.rev ? '🔄' : p.curse ? '☠️' : p.fz ? '🧊' : p.sl ? '🐌' : '';
+    if (p.fz || p.sl) { ctx.fillStyle = p.fz ? 'rgba(160,220,255,0.45)' : 'rgba(120,170,255,0.22)'; ctx.beginPath(); ctx.ellipse(0, 6, 30, 22, 0, 0, Math.PI * 2); ctx.fill(); } // こおっている・遅い
     if (icon) { ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(icon, 26, -50); }
     if (p.au || p.su) { ctx.fillStyle = 'rgba(255,200,60,0.22)'; ctx.beginPath(); ctx.arc(0, -10, 38 + Math.sin(performance.now() / 120) * 3, 0, Math.PI * 2); ctx.fill(); }
     if (me) { ctx.strokeStyle = '#ffe36b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 27, 0, Math.PI * 2); ctx.stroke(); }
@@ -2668,7 +2681,9 @@
   const TELE_C = { bolt: ['255,225,60', 'rgba(255,240,120,0.95)'], wind: ['70,240,190', 'rgba(120,255,210,0.95)'],
     curse: ['160,220,60', 'rgba(200,90,255,0.95)'], charm: ['255,120,200', 'rgba(255,160,220,0.95)'], clock: ['120,180,255', 'rgba(170,210,255,0.95)'],
     hand: ['240,230,200', 'rgba(255,250,230,0.95)'], mimic: ['255,90,216', 'rgba(255,160,240,0.95)'], shade: ['150,80,220', 'rgba(200,140,255,0.95)'] };
-  const TELE_ICON = { curse: '☠️', charm: '💗', hand: '🖐', mimic: '🔄', shade: '👤' };
+  TELE_C.ice = ['150,220,255', 'rgba(200,240,255,0.95)']; TELE_C.fire = ['255,90,30', 'rgba(255,160,60,0.95)']; TELE_C.dark = ['90,40,140', 'rgba(170,110,255,0.95)'];
+  TELE_C.soul = ['200,200,255', 'rgba(230,230,255,0.95)']; TELE_C.triple = ['255,30,90', 'rgba(255,90,140,1)'];
+  const TELE_ICON = { curse: '☠️', charm: '💗', hand: '🖐', mimic: '🔄', shade: '👤', ice: '❄️', fire: '🔥', dark: '🌑', soul: '👻', clock: '⏳', triple: '👹' };
   function drawTelegraph(t) {
     ctx.save();
     ctx.translate(t.x, t.y);
@@ -2725,6 +2740,7 @@
     for (const e of snap.patrols) dot(e.x, e.y, 3, e.alert ? (Math.sin(now * 12) > 0 ? '#ff4040' : '#ffffff') : '#b08cff');
     if (snap.ring) { ctx.strokeStyle = '#ff3a6a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ox + snap.ring.x * sx, oy + snap.ring.y * sx, snap.ring.r * sx, 0, Math.PI * 2); ctx.stroke(); }
     if (snap.boss2) dot(snap.boss2.x, snap.boss2.y, 6, BOSS_UI.twin2);
+    for (const e of snap.ex || []) dot(e.x, e.y, 6, BOSS_UI[e.type] || '#ff2020'); // 三鬼合戦のほかの鬼
     for (const e of snap.decoys || []) if (snap.reveal || snap.falcon) dot(e.x, e.y, 5, '#888'); else { dot(e.x, e.y, 6, BOSS_UI.kyubi); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox + e.x * sx, oy + e.y * sx, 6, 0, Math.PI * 2); ctx.stroke(); } // 九尾鬼の偽者もミニマップでは本物と同じに見える（ホルスがいると灰色）
     if (snap.boss && (!snap.boss.bliz || snap.reveal)) {
       dot(snap.boss.x, snap.boss.y, 6, BOSS_UI[snap.boss.type] || '#ff2020');
@@ -2821,7 +2837,8 @@
   }
   function drawHUD(me, now) {
     Stages.drawTint(ctx, W, H, stage);
-    const dark = snap.boss && snap.boss.type === 'nue';
+    const meP = snap.players.find(p => p.id === myId);
+    const dark = (snap.boss && snap.boss.type === 'nue') || (snap.ex || []).some(e => e.type === 'nue') || (meP && meP.dk); // ぬえ鬼・合体技の暗やみ
     if (dark) drawNueDark(me, now);
     if (snap.players.some(p => p.crit)) { ctx.fillStyle = 'rgba(20,20,80,0.28)'; ctx.fillRect(0, 0, W, H); } // ツクヨミの月夜の帳
     if (snap.tstop) { // クロノスの時の停止: 画面が灰色に
@@ -2981,7 +2998,7 @@
     } else if (p < 0.95) {
       ctx.globalAlpha = Math.min(1, (p - 0.4) * 6, (0.95 - p) * 8);
       ctx.font = `bold ${Math.round(Math.min(W, H) * 0.1)}px sans-serif`; ctx.lineWidth = 8; ctx.strokeStyle = '#000';
-      const arrive = `${kind.name}が${S.STAGES[stage].name}に到着した…！`;
+      const arrive = sankiTypes ? `${sankiTypes.map(t => S.BOSSES[t].name).join('・')}が同時に到着…！` : `${kind.name}が${S.STAGES[stage].name}に到着した…！`;
       ctx.strokeText(arrive, W / 2, H * 0.24); ctx.fillStyle = BOSS_UI[bossType]; ctx.fillText(arrive, W / 2, H * 0.24);
       ctx.font = `bold ${Math.round(H * 0.045)}px sans-serif`; ctx.lineWidth = 5;
       ctx.strokeText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09); ctx.fillStyle = '#fff'; ctx.fillText('見回り鬼に見つかると、ボス鬼に居場所がバレるぞ', W / 2, H * 0.24 + H * 0.09);
@@ -3252,6 +3269,14 @@
     }
     drawFusuma(now, me);
 
+    // 合体技のあとに残る毒の沼・氷の床・地獄の炎
+    for (const h of snap.hz || []) {
+      const key = { poison: 'oni_fx/poison_cloud', ice: 'fx/ice_aura', fire: 'oni_fx/hellfire_ring' }[h.k], im = key && art(key);
+      ctx.save(); ctx.globalAlpha = Math.min(1, h.t) * 0.75;
+      if (im) { ctx.translate(h.x, h.y); ctx.rotate(now * 0.6); ctx.drawImage(im, -h.r * 1.15, -h.r * 1.15, h.r * 2.3, h.r * 2.3); }
+      else { ctx.fillStyle = { poison: '#7ad04a66', ice: '#9ad8ff66', fire: '#ff5a1a66' }[h.k] || '#fff4'; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
     // 地面のエフェクト（魔法陣・衝撃波など）はキャラより先に描く
     for (const e of fx) if (e.k === 'img' && e.under) drawFxImg(e);
     // y座標順に描画
@@ -3268,6 +3293,7 @@
       } else list.push({ y: pos.y, f: () => drawBoss(snap.boss, pos, now) });
     }
     if (snap.boss2) { const pos = lerpEnt('boss2', snap.boss2.x, snap.boss2.y, snap.boss2.st === 'charging' ? 0.6 : k); list.push({ y: pos.y, f: () => drawBoss(snap.boss2, pos, now) }); }
+    for (const e of snap.ex || []) { const pos = lerpEnt('x' + e.type, e.x, e.y, e.st === 'charging' ? 0.6 : k); list.push({ y: pos.y, f: () => drawBoss(e, pos, now) }); }
     for (const e of snap.shades || []) { const pos = lerpEnt('s' + e.id, e.x, e.y, k); list.push({ y: pos.y, f: () => drawShade(e, pos, now) }); }
     for (const e of snap.decoys || []) { const pos = lerpEnt('d' + e.id, e.x, e.y, k); list.push({ y: pos.y, f: () => drawDecoy(e, pos, now) }); }
     for (const p of snap.players) {
