@@ -170,7 +170,7 @@
     if (m['title/logo']) { // 生成AIのロゴ
       const img = new Image();
       img.className = 'logo-img'; img.alt = '鬼バスターズ';
-      img.onload = () => { svgLogo.style.display = 'none'; logo.appendChild(img); };
+      img.onload = () => { svgLogo.style.display = 'none'; logo.classList.add('has-img'); logo.appendChild(img); };
       img.src = 'art/' + m['title/logo'];
     }
     if (m['title/oni_peek']) { // 画面のはしからのぞく赤鬼

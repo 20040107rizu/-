@@ -607,7 +607,9 @@ html.art-ui #result { background: linear-gradient(#0b051490, #0b0514d0), var(--a
 html.art-ui #result.lose { background: linear-gradient(#0b051490, #0b0514d0), var(--art-bg-result_lose) center/cover no-repeat; }
 html.art-ui #choiceScreen, html.art-ui #rewardScreen { background: linear-gradient(#0b0514b8, #0b0514e0), var(--art-gacha-bg) center/cover no-repeat; }
 .charm-big img { width: 120px; height: 120px; object-fit: contain; }
-.logo-img { display: block; width: 100%; max-height: calc(40 * var(--vh, 1vh)); object-fit: contain; animation: logoPop .9s cubic-bezier(.2, 1.6, .4, 1) both, logoFloat 4s 1s ease-in-out infinite; filter: drop-shadow(0 6px 14px #000a); }
+.logo-wrap.has-img { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; margin: 0; padding-top: calc(1.5 * var(--vh, 1vh)); }
+/* ロゴは、ボタンの上に残った高さにおさまる大きさにする（画面の上で切れないように） */
+.logo-img { display: block; height: 100%; width: auto; max-width: 100%; max-height: calc(40 * var(--vh, 1vh)); object-fit: contain; animation: logoPop .9s cubic-bezier(.2, 1.6, .4, 1) both, logoFloat 4s 1s ease-in-out infinite; filter: drop-shadow(0 6px 14px #000a); }
 @keyframes logoPop { from { transform: scale(.4) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes logoFloat { 50% { transform: translateY(-6px); } }
 #title > .oni-peek { position: absolute; left: -2%; bottom: -3%; width: min(30vw, calc(42 * var(--vh, 1vh))); z-index: 0; pointer-events: none; animation: oniPeek 6s ease-in-out infinite; transform-origin: 20% 100%; }
