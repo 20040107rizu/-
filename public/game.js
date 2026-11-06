@@ -840,9 +840,9 @@
     let x = Math.random(), rank = ball.ranks[0][0];
     for (const [rk, w] of ball.ranks) { if (x < w) { rank = rk; break; } x -= w; }
     const pool = S.YOKAI.filter(y => y.rank === rank);
-    let y = pool[Math.floor(Math.random() * pool.length)], spNote = '';
+    let y = pool[Math.floor(Math.random() * pool.length)], spNote = '', spKind = null;
     if (key === 'special') { // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%
-      const sp = S.rollSpecial(); y = sp.y;
+      const sp = S.rollSpecial(); y = sp.y; spKind = sp.kind;
       if (sp.kind === 'god' && friends[y.id]) { stats.gods.frag += (y.frag || S.GOD_FRAG); spNote = `（持っているので神の欠片 +${y.frag || S.GOD_FRAG}）`; }
       if (sp.kind === 'legend' && friends[y.id]) { const sl = (stats.seals[y.id] = stats.seals[y.id] || { frag: 0 }); sl.frag += S.SEAL.gacha; spNote = `（持っているので封印の欠片 +${S.SEAL.gacha}）`; }
     }
@@ -855,9 +855,9 @@
     $('btnToResult').hidden = true; $('btnToResult').textContent = 'ホームへ';
     $('gachaFail').hidden = true;
     GachaShow.run($('gachaStage'), {
-      team: 0, ticket: key === 'special' ? `🌈スペシャルガチャチケット${spNote}` : `${ball.name}玉チケット`,
+      team: 0, ticket: key === 'special' ? `🌈スペシャルガチャチケット${spNote}` : `${ball.name}玉チケット`, special: spKind === 'S' ? null : spKind, tease: !!spKind && (spKind !== 'S' || Math.random() < 0.15),
       ball: { key: ball.key, name: ball.name, color: ball.color },
-      yokai: { name: y.name, rank: y.rank, rankColor: S.RANKS[y.rank].color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' },
+      yokai: (() => { const rk = spKind === 'god' ? 'G' : spKind === 'legend' ? 'L' : y.rank; return { name: y.name, rank: rk, rankColor: (S.RANKS[rk] || S.RANKS.S).color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' }; })(),
       isNew, overExp, dupCount: friends[y.id], totsu: S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
     }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
     show('gacha');

@@ -182,16 +182,33 @@
     ball.classList.add('drop');
     SFX.drop();
     await wait(1100);
+    // スペシャルガチャの前ぶれ: 黒玉がガタガタふるえて、虹色の火花（レジェンド・神なら必ず、Sでもたまに）
+    if (o.tease) { ball.classList.add('tease'); SFX.shimmer(); shakeScreen('gs-quake'); await wait(900); }
 
     // 5) お札がはがれて色がわかる
     await tap('タップでお札をはがす');
     ball.classList.add('burn'); SFX.burn();
     await wait(650);
-    flash(o.ball.color, 500);
     const bt = $('.gs-balltext');
-    bt.textContent = `${o.ball.name}のガチャ玉！`; bt.style.color = o.ball.key === 'black' ? '#d0a8ff' : o.ball.color; bt.hidden = false;
-    ball.classList.add('glow');
-    await wait(900);
+    if (o.special) { // 確定演出: お札の下は虹の玉（レジェンド）・金と白に光る玉（神）
+      ball.classList.remove('tease');
+      ball.classList.add(o.special === 'god' ? 'divine' : 'rainbow');
+      g.classList.add(o.special === 'god' ? 'gs-divine' : 'gs-rainbow');
+      ball.style.setProperty('--ball', o.special === 'god' ? '#fff6c0' : '#ff9ae8');
+      SFX.thunder(); shakeScreen('gs-quake-big');
+      flash(o.special === 'god' ? '#ffffff' : '#ff9ae8', o.special === 'god' ? 1400 : 800);
+      if (o.special === 'god') { await wait(500); SFX.thunder(); flash('#fff6c0', 1200); }
+      bt.textContent = o.special === 'god' ? '✨ 神々しく光る玉…！？' : '🌈 虹のガチャ玉！？';
+      bt.style.color = o.special === 'god' ? '#fff6c0' : '#ff9ae8'; bt.hidden = false;
+      ball.classList.add('glow');
+      await wait(o.special === 'god' ? 1600 : 1200);
+    } else {
+      ball.classList.remove('tease');
+      flash(o.ball.color, 500);
+      bt.textContent = `${o.ball.name}のガチャ玉！`; bt.style.color = o.ball.key === 'black' ? '#d0a8ff' : o.ball.color; bt.hidden = false;
+      ball.classList.add('glow');
+      await wait(900);
+    }
 
     // 6) 割って妖怪を出す
     await tap('タップであける！');
@@ -214,12 +231,17 @@
     rv.classList.add('show');
     await wait(tier >= 3 ? 1100 : 800);
     const stamp = $('.gs-stamp');
-    stamp.textContent = o.yokai.rank; stamp.classList.add('on'); SFX.stamp(); shakeScreen('gs-quake');
+    stamp.textContent = o.yokai.rank === 'G' ? '神' : o.yokai.rank; stamp.classList.add('on'); SFX.stamp(); shakeScreen(o.special ? 'gs-quake-big' : 'gs-quake');
     await wait(350);
     $('.gs-name').textContent = o.yokai.name; $('.gs-name').classList.add('on');
     $('.gs-msg').textContent = o.isNew ? `${o.yokai.role}の${o.yokai.name}がお友達になった！` : o.overExp ? `${o.yokai.name}は凸MAX！ あふれた分が 📈 経験値 +${o.overExp.toLocaleString('ja-JP')} に変わった` : o.totsu != null ? (o.dupCount - 1 > o.totsuMax ? `${o.yokai.name}は凸MAX！ これ以上は強くならないけど仲良し（×${o.dupCount}）` : `${o.yokai.name}が凸${o.totsu}になった！ HP・攻撃 +${Math.round(o.totsu * o.totsuStep * 100)}%`) : `${o.yokai.name}とさらに仲良くなった！（×${o.dupCount}）`;
     $('.gs-msg').classList.add('on');
-    SFX.fanfare(tier);
+    SFX.fanfare(o.special ? 4 : tier);
+    if (o.special) { // レジェンド・神: いちばん長いファンファーレと、虹・金の紙吹雪
+      const cols = o.special === 'god' ? ['#ffffff', '#fff6c0', '#ffd23a', '#ffe680'] : ['#ff4a4a', '#ffd23a', '#4ae07a', '#3ac8ff', '#c85aff'];
+      confetti($('.gs-cfl'), cols, 120); setTimeout(() => confetti($('.gs-cfl'), cols, 100), 600); setTimeout(() => confetti($('.gs-cfl'), cols, 80), 1300);
+      setTimeout(() => SFX.fanfare(4), 900);
+    }
     confetti($('.gs-cfl'), tier >= 3 ? ['#ffe14a', '#fff6c0', '#ffb000', '#ffffff'] : [o.yokai.rankColor, '#ffffff', '#ff8ad8', '#7ad8ff'], tier >= 3 ? 90 : 50);
     if (tier >= 3) setTimeout(() => confetti($('.gs-cfl'), ['#ffe14a', '#fff6c0', '#ffffff'], 60), 700);
     await wait(900);

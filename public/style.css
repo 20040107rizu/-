@@ -686,3 +686,17 @@ html.art-ui .cs-bg { background: linear-gradient(#0b0514b0, #0b0514e8), var(--ar
 #shopPop.on { animation: shopPop 1.4s ease-out; }
 @keyframes shopPop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); } 30% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -80%) scale(1); } }
 html.art-ui .cp-head button.sell { background: linear-gradient(#5a3a6a, #3a2448); font-size: 11px; padding: 5px 8px; }
+/* スペシャルガチャ: レジェンド（虹の玉）・神（金と白に光る玉）の確定演出 */
+.gs-ball.tease .gs-ballcore { animation: gsTease .12s infinite; box-shadow: 0 0 30px #c85aff, 0 0 60px #ff9ae8; }
+@keyframes gsTease { 25% { transform: translate(-3px, 1px) rotate(-4deg); } 75% { transform: translate(3px, -1px) rotate(4deg); } }
+.gs-ball.rainbow .gs-ballcore, html.art-ui .gs-ball.rainbow.burn .gs-ballcore { background: conic-gradient(from 0deg, #ff4a4a, #ffd23a, #4ae07a, #3ac8ff, #c85aff, #ff4a4a) !important; border: 4px solid #fff; border-radius: 50%; box-shadow: 0 0 40px #ff9ae8, 0 0 90px #c85aff; filter: none; animation: gsSpin 2s linear infinite; }
+.gs-ball.divine .gs-ballcore, html.art-ui .gs-ball.divine.burn .gs-ballcore { background: radial-gradient(circle at 40% 35%, #fff 0 25%, #fff6c0 45%, #ffd23a 80%) !important; border: 4px solid #fff; border-radius: 50%; box-shadow: 0 0 60px #fff, 0 0 120px #ffd23a, 0 0 200px #fff6c0; filter: none; animation: gsDivine 1s ease-in-out infinite; }
+@keyframes gsDivine { 50% { box-shadow: 0 0 90px #fff, 0 0 180px #ffd23a, 0 0 260px #fff6c0; transform: scale(1.06); } }
+.gs-rainbow .gs-bg { filter: hue-rotate(0deg) saturate(1.4); animation: gsHue 2s linear infinite; }
+@keyframes gsHue { to { filter: hue-rotate(360deg) saturate(1.4); } }
+.gs-divine .gs-bg { filter: brightness(1.6) sepia(.4); }
+.gs-rainbow .gs-rays { background: repeating-conic-gradient(from 0deg, #ff4a4a 0 6deg, #ffd23a 6deg 12deg, #4ae07a 12deg 18deg, #3ac8ff 18deg 24deg, #c85aff 24deg 30deg, transparent 30deg 40deg) !important; opacity: .7 !important; }
+.gs-divine .gs-rays { background: repeating-conic-gradient(from 0deg, #fff 0 5deg, transparent 5deg 15deg) !important; opacity: .9 !important; }
+html.art-ui .gs-rainbow .gs-charabox::before { background-image: var(--art-gacha-burst_rainbow); }
+.gs-divine .gs-charabox::before { filter: brightness(1.5) saturate(.6); }
+.gs-divine .gs-stamp, .gs-rainbow .gs-stamp { font-size: 1.4em; }
