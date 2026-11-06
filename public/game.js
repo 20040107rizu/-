@@ -783,8 +783,44 @@
   const ents = new Map();
   const floats = [];
   const fx = [];
+  // ---- 画像のエフェクト（生成AIの絵。動き＝大きさ・回転・消え方はここで付ける） ----
+  // 色から属性を当てる（サーバーのイベントは色だけ送ってくる）
+  const EL_RGB = Object.entries(Attacks.ELEMENT).map(([k, v]) => { const n = parseInt(v.color.slice(1), 16); return [k, n >> 16, (n >> 8) & 255, n & 255]; });
+  function elOfColor(c) {
+    if (!c || c[0] !== '#' || c.length < 7) return null;
+    const n = parseInt(c.slice(1, 7), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    let best = null, bd = 1e9;
+    for (const [k, R, G, B] of EL_RGB) { const d = (R - r) ** 2 + (G - g) ** 2 + (B - b) ** 2; if (d < bd) { bd = d; best = k; } }
+    return bd < 9000 ? best : null;
+  }
+  const easeOut = p => 1 - (1 - p) ** 3;
+  // o: size（大きさ）, s0→s1（大きさの変化）, t（秒）, a（向き）, spin（回転の速さ）, add（光を足す）, alpha, rise（上に動く）
+  function fxImg(key, x, y, o = {}) {
+    if (!art(key)) return false;
+    if (fx.length > 90 && !o.must) return true; // 多すぎると重い・画面が真っ白になるので、それ以上は出さない
+    const t = o.t || 0.35;
+    fx.push({ k: 'img', key, x, y, a: o.a || 0, s0: o.s0 ?? 0.6, s1: o.s1 ?? 1, size: o.size || 120, t, max: t, spin: o.spin || 0, add: o.add, alpha: o.alpha ?? 1, rise: o.rise || 0, hold: o.hold ?? 0.55, follow: o.follow, under: o.under }); // under: キャラの下（地面）に描く
+    return true;
+  }
+  function drawFxImg(e) {
+    const img = art(e.key);
+    if (!img) return;
+    const p = 1 - e.t / e.max, sc = e.s0 + (e.s1 - e.s0) * easeOut(Math.min(1, p / 0.7));
+    const al = e.alpha * (p < e.hold ? 1 : Math.max(0, 1 - (p - e.hold) / (1 - e.hold)));
+    let x = e.x, y = e.y;
+    if (e.follow) { const fp = snap.players.find(q => q.id === e.follow); if (fp) { x = fp.x; y = fp.y; } }
+    ctx.save(); ctx.globalAlpha = al; if (e.add) ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(x, y - e.rise * p); ctx.rotate(e.a + e.spin * p * e.max);
+    const s = e.size * sc; ctx.drawImage(img, -s / 2, -s / 2, s, s);
+    ctx.restore();
+  }
+  function preloadFx() { for (const k of Object.keys(MANIFEST)) if (/^(fx|oni_fx|ult)\//.test(k)) art(k); }
+  // キャラの動き（ふみこみ・歩くはずみ・必殺ポーズ）: id -> 状態
+  const motion = new Map();
+  function motionOf(id) { let m = motion.get(id); if (!m) motion.set(id, m = { px: null, py: null, walk: 0, mv: 0, atk: 0, st: 0, lunge: 0, la: 0, sq: 0, hurt: 0, pose: 0, poseMax: 1 }); return m; }
   const bubbles = new Map(); // 見回り鬼の笛表示 id -> 残り時間
   let shake = 0;
+  let zoomPunch = 0; // 必殺技の瞬間に少しだけ画面が寄る
   let banner = null;
   let godFlash = null; // 神の必殺技: 画面が一瞬その色に光る
   // 神の必殺技の演出（カットインは出さず、その場で大きく光る）
@@ -1129,7 +1165,7 @@
         timeLimit = m.timeLimit;
         dama = new Map(m.dama.map(d => [d.id, d]));
         snap = null; myPred = null; result = null;
-        ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear();
+        ents.clear(); floats.length = 0; fx.length = 0; bubbles.clear(); motion.clear(); preloadFx();
         bossType = m.boss;
         stage = S.STAGES[m.stage] ? m.stage : 'oni';
         spectateId = null;
@@ -1700,24 +1736,41 @@
   function handleEvent(ev) {
     const near = (x, y) => myPred && Math.hypot(x - myPred.x, y - myPred.y) < 700;
     switch (ev.k) {
-      case 'dmg': floats.push({ x: ev.x, y: ev.y, text: ev.v, c: '#fff', t: 0.8 }); break;
+      case 'dmg':
+        floats.push({ x: ev.x, y: ev.y, text: ev.v, c: '#fff', t: 0.8 });
+        if (ev.v >= 8 && Math.random() < 0.7) fxImg(ev.v >= 60 ? 'fx/impact_big' : 'fx/impact', ev.x + (Math.random() - 0.5) * 20, ev.y - 10 + (Math.random() - 0.5) * 20, { size: ev.v >= 60 ? 110 : 64, t: 0.16, s0: 0.5, s1: 1.1, a: Math.random() * 6.28, add: true, hold: 0.3 });
+        if (ev.v >= 60 && near(ev.x, ev.y)) shake = Math.max(shake, 0.08);
+        break;
       case 'hurt':
         floats.push({ x: ev.x, y: ev.y, text: ev.v, c: '#ff5050', t: 0.8 });
+        fxImg('fx/claw', ev.x, ev.y - 20, { size: 70, t: 0.22, s0: 0.7, s1: 1, a: -0.4, hold: 0.4 });
+        if (ev.id) motionOf(ev.id).hurt = 0.25;
         if (ev.id === myId) { shake = 0.25; navigator.vibrate?.(40); }
         break;
-      case 'heal': floats.push({ x: ev.x, y: ev.y, text: '+' + ev.v, c: '#7dff9a', t: 0.8 }); break;
-      case 'slash': fx.push({ k: 'slash', x: ev.x, y: ev.y, a: ev.a, c: ev.c, big: ev.big, t: 0.15, max: 0.15 }); break;
+      case 'heal': floats.push({ x: ev.x, y: ev.y, text: '+' + ev.v, c: '#7dff9a', t: 0.8 }); if (ev.v >= 5 && Math.random() < 0.6) fxImg('fx/heal', ev.x, ev.y + 10, { size: 80, t: 0.6, s0: 0.6, s1: 1, rise: 20, add: true }); break;
+      case 'slash': if (!fxImg(ev.big ? 'fx/slash_big' : 'fx/slash', ev.x, ev.y, { a: ev.a + 0.6, size: ev.big ? 150 : 115, t: 0.2, s0: 0.75, s1: 1.15, add: true, hold: 0.35 })) fx.push({ k: 'slash', x: ev.x, y: ev.y, a: ev.a, c: ev.c, big: ev.big, t: 0.15, max: 0.15 }); break;
       case 'beam': fx.push({ k: 'beam', x: ev.x, y: ev.y, x2: ev.x2, y2: ev.y2, w: ev.w, c: ev.c, t: 0.22, max: 0.22 }); break;
       case 'cone': fx.push({ k: 'cone', x: ev.x, y: ev.y, a: ev.a, r: ev.r, c: ev.c, t: 0.25, max: 0.25 }); break;
       case 'blink': fx.push({ k: 'beam', x: ev.x, y: ev.y, x2: ev.x2, y2: ev.y2, w: 26, c: ev.c, t: 0.3, max: 0.3 }); fx.push({ k: 'ring', x: ev.x2, y: ev.y2, r: 110, c: ev.c, t: 0.35, max: 0.35 }); break;
-      case 'bolt': fx.push({ k: 'bolt', x: ev.x, y: ev.y, c: ev.c, t: 0.3, max: 0.3 }); if (near(ev.x, ev.y)) shake = Math.max(shake, 0.12); break;
+      case 'bolt':
+        if (!fxImg('oni_fx/lightning', ev.x, ev.y - 90, { size: 220, t: 0.3, s0: 0.9, s1: 1, hold: 0.4 })) fx.push({ k: 'bolt', x: ev.x, y: ev.y, c: ev.c, r: ev.r || 80, t: 0.3, max: 0.3 });
+        fxImg('fx/thunder_hit', ev.x, ev.y, { size: (ev.r || 60) * 2, t: 0.3, s0: 0.4, s1: 1.1, alpha: 0.8 });
+        if (near(ev.x, ev.y)) shake = Math.max(shake, 0.12);
+        break;
       case 'buff': fx.push({ k: 'buff', id: ev.id, t: 0.8, max: 0.8 }); if (ev.id === myId) floatOn(ev.id, '攻撃・速さアップ！', '#ffd84a'); break;
-      case 'dodge': fx.push({ k: 'after', id: ev.id, t: 0.3, max: 0.3 }); break;
-      case 'strong': floatOn(ev.id, ev.name, ev.c); break;
+      case 'dodge': fx.push({ k: 'after', id: ev.id, t: 0.3, max: 0.3 }); { const p = snap && snap.players.find(q => q.id === ev.id); if (p) fxImg('fx/dust', p.x, p.y + 14, { size: 80, t: 0.4, s0: 0.6, s1: 1.2, alpha: 0.8, under: true }); } break;
+      case 'strong': floatOn(ev.id, ev.name, ev.c); motionOf(ev.id).st = 1; break;
       case 'ult': {
         // 技の名前をキャラの上に出す（大きなカットインはなし）
         floatOn(ev.id, `必殺！${ev.name}`, ev.c, true);
         fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#fff', t: 0.4, max: 0.4 });
+        { // 必殺ポーズに切りかえ＋足もとに魔法陣＋属性のオーラ
+          const up = snap && snap.players.find(q => q.id === ev.id), uel = up ? Attacks.of(up.yokai).el : elOfColor(ev.c);
+          const m = motionOf(ev.id); m.pose = m.poseMax = 1.5;
+          fxImg('fx/magic_circle', ev.x, ev.y + 14, { size: 230, t: 1.5, s0: 0.3, s1: 1, spin: 1.6, add: true, hold: 0.75, alpha: 0.85, under: true, follow: ev.id });
+          if (uel) fxImg(`fx/${uel}_aura`, ev.x, ev.y - 10, { size: 330, t: 0.9, s0: 0.25, s1: 1.35, add: true, hold: 0.4, under: true });
+          zoomPunch = 0.25;
+        }
         shake = Math.max(shake, 0.3);
         beep(220, 0.5, 'sawtooth', 0.08, 600); setTimeout(() => beep(660, 0.4, 'triangle', 0.07, 900), 120);
         if (ev.kind === 'roar') for (let k = 0; k < 3; k++) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 480 * (0.5 + k * 0.25), c: ['#ff4a4a', '#ffb83a', '#fff'][k], t: 0.7 + k * 0.15, max: 0.7 + k * 0.15 });
@@ -1728,11 +1781,14 @@
         if (ev.kind === 'gungnir') shake = Math.max(shake, 0.5);
         break;
       }
-      case 'ring': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: ev.r, c: ev.c, t: 0.4, max: 0.4 }); break;
-      case 'boom':
-        fx.push({ k: 'boom', x: ev.x, y: ev.y, r: ev.r || 80, c: ev.c, t: ev.big ? 0.5 : 0.35, max: ev.big ? 0.5 : 0.35 });
+      case 'ring': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: ev.r, c: ev.c, t: 0.4, max: 0.4 }); fxImg('fx/shockwave', ev.x, ev.y, { size: (ev.r || 100) * 2.1, t: 0.4, s0: 0.3, s1: 1, add: true, alpha: 0.7, hold: 0.2, under: true }); break;
+      case 'boom': {
+        const bel = elOfColor(ev.c), bkey = ev.big ? 'fx/explosion' : bel ? `fx/${bel}_hit` : 'fx/impact_big';
+        if (!fxImg(bkey, ev.x, ev.y - 10, { size: (ev.r || 80) * (ev.big ? 2.4 : 2.1), t: ev.big ? 0.6 : 0.4, s0: 0.35, s1: 1.1, add: !ev.big, hold: 0.45 })) fx.push({ k: 'boom', x: ev.x, y: ev.y, r: ev.r || 80, c: ev.c, t: ev.big ? 0.5 : 0.35, max: ev.big ? 0.5 : 0.35 });
+        if (ev.big) fxImg('fx/smoke', ev.x, ev.y - 20, { size: (ev.r || 80) * 2, t: 1.0, s0: 0.6, s1: 1.4, rise: 30, alpha: 0.6 });
         if (near(ev.x, ev.y)) { shake = Math.max(shake, ev.big ? 0.4 : 0.15); beep(90, 0.3, 'sawtooth', 0.06, -40); }
         break;
+      }
       case 'whistle':
         bubbles.set(ev.id, 1.0);
         if (ev.target === myId) {
@@ -1754,9 +1810,15 @@
       case 'pick':
         if (ev.id === myId) { banner = { text: `${S.ITEMS[ev.item].icon} ${S.ITEMS[ev.item].name}をひろった`, t: 1.2, c: '#ffe36b' }; beep(880, 0.12, 'square', 0.04); }
         break;
-      case 'use': if (ev.id === myId) beep(660, 0.1, 'square', 0.05); break;
-      case 'stun': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#ffe14a', t: 0.6, max: 0.6 }); banner = { text: 'ボス鬼がしびれた！', t: 1.4, c: '#ffe14a' }; break;
-      case 'oniDown': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 90, c: '#ffffff', t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) banner = { text: '見回り鬼をたおした！', t: 1.2 }; break;
+      case 'use': {
+        if (ev.id === myId) beep(660, 0.1, 'square', 0.05);
+        const ik = { stamina: 'fx/item_stamina', onigiri: 'fx/item_onigiri', jimmy: 'fx/item_jimmy', trap: 'fx/item_trap' }[ev.item];
+        if (ik) fxImg(ik, ev.x, ev.y - (ev.item === 'trap' ? 0 : 20), { size: ev.item === 'trap' ? 90 : 120, t: 0.7, s0: 0.5, s1: 1.15, add: ev.item !== 'jimmy', rise: ev.item === 'onigiri' ? 20 : 0 });
+        if (ev.item === 'punch' || ev.item === 'bomb') motionOf(ev.id).st = 1;
+        break;
+      }
+      case 'stun': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 120, c: '#ffe14a', t: 0.6, max: 0.6 }); fxImg('fx/thunder_aura', ev.x, ev.y - 20, { size: 260, t: 0.6, s0: 0.4, s1: 1.2, add: true }); banner = { text: 'ボス鬼がしびれた！', t: 1.4, c: '#ffe14a' }; break;
+      case 'oniDown': if (!fxImg('oni_fx/oni_down', ev.x, ev.y - 20, { size: 130, t: 0.55, s0: 0.5, s1: 1.25, hold: 0.4 })) fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 90, c: '#ffffff', t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) banner = { text: '見回り鬼をたおした！', t: 1.2 }; break;
       case 'clang': floats.push({ x: ev.x, y: ev.y, text: 'カキン！', c: '#ffd23a', t: 0.7, small: true }); if (Math.random() < 0.5) beep(1800, 0.05, 'square', 0.03, 600); break;
       case 'bliz': banner = { text: '❄ 吹雪だ！', sub: '白鬼の姿が見えない…赤い予告に気をつけろ', t: 2.4, c: '#bfe6ff' }; beep(300, 0.8, 'sawtooth', 0.04, -200); break;
       case 'blizEnd': banner = { text: '吹雪がやんだ', t: 1.4, c: '#bfe6ff' }; break;
@@ -1765,7 +1827,7 @@
         fx.push({ k: 'bolt', x: ev.x, y: ev.y, r: ev.r || 80, t: 0.35, max: 0.35 });
         if (near(ev.x, ev.y)) { shake = Math.max(shake, 0.2); beep(1400, 0.12, 'sawtooth', 0.05, -1300); }
         break;
-      case 'gust': fx.push({ k: 'gust', x: ev.x, y: ev.y, a: ev.a || 0, t: 0.5, max: 0.5 }); if (near(ev.x, ev.y)) beep(200, 0.4, 'triangle', 0.05, 400); break;
+      case 'gust': fx.push({ k: 'gust', x: ev.x, y: ev.y, a: ev.a || 0, t: 0.5, max: 0.5 }); fxImg('oni_fx/wind_gust', ev.x, ev.y, { a: ev.a || 0, size: 300, t: 0.6, s0: 0.6, s1: 1.3, add: true, alpha: 0.85 }); if (near(ev.x, ev.y)) beep(200, 0.4, 'triangle', 0.05, 400); break;
       case 'phase':
         banner = ev.n === 2 ? { text: '鬼神が変身した！', sub: '金の鎧・吹雪・大なぎ払いを使ってくるぞ', t: 2.8, c: '#ff3a6a' } : { text: '鬼神 最後の姿！', sub: '町がせまくなっていく…赤い輪の中にいろ！', t: 3, c: '#ff3a6a' };
         fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 420, c: '#ff3a6a', t: 0.9, max: 0.9 }); shake = 0.8; beep(60, 0.9, 'sawtooth', 0.12, -20);
@@ -1817,7 +1879,8 @@
       case 'poof': fx.push({ k: 'ring', x: ev.x, y: ev.y, r: 110, c: '#ff8ac8', t: 0.5, max: 0.5 }); break;
       case 'bossDown': banner = { text: `${S.BOSSES[bossType].name}をたおした！`, t: 2.5, c: '#ffd84a' }; shake = 0.6; break;
       case 'down': if (ev.id === myId) banner = { text: 'たおれた… 仲間を待とう', t: 2, c: '#ff8080' }; break;
-      case 'revive': if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
+      case 'revive': { const p = snap && snap.players.find(q => q.id === ev.id); if (p) fxImg('fx/revive', p.x, p.y - 60, { size: 200, t: 0.9, s0: 0.6, s1: 1.1, add: true, hold: 0.5 }); }
+        if (ev.id === myId) banner = { text: '復活！', t: 1.2, c: '#7dff9a' }; break;
       case 'escape':
         banner = ev.id === myId ? { text: '脱出成功！', sub: 'タップで観戦する仲間を切り替え', t: 2.5, c: '#ffd84a' } : { text: `${nameOf(ev.id)}が脱出した！`, t: 1.6 };
         break;
@@ -2231,7 +2294,7 @@
     ctx.fillStyle = e.alert ? 'rgba(255,60,60,0.16)' : 'rgba(255,240,120,0.12)';
     ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.arc(pos.x, pos.y, range, e.face - half, e.face + half); ctx.closePath(); ctx.fill();
     const img = art('oni/patrol');
-    if (img) { ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 18, 22, 7, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 18, 86, Math.cos(e.face) < 0, e.flash); }
+    if (img) { ctx.fillStyle = '#0006'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 18, 22, 7, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 18 - Math.abs(Math.sin(now * (e.alert ? 14 : 8) + e.id)) * 4, 86, Math.cos(e.face) < 0, e.flash); } // 歩くとはずむ（見つけると速く）
     else drawOni(pos.x, pos.y, 22, '#7a4ab0', e.face, e.flash, [0]);
     bar(pos.x - 20, pos.y - (img ? 66 : 40), 40, 4, e.hp / e.maxHp, '#ff5050');
     if (e.alert) {
@@ -2253,7 +2316,10 @@
     if (img) { ctx.shadowBlur = 0; ctx.fillStyle = '#0007'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y + 40, 50 * size / 180, 15 * size / 180, 0, 0, Math.PI * 2); ctx.fill(); drawSprite(img, pos.x, pos.y + 40 + wob, size, Math.cos(b.face) < 0, b.flash); }
     else drawOni(pos.x, pos.y + wob, 46, S.BOSSES[b.type || 'red'].color, b.face, b.flash, [-1, 1]);
     ctx.shadowBlur = 0;
-    if (b.stun) {
+    if (b.stun && art('fx/stun')) { // しびれ: 頭の上で星がまわる
+      const im = art('fx/stun'); ctx.save(); ctx.translate(pos.x, pos.y - (b.big ? 190 : 110)); ctx.rotate(now * 3); ctx.drawImage(im, -45, -45, 90, 90); ctx.restore();
+      ctx.fillStyle = '#ffe14a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('ビリビリ…', pos.x, pos.y - (b.big ? 240 : 160));
+    } else if (b.stun) {
       ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 3;
       for (let k = 0; k < 5; k++) {
         const a = now * 6 + k * 1.26;
@@ -2308,6 +2374,13 @@
   // 金鬼から先のボスのまわりの光
   function bossAura(b, pos, now) {
     const cy = pos.y - 30;
+    const spr = (key, x, y, size, rot, alpha, add) => { const im = art(key); if (!im) return; ctx.save(); ctx.globalAlpha *= alpha; if (add) ctx.globalCompositeOperation = 'lighter'; ctx.translate(x, y); ctx.rotate(rot); ctx.drawImage(im, -size / 2, -size / 2, size, size); ctx.restore(); };
+    const bs = b.big ? 1.8 : 1;
+    if (b.rage) spr('oni_fx/rage_aura', pos.x, pos.y + 20, 230 * bs * (1 + 0.04 * Math.sin(now * 8)), now * 0.8, 0.55, true); // 怒り: 足もとに赤黒い炎
+    if (b.armor) spr('oni_fx/gold_armor', pos.x, cy, 210 * bs, 0, 0.35 + 0.15 * Math.sin(now * 9), true);
+    if (b.type === 'fuurai' && b.mode !== 'wind') spr('oni_fx/thunder_drum', pos.x, cy - 10, 240, Math.sin(now) * 0.1, 0.6);
+    if (b.type === 'kyubi') for (let k = 0; k < 3; k++) { const a = now * 1.5 + k * 2.1; spr('oni_fx/foxfire', pos.x + Math.cos(a) * 90, cy + Math.sin(a) * 40, 50, 0, 0.9, true); }
+    if (b.type === 'shin' || (b.phase || 0) >= 3) spr('oni_fx/awaken', pos.x, cy, 240 * bs, now * 0.4, 0.35, true);
     if (b.armor) { // 金の鎧: 正面に盾
       ctx.save(); ctx.translate(pos.x, cy);
       ctx.strokeStyle = `rgba(255,215,60,${0.7 + 0.3 * Math.sin(now * 9)})`; ctx.lineWidth = 10; ctx.lineCap = 'round';
@@ -2429,7 +2502,33 @@
     if (img) {
       ctx.strokeStyle = S.RANKS[y.rank].color; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(0, 16, 20, 7, 0, 0, Math.PI * 2); ctx.stroke();
-      drawSprite(img, 0, 16, y.legend || y.god ? 96 : 80, Math.cos(p.face) < 0);
+      // ---- 動き: 歩くとはずむ・待つと呼吸・攻撃でふみこむ・強攻撃でちぢんで伸びる・やられると白く光ってゆれる・必殺ポーズ ----
+      const m = motionOf(p.id), ts = performance.now() / 1000, mdt = m.last ? Math.min(0.1, ts - m.last) : 0; m.last = ts;
+      if (m.px != null && mdt > 0) { const d = Math.hypot(pos.x - m.px, pos.y - m.py); m.mv += ((d / mdt > 40 ? 1 : 0) - m.mv) * Math.min(1, mdt * 10); m.walk += d * 0.075; }
+      m.px = pos.x; m.py = pos.y;
+      if (p.atkCd > m.atk + 0.25) { m.lunge = 1; m.lmax = 1; m.la = p.face; } m.atk = p.atkCd || 0;
+      if (m.st === 1) { m.lunge = m.lmax = 1.4; m.la = p.face; m.sq = 1; m.st = 0; }
+      m.lunge = Math.max(0, m.lunge - mdt * 6); m.sq = Math.max(0, m.sq - mdt * 3.5); m.hurt = Math.max(0, m.hurt - mdt); m.pose = Math.max(0, m.pose - mdt);
+      const seed = typeof p.id === 'number' ? p.id : 0;
+      const lk = m.lmax ? m.lunge / m.lmax : 0, off = Math.sin(lk * Math.PI) * 15 * (m.lmax || 1);
+      const bob = -Math.abs(Math.sin(m.walk)) * 6 * m.mv;
+      const sqw = Math.sin(m.sq * Math.PI * 2) * m.sq * 0.16;
+      const breathe = Math.sin(ts * 2.6 + seed) * 0.025 * (1 - m.mv);
+      const flip = Math.cos(p.face) < 0;
+      ctx.save();
+      ctx.translate(Math.cos(m.la) * off + (m.hurt > 0 ? Math.sin(ts * 90) * 3 : 0), Math.sin(m.la) * off * 0.6 + bob);
+      if (p.down) { ctx.translate(0, 16); ctx.rotate(flip ? 1.25 : -1.25); ctx.translate(0, -16); } // 倒れたら横になる
+      ctx.translate(0, 16); ctx.rotate(Math.sin(m.walk) * 0.07 * m.mv); ctx.scale(1 + sqw, 1 - sqw + breathe); ctx.translate(0, -16);
+      const pose = m.pose > 0 && art('ult/' + y.id);
+      if (pose) { // 必殺ポーズ: ポンッと大きくなって、光の中で決める
+        const base = (y.legend || y.god ? 96 : 80) * 1.55, pk = m.pose / (m.poseMax || 1);
+        const pop = 1 + 0.35 * Math.max(0, (pk - 0.85) / 0.15);
+        ctx.save(); ctx.globalAlpha *= Math.min(1, m.pose / 0.25);
+        ctx.shadowColor = '#fff6c0'; ctx.shadowBlur = 24;
+        drawSprite(pose, 0, 16, base * pop, flip);
+        ctx.restore();
+      } else drawSprite(img, 0, 16, y.legend || y.god ? 96 : 80, flip, m.hurt > 0.12);
+      ctx.restore();
     } else {
       ctx.fillStyle = y.color;
       ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
@@ -3060,7 +3159,9 @@
     const px = scale * DPR;
     cam.x = Math.round(cam.x * px) / px; cam.y = Math.round(cam.y * px) / px;
     ctx.translate(Math.round((W / 2 + sx) * DPR) / DPR, Math.round((H / 2 + sy) * DPR) / DPR);
-    ctx.scale(scale, scale);
+    zoomPunch = Math.max(0, zoomPunch - dt);
+    const zf = 1 + 0.32 * zoomPunch; // 必殺技: ぐっと寄ってもどる
+    ctx.scale(scale * zf, scale * zf);
     ctx.translate(-cam.x, -cam.y);
 
     drawCity(cam);
@@ -3083,6 +3184,8 @@
       ctx.fillStyle = t.c; ctx.beginPath(); ctx.arc(t.x, t.y - 4, 7 + Math.sin(now * 10) * 2, 0, Math.PI * 2); ctx.fill();
     }
     for (const t of snap.traps) {
+      const ti = art('fx/item_trap');
+      if (ti) { ctx.save(); ctx.globalAlpha = 0.85 + 0.15 * Math.sin(now * 10); ctx.drawImage(ti, t.x - 40, t.y - 40, 80, 80); ctx.restore(); continue; }
       ctx.fillStyle = '#ffe14a33'; ctx.strokeStyle = '#ffe14a'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(t.x, t.y, 26, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⚡', t.x, t.y); ctx.textBaseline = 'alphabetic';
@@ -3121,6 +3224,8 @@
     }
     drawFusuma(now, me);
 
+    // 地面のエフェクト（魔法陣・衝撃波など）はキャラより先に描く
+    for (const e of fx) if (e.k === 'img' && e.under) drawFxImg(e);
     // y座標順に描画
     const list = [];
     for (const e of snap.patrols) { const pos = lerpEnt('e' + e.id, e.x, e.y, k); list.push({ y: pos.y, f: () => drawPatrol(e, pos, now) }); }
@@ -3146,7 +3251,16 @@
 
     for (const pr of snap.proj) {
       const pos = lerpEnt('j' + pr.id, pr.x, pr.y, 0.5);
-      if (pr.punch) { ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👊', pos.x, pos.y); ctx.textBaseline = 'alphabetic'; continue; }
+      if (pr.punch) {
+        const pi = art('fx/item_punch');
+        if (pi) { ctx.save(); ctx.translate(pos.x, pos.y - 10); ctx.rotate(pr.a); if (Math.cos(pr.a) < 0) ctx.scale(1, -1); ctx.drawImage(pi, -55, -55, 110, 110); ctx.restore(); continue; }
+        ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👊', pos.x, pos.y); ctx.textBaseline = 'alphabetic'; continue;
+      }
+      if (pr.bomb && art('item/bomb')) { ctx.save(); ctx.translate(pos.x, pos.y - 16); ctx.rotate(now * 8); ctx.drawImage(art('item/bomb'), -20, -20, 40, 40); ctx.restore(); continue; }
+      if (!pr.spin) { // 属性の弾の絵（進む向きに回す。絵は左にしっぽ＝右へ進む）
+        const pel = elOfColor(pr.c), si = pel && art(`fx/${pel}_shot`);
+        if (si) { const s = Math.max(44, pr.r * 4.2); ctx.save(); ctx.translate(pos.x, pos.y - (pr.lob ? 18 : 0)); ctx.rotate(pr.a); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(si, -s * 0.7, -s / 2, s, s); ctx.restore(); continue; }
+      }
       if (pr.bomb) { ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💣', pos.x, pos.y - 16); ctx.textBaseline = 'alphabetic'; continue; }
       if (!pr.spin) { glowDot(pos.x, pos.y - (pr.lob ? 18 : 0), pr.r, pr.c, pr.c, 12); continue; }
       ctx.fillStyle = pr.c; ctx.shadowColor = pr.c; ctx.shadowBlur = 12;
@@ -3166,6 +3280,7 @@
       if (e.t <= 0) { fx.splice(i, 1); continue; }
       const a = e.t / e.max;
       ctx.globalAlpha = a;
+      if (e.k === 'img') { if (!e.under) drawFxImg(e); continue; }
       if (e.k === 'slash') {
         ctx.strokeStyle = e.c || '#fff'; ctx.lineWidth = e.big ? 14 : 8; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 1.1, e.a + 1.1); ctx.stroke();
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.big ? 52 : 40, e.a - 0.9, e.a + 0.9); ctx.stroke();
