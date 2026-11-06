@@ -655,3 +655,34 @@ html.art-ui .cp-row .fav.on { color: #ffd23a; }
 .shop-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #ffffff12; border: 1px solid #ffffff26; }
 .shop-name { flex: 1; font-weight: bold; display: flex; flex-direction: column; } .shop-name small { font-weight: normal; opacity: .75; font-size: 11px; }
 html.art-ui .shop-row button.small { border-image: none; border: 2px solid #ffd84a; border-radius: 10px; background: linear-gradient(#ffb03a, #e2601f); box-shadow: 0 3px 0 #7a2a0a; padding: 6px 12px; }
+/* お守りガチャの演出 */
+#charmShow { position: fixed; inset: 0; width: var(--app-w, 100%); height: var(--app-h, 100%); z-index: 95; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
+#charmShow[hidden] { display: none; }
+.cs-bg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, #3a1f4c 0%, #0b0514 75%); }
+html.art-ui .cs-bg { background: linear-gradient(#0b0514b0, #0b0514e8), var(--art-gacha-bg) center/cover no-repeat; }
+.cs-bag { position: relative; width: min(38vmin, 220px); height: min(38vmin, 220px); object-fit: contain; filter: grayscale(.85) brightness(.9) drop-shadow(0 8px 20px #000a); animation: csShake .28s ease-in-out infinite; transform-origin: 50% 90%; z-index: 2; }
+.cs-emoji { font-size: min(30vmin, 180px); display: flex; align-items: center; justify-content: center; }
+@keyframes csShake { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg) translateY(-4px); } }
+.cs.hint-glow .cs-bag { filter: grayscale(.4) brightness(1.2) drop-shadow(0 0 22px var(--cc)); animation-duration: .16s; }
+.cs-glow { position: absolute; width: 60vmin; height: 60vmin; border-radius: 50%; background: radial-gradient(circle, var(--cc) 0%, transparent 65%); opacity: 0; transition: opacity .4s; z-index: 1; }
+.cs.hint-glow .cs-glow { opacity: .35; }
+.cs-burst { position: absolute; width: 110vmin; height: 110vmin; background: center/contain no-repeat; opacity: 0; z-index: 1; }
+.cs-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 5; }
+.cs.flash .cs-flash { animation: csFlash .7s ease-out; }
+@keyframes csFlash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+.cs.open .cs-bag { animation: csPop .6s cubic-bezier(.2, 1.8, .4, 1) both; filter: drop-shadow(0 0 26px var(--cc)) drop-shadow(0 0 50px var(--cc)); }
+@keyframes csPop { from { transform: scale(.3) rotate(-20deg); } to { transform: scale(1.15); } }
+.cs.open .cs-burst { opacity: .9; animation: gsSpin 8s linear infinite; }
+.cs.open .cs-glow { opacity: .6; }
+.cs.r0 .cs-burst, .cs.r1 .cs-burst { opacity: 0 !important; }
+.cs-hint { position: absolute; bottom: 9%; font-weight: bold; color: #fff; text-shadow: 0 2px 6px #000; animation: csBlink 1s infinite; z-index: 3; }
+.cs.open .cs-hint { display: none; }
+@keyframes csBlink { 50% { opacity: .4; } }
+.cs-info { position: absolute; bottom: 6%; left: 50%; transform: translateX(-50%); width: min(92%, 560px); text-align: center; background: #120a1ad8; border: 2px solid var(--cc); border-radius: 14px; padding: 8px 12px; opacity: 0; transition: opacity .4s, transform .4s; z-index: 4; }
+.cs.done .cs-info { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+.cs-info > b { font-size: 22px; } .cs-sk { font-size: 13px; margin: 4px 0; } .cs-info small { opacity: .7; }
+.cs.r4 .cs-info > b { background: linear-gradient(90deg, #ff4a4a, #ffd23a, #4ae07a, #3ac8ff, #c85aff); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+#shopPop { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%) scale(.5); padding: 14px 22px; border-radius: 16px; background: linear-gradient(#ffd84a, #e2901f); color: #3a1a00; font-weight: bold; font-size: 20px; box-shadow: 0 0 30px #ffd84a; opacity: 0; pointer-events: none; z-index: 10; white-space: nowrap; }
+#shopPop.on { animation: shopPop 1.4s ease-out; }
+@keyframes shopPop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); } 30% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -80%) scale(1); } }
+html.art-ui .cp-head button.sell { background: linear-gradient(#5a3a6a, #3a2448); font-size: 11px; padding: 5px 8px; }

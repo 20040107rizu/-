@@ -433,6 +433,7 @@
     const list = charms.slice().sort((a, b) => b.r - a.r || (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || b.id - a.id);
     box.hidden = false;
     box.innerHTML = `<div class="cp-in"><div class="cp-head"><b>${charmIco(3)} ${esc(y.name)}のお守り（${slot + 1}つ目）</b><small>持っているお守り ${charms.length}/${S.CHARM_MAX}</small>
+      <button class="small sell" data-act="sellLow">白・青を売る</button><button class="small sell" data-act="sellAll">★以外を売る</button>
       ${cur ? '<button class="small" data-act="off">はずす</button>' : ''}<button class="small alt" data-act="close">とじる</button></div>
       <div class="cp-list">${list.length ? list.map(c => { const o = owner(c.id), eff = S.charmEffects([c]);
         return `<div class="cp-row${cur && cur.id === c.id ? ' on' : ''}" style="--cc:${charmColor(c)}">${charmIco(c.r, 'cp-ico')}<div class="cp-main">${charmTag(c)}<small>${Object.entries(eff).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}${o ? `　（${esc(S.YOKAI_BY_ID[o].name)}がつけている）` : ''}</small></div>
@@ -441,6 +442,19 @@
     for (const b of box.querySelectorAll('button')) b.onclick = () => {
       const act = b.dataset.act, cid = +b.dataset.id;
       if (act === 'close') { box.hidden = true; return; }
+      if (act === 'sellLow' || act === 'sellAll') { // まとめて売る（つけているもの・★お気に入りは売らない）
+        const on = new Set(Object.values(equips).flat());
+        const list = charms.filter(c => !c.fav && !on.has(c.id) && (act === 'sellAll' || c.r <= 1));
+        if (!list.length) { alert('売れるお守りがありません（つけているもの・★お気に入りは売りません）'); return; }
+        const exp = list.reduce((a, c) => a + S.CHARM_RARITY[c.r].exp, 0);
+        const cnt = S.CHARM_RARITY.map((R, r) => [R.name, list.filter(c => c.r === r).length]).filter(([, n]) => n).map(([n, k]) => `${n}${k}`).join('・');
+        if (!confirm(`お守り ${list.length}個（${cnt}）を売って、📈 経験値 +${exp.toLocaleString('ja-JP')} にしますか？\n（つけているもの・★お気に入りは売りません）`)) return;
+        for (const c of list) removeCharm(c.id);
+        stats.expStock += exp; saveAll();
+        beep(660, 0.1, 'triangle', 0.06); setTimeout(() => beep(990, 0.15, 'triangle', 0.07), 100);
+        openCharmPick(id, slot, rerender); rerender(); box.hidden = false;
+        return;
+      }
       if (act === 'off') { equips[id] = (equips[id] || []).filter(x => x !== cur.id); if (!equips[id].length) delete equips[id]; }
       if (act === 'eq') {
         for (const k of Object.keys(equips)) { equips[k] = equips[k].filter(x => x !== cid); if (!equips[k].length) delete equips[k]; } // ほかの妖怪からはずす
@@ -744,11 +758,55 @@
     open();
   }
 
+  // ---- お守りガチャの演出 ----
+  // お守り袋がふるえて（いいお守りほど長く・光る）、タップでひらくと色がわかる
+  let lastPrizeCharm = null;
+  function charmShow(c) {
+    return new Promise(res => {
+      let el = $('charmShow');
+      if (!el) { el = document.createElement('div'); el.id = 'charmShow'; document.body.appendChild(el); }
+      const bag0 = artUrl('icon/charm_1'), bag = artUrl('icon/charm_' + (c.r + 1)), burst = artUrl(c.r >= 4 ? 'gacha/burst_rainbow' : 'gacha/burst');
+      const ico = u => (u ? `<img class="cs-bag" src="${u}" alt="">` : '<div class="cs-bag cs-emoji">🧿</div>');
+      el.className = 'cs r' + c.r; el.style.setProperty('--cc', charmColor(c));
+      el.innerHTML = `<div class="cs-bg"></div><div class="cs-burst"${burst ? ` style="background-image:url('${burst}')"` : ''}></div><div class="cs-glow"></div>${ico(bag0)}
+        <div class="cs-flash"></div><div class="cs-hint">タップでお守り袋をひらく</div>
+        <div class="cs-info"><b style="color:${charmColor(c)}">${S.charmName(c)}</b><div class="cs-sk">${c.s.map(([k, lv]) => `<div><b>${S.CHARM_SKILLS[k].name}${S.CHARM_SKILLS[k].once ? '' : '+' + lv}</b>　${S.CHARM_SKILLS[k].text(S.CHARM_SKILLS[k].per * lv)}</div>`).join('')}</div><small>タップで次へ</small></div>`;
+      el.hidden = false;
+      let stage = 0;
+      const shakeN = 2 + c.r; // いいお守りほどたくさんふるえる
+      for (let i = 0; i < shakeN; i++) setTimeout(() => { if (!stage) beep(300 + i * 70, 0.08, 'square', 0.04); }, i * 280);
+      if (c.r >= 3) setTimeout(() => { if (!stage) el.classList.add('hint-glow'); }, 600); // 金・虹: 袋が光りだす
+      const open = () => {
+        if (stage) return; stage = 1;
+        el.classList.add('flash');
+        setTimeout(() => {
+          const b = el.querySelector('.cs-bag'); if (b && b.tagName === 'IMG' && bag) b.src = bag;
+          el.classList.add('open');
+          [523, 659, 784, 1046, 1318].slice(0, 2 + c.r).forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.08), i * 90));
+          if (c.r >= 4) setTimeout(() => beep(1568, 0.6, 'triangle', 0.09), 500);
+          setTimeout(() => { el.classList.add('done'); stage = 2; }, 800);
+        }, 380);
+      };
+      const auto = setTimeout(open, shakeN * 280 + 600);
+      el.onpointerdown = e => {
+        e.preventDefault();
+        if (stage === 0) { clearTimeout(auto); open(); }
+        else if (stage === 2) { el.hidden = true; el.className = ''; el.onpointerdown = null; res(); }
+      };
+    });
+  }
+  // 交換所: もらったものがポンッと出る
+  function shopPop(text) {
+    let el = $('shopPop');
+    if (!el) { el = document.createElement('div'); el.id = 'shopPop'; $('shopScreen').appendChild(el); }
+    el.textContent = text; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  }
+
   // ---- 鬼の塔のごほうび・交換所・スペシャルガチャ ----
   // m: { k: exp|charm|ticket|frag|special, v } → 文（もらったもの）
   function giveTowerPrize(m) {
     if (m.k === 'exp') { stats.expStock += m.v; return `📈 経験値 +${m.v.toLocaleString('ja-JP')}`; }
-    if (m.k === 'charm') { const c = S.makeCharm(Math.random() < 0.15 ? Math.min(4, m.v + 1) : m.v), got = addCharm(c); return got.full ? `🧿 ${S.charmName(c)}（いっぱいなので経験値 +${got.exp}）` : `🧿 ${S.charmName(c)}（${S.charmText(c)}）`; }
+    if (m.k === 'charm') { const c = lastPrizeCharm = S.makeCharm(Math.random() < 0.15 ? Math.min(4, m.v + 1) : m.v), got = addCharm(c); return got.full ? `🧿 ${S.charmName(c)}（いっぱいなので経験値 +${got.exp}）` : `🧿 ${S.charmName(c)}（${S.charmText(c)}）`; }
     if (m.k === 'ticket') { tickets[m.v] = (tickets[m.v] || 0) + 1; return `🎫 ${S.BALLS.find(b => b.key === m.v).name}玉チケット`; }
     if (m.k === 'frag') { stats.gods.frag += m.v; return `⚡ 神の欠片 ×${m.v}`; }
     if (m.k === 'special') { tickets.special = (tickets.special || 0) + m.v; return `🌈 スペシャルガチャチケット ×${m.v}`; }
@@ -766,6 +824,7 @@
       saveAll(); renderTicketButton(); beep(784, 0.12, 'triangle', 0.07);
       $('shopMsg').textContent = `交換した：${msg}${it.id === 'special' || it.id === 'gold' || it.id === 'black' ? '（タイトル画面の「チケットガチャ」で引けます）' : ''}`;
       renderShop();
+      if (it.id === 'charm' && lastPrizeCharm) charmShow(lastPrizeCharm); else shopPop(msg); // お守りは袋をひらく演出、ほかはポンッと出る
     };
   }
   $('btnShop').onclick = () => { $('shopMsg').textContent = ''; renderShop(); show('shopScreen'); };
@@ -1636,7 +1695,6 @@
     pending = null;
     try { localStorage.removeItem('pendingChoice'); } catch {}
     saveAll();
-    beep(523, 0.15, 'triangle', 0.07); setTimeout(() => beep(784, 0.15, 'triangle', 0.07), 120); if (c.r >= 3) setTimeout(() => beep(1175, 0.4, 'triangle', 0.09), 260);
     const line = got.full ? `お守りがいっぱい（${S.CHARM_MAX}個）なので、📈 経験値 +${got.exp} に変わった` : '図鑑で妖怪をえらんで、つけられます';
     $('rewardWeek').textContent = '🧿 お守りガチャ';
     $('rewardTitle').innerHTML = `<span style="color:${charmColor(c)}">${S.charmName(c)}</span>が出た！`;
@@ -1644,7 +1702,7 @@
     $('rewardPrizes').innerHTML = `<div class="charm-big r${c.r}" style="--cc:${charmColor(c)}">${artUrl('icon/charm_' + (c.r + 1)) ? `<img src="${artUrl('icon/charm_' + (c.r + 1))}" alt="">` : '🧿'}</div><div class="charm-lines">${c.s.map(([k, lv]) => `<div><b>${S.CHARM_SKILLS[k].name}${S.CHARM_SKILLS[k].once ? '' : '+' + lv}</b>　${S.CHARM_SKILLS[k].text(S.CHARM_SKILLS[k].per * lv)}</div>`).join('')}</div>`;
     if (inBattle && result) { result.myChoice = 'charm'; result.expNote = `🧿 お守りガチャ：${S.charmName(c)}（${S.charmText(c)}）`; }
     $('btnRewardOk').onclick = () => { if (inBattle && result) { renderResult(); show('result', true); menuMusic(); } else show('title'); };
-    show('rewardScreen', inBattle);
+    charmShow(c).then(() => show('rewardScreen', inBattle)); // お守りガチャの演出のあとに結果
   };
   function pickSeal(l) {
     if (!pending || pending.count < S.SEAL_PICK) return;
