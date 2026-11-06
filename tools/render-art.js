@@ -17,6 +17,10 @@ const sheet = (args.find(a => a.startsWith('--sheet=')) || '').slice(8);
 (async () => {
   let items = all();
   if (only.length) items = items.filter(([key]) => only.some(o => key.startsWith(o)));
+  // 生成AIの絵を入れたもの（public/art/ai.json）は、SVGの絵で上書きしない
+  const aiPath = path.join(ART_DIR, 'ai.json');
+  const aiKeys = new Set(fs.existsSync(aiPath) ? JSON.parse(fs.readFileSync(aiPath, 'utf8')) : []);
+  items = items.filter(([key]) => !aiKeys.has(key));
   const rendered = [];
   for (const [key, svg, size] of items) {
     let buf;
