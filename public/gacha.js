@@ -183,6 +183,8 @@
     SFX.drop();
     await wait(1100);
     // スペシャルガチャの前ぶれ: 黒玉がガタガタふるえて、虹色の火花（レジェンド・神なら必ず、Sでもたまに）
+    // 生成AIの絵（虹の玉・神の玉・ふるえる黒玉・光・後光・メダル）をCSSで使えるようにする
+    for (const k of ['ball_rainbow', 'ball_divine', 'ball_tease', 'burst_divine', 'rays_rainbow', 'halo', 'mark_legend', 'mark_god']) if (au('gacha/' + k)) g.style.setProperty('--sp-' + k.replace('_', '-'), `url("${au('gacha/' + k)}")`);
     if (o.tease) { ball.classList.add('tease'); SFX.shimmer(); shakeScreen('gs-quake'); await wait(900); }
 
     // 5) お札がはがれて色がわかる

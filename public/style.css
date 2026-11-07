@@ -700,3 +700,16 @@ html.art-ui .cp-head button.sell { background: linear-gradient(#5a3a6a, #3a2448)
 html.art-ui .gs-rainbow .gs-charabox::before { background-image: var(--art-gacha-burst_rainbow); }
 .gs-divine .gs-charabox::before { filter: brightness(1.5) saturate(.6); }
 .gs-divine .gs-stamp, .gs-rainbow .gs-stamp { font-size: 1.4em; }
+/* スペシャルガチャ（生成AIの絵があるとき） */
+.gs-ball.tease .gs-ofuda { transition: opacity .3s; }
+.gs-ball.tease::before { content: ""; position: absolute; inset: -18%; background: var(--sp-ball-tease) center/contain no-repeat; z-index: -1; animation: gsTease .12s infinite; filter: drop-shadow(0 0 18px #c85aff); }
+.gs-ball.rainbow .gs-ballcore, html.art-ui .gs-ball.rainbow.burn .gs-ballcore { background: var(--sp-ball-rainbow, conic-gradient(from 0deg, #ff4a4a, #ffd23a, #4ae07a, #3ac8ff, #c85aff, #ff4a4a)) center/contain no-repeat !important; border: none; box-shadow: none; filter: drop-shadow(0 0 30px #ff9ae8) drop-shadow(0 0 60px #c85aff); animation: gsBob 1.2s ease-in-out infinite; }
+.gs-ball.divine .gs-ballcore, html.art-ui .gs-ball.divine.burn .gs-ballcore { background: var(--sp-ball-divine, radial-gradient(circle at 40% 35%, #fff 0 25%, #fff6c0 45%, #ffd23a 80%)) center/contain no-repeat !important; border: none; box-shadow: none; filter: drop-shadow(0 0 40px #fff) drop-shadow(0 0 90px #ffd23a); animation: gsBob 1.2s ease-in-out infinite; }
+@keyframes gsBob { 50% { transform: translateY(-6px) scale(1.04); } }
+.gs-ball.rainbow::after, .gs-ball.divine::after { content: ""; position: absolute; inset: -90%; z-index: -1; background: var(--sp-rays-rainbow) center/contain no-repeat; animation: gsSpin 6s linear infinite; opacity: .9; }
+.gs-ball.divine::after { background-image: var(--sp-halo); animation-duration: 10s; }
+html.art-ui .gs-rainbow .gs-charabox::before { background-image: var(--sp-rays-rainbow, var(--art-gacha-burst_rainbow)); inset: -60%; animation-duration: 8s; }
+html.art-ui .gs-divine .gs-charabox::before { background-image: var(--sp-burst-divine, var(--art-gacha-burst)); inset: -60%; filter: none; }
+.gs-divine .gs-charabox::after { content: ""; position: absolute; inset: -38%; z-index: -1; background: var(--sp-halo) center/contain no-repeat; animation: gsSpin 14s linear infinite reverse; }
+.gs-rainbow .gs-stamp, .gs-divine .gs-stamp { background: var(--sp-mark-legend) center/contain no-repeat; border: none; box-shadow: none; color: #fff; text-shadow: 0 0 4px #000, 0 2px 0 #000; width: min(19vmin, 108px); }
+.gs-divine .gs-stamp { background-image: var(--sp-mark-god); }
