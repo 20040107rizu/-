@@ -60,7 +60,7 @@
 
   // ---------- お守り（ランダムなスキルがつく装備。ふつうは1体に1つ、神は2つまで） ----------
   const CHARM_SKILLS = {
-    drain: { name: '吸血',     per: 0.01,  max: 0.1,  text: v => `攻撃したダメージの${Math.round(v * 100)}%回復` },
+    drain: { name: '吸血',     per: 0.005, max: 0.05, text: v => `攻撃したダメージの${+(v * 100).toFixed(1)}%回復` },
     regen: { name: '自然回復', per: 0.0006, max: 0.005, text: v => `1秒ごとに最大体力の${(v * 100).toFixed(1)}%回復` },
     guard: { name: '鉄壁',     per: 0.03,  max: 0.3,  text: v => `受けるダメージ -${Math.round(v * 100)}%` },
     hp:    { name: '体力',     per: 0.04,  max: 0.4,  text: v => `最大体力 +${Math.round(v * 100)}%` },

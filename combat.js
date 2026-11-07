@@ -31,7 +31,7 @@ function hit(room, p, e, amount, el) {
   if (p && p.legend && !(room.time < p.ultBusyUntil)) p.ult = Math.min(ULT_MAX, p.ult + amount * ULT_GAIN * (p.ultBoost || 1) * (room.ultGainTeam || 1) * (p.ch ? 1 + p.ch.ult : 1) * (p.passive === 'shock' ? 0.5 : 1)); // 必殺技の効果中はたまらない／ゼウスはたまるのが半分
   if (el) applyElement(room, p, e, amount, el);
   if (p && p.passive === 'seaking' && e.hp > 0) slow(e, 0.6, 2); // ポセイドン: 潮の力
-  if (p && p.ch && p.ch.drain > 0) room.healPlayer(p, amount * p.ch.drain); // お守り: 吸血
+  if (p && p.ch && p.ch.drain > 0 && !(room.time < p.ultBusyUntil)) room.healPlayer(p, amount * p.ch.drain * (e.isPatrol ? 0.5 : 1)); // お守り: 吸血（必殺技の効果中は回復しない・見回り鬼は半分）
   if (p && p.passive === 'backstab' && e.hp > 0) { // オーディン: ルーンの呪い（4秒で当てたダメージの40%、3つまで重なる）
     const runes = (e.dots || []).filter(d => d.rune);
     if (runes.length >= 3) { const old = runes.reduce((a, b) => (a.t < b.t ? a : b)); e.dots = e.dots.filter(d => d !== old); }
