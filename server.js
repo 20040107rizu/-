@@ -63,6 +63,7 @@ function whatsNew() {
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
+  if (urlPath === '/' || urlPath === '/index.html') console.log(`[アクセス] ${urlPath} ${(req.headers['user-agent'] || '').slice(0, 60)}`); // 開けないときの調査用: ページを開きに来た記録
   if (urlPath === '/version') {
     return sendJSON(req, res, { v: VERSION, ...whatsNew() });
   }
