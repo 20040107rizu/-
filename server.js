@@ -2184,6 +2184,10 @@ if (require.main === module) {
     }
     if (n) console.log(`フレンドを ${n} 人読み込みました`);
   });
+  // 無料プランは15分だれも開かないと寝てしまい、起きるときに失敗して真っ白になることがあるので、10分ごとに自分のページを1回だけ見に行って起こしておく
+  if (process.env.RENDER_EXTERNAL_URL) setInterval(() => {
+    fetch(process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '') + '/version', { headers: { 'User-Agent': 'oni-busters-keepalive' } }).then(r => r.arrayBuffer()).catch(() => {});
+  }, 10 * 60 * 1000);
   process.on('SIGTERM', startDrain);
   process.on('SIGINT', startDrain);
 }
