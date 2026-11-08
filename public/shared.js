@@ -371,7 +371,7 @@
     },
     SHOP: [
       { id: 'exp', name: '経験値 5,000', price: 60 },
-      { id: 'charm', name: 'お守りガチャ（金以上確定）', price: 150 },
+      { id: 'charm', name: 'お守りガチャ（金以上確定）', price: 300 },
       { id: 'frag', name: '神の欠片 ×1', price: 120 },
       { id: 'gold', name: '金玉チケット', price: 200 },
       { id: 'black', name: '黒玉チケット', price: 500 },
