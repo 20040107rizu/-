@@ -1784,6 +1784,23 @@
     };
     setTimeout(open, 1800);
   }
+  // おわびのプレゼント②: ゲームが開けなかったおわびに、スペシャルガチャチケット 10枚（1つの端末で1回だけ）
+  if (!localStorage.getItem('gift-special-20261108')) {
+    try { localStorage.setItem('gift-special-20261108', '1'); } catch {}
+    tickets.special = (tickets.special || 0) + 10;
+    try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+    renderTicketButton();
+    const open = () => {
+      if (!$('title').classList.contains('active') || $('rewardScreen').classList.contains('active')) { setTimeout(open, 900); return; }
+      $('rewardWeek').textContent = '🎁 おわびのプレゼント';
+      $('rewardTitle').textContent = 'スペシャルガチャチケット ×10！';
+      $('rewardSub').textContent = 'ゲームが開けなくなってしまい、ご迷惑をおかけしました。タイトル画面の「チケットガチャ」から引けます（Sランク確定・まれにレジェンドや神も…！）';
+      $('rewardPrizes').innerHTML = `<div class="charm-big" style="--cc:#ff9ae8">${artUrl('gacha/ball_rainbow') ? `<img src="${artUrl('gacha/ball_rainbow')}" alt="">` : '🌈'}</div>`;
+      $('btnRewardOk').onclick = () => show('title');
+      show('rewardScreen');
+    };
+    setTimeout(open, 2400);
+  }
   // 前からいた「完凸よりあふれたお友達」を、1回だけまとめて経験値に変える
   {
     const over = convertOverflow();
