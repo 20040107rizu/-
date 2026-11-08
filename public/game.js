@@ -871,6 +871,26 @@
   let fusuma = null;
   let dama = new Map();     // 鬼玉 id -> {x,y}
   let snap = null;
+  // サーバーが省いた値を元どおりにする（server.js の compact と対になる）
+  const SNAP_BOOL = ['down', 'esc', 'exh', 'inf', 'invis', 'sh', 'dash', 'run', 'au', 'su', 'dodge'], PATROL_HP = 120;
+  let snapCache = { items: null, ps: {} };
+  function expandSnap(m) {
+    if (m.kf) snapCache = { items: null, ps: {} };
+    if (m.items) snapCache.items = m.items; else if (snapCache.items) m.items = snapCache.items; else return false;
+    for (const p of m.players) {
+      if (p.yokai !== undefined) snapCache.ps[p.id] = { name: p.name, yokai: p.yokai, maxHp: p.maxHp };
+      else { const c = snapCache.ps[p.id]; if (!c) return false; p.name = c.name; p.yokai = c.yokai; p.maxHp = c.maxHp; }
+      for (const k of SNAP_BOOL) if (p[k] === undefined) p[k] = false;
+      if (p.item === undefined) p.item = null;
+    }
+    for (const e of m.patrols) {
+      if (e.alert === undefined) e.alert = false;
+      if (e.target === undefined) e.target = null;
+      if (e.flash === undefined) e.flash = false;
+      if (e.hp === undefined) e.hp = e.maxHp = PATROL_HP;
+    }
+    return true;
+  }
   let timeLimit = 180;
   let result = null;
   const ents = new Map();
@@ -1298,6 +1318,7 @@
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
         break;
       case 'state':
+        if (!expandSnap(m)) break; // 送られなかったところを元どおりにする（まだ全部そろっていなければ、この回は使わない）
         // 知らない妖怪・ボス（仲間が新しいバージョンのとき）が来ても止まらないように置きかえる
         for (const p of m.players) if (!S.YOKAI_BY_ID[p.yokai]) p.yokai = 'nekomata';
         for (const e of m.shades || []) if (!S.YOKAI_BY_ID[e.yokai]) e.yokai = 'nekomata';

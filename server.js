@@ -23,6 +23,8 @@ const SHIN_RATE = process.env.SHIN_RATE != null ? +process.env.SHIN_RATE : 0.3; 
 
 const PLAYER_R = 18;
 const PATROL_R = 22;
+const PATROL_HP = 120; // 見回り鬼の体力
+const SNAP_BOOL = ['down', 'esc', 'exh', 'inf', 'invis', 'sh', 'dash', 'run', 'au', 'su', 'dodge']; // 送らないときは false
 const BOSS_R = 46;
 const GIMMICK_ELS = ['fire', 'ice', 'thunder', 'wind', 'water', 'dark', 'light', 'earth', 'flower']; // 九尾鬼の9本の尾
 const NUE_FORMS = { monkey: { name: '猿', weak: 'fire', spd: 1.3 }, tiger: { name: '虎', weak: 'thunder', gap: 0.8 }, snake: { name: '蛇', weak: 'ice' } };
@@ -321,6 +323,7 @@ class Room {
 
   // 途中から観戦する人（つなぎ直した人）に、今のバトルの様子を送る
   watchStart(ws, watch = true) {
+    this.forceKey = true; // 次の送信は全部送る（途中から見る人のため）
     ws.send(JSON.stringify({
       t: 'start', seed: this.map.seed, stage: this.stage, timeLimit: this.timeLimit, fusuma: this.fusuma, boss: this.boss.type, movie: 0, countdown: 0, watch, rejoin: !watch,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v, b: d.b })),
@@ -361,6 +364,7 @@ class Room {
     }
     if (DEMO_AI && process.env.DEMO_YOKAI) this.players.values().next().value.yokai = process.env.DEMO_YOKAI;
     this.state = 'battle';
+    this.lastSent = null; this.snapN = 0;
     this.time = 0;
     // 1回でもバトルに行った人はフレンド一覧に出す
     for (const p of this.players.values()) if (p.pid) { touchPlayer(p.pid, p.name, p.yokai, p.title); known.get(p.pid).played = true; }
@@ -508,7 +512,7 @@ class Room {
   spawnPatrol(awayFrom) {
     const p = this.farFromAll(this.gridS, awayFrom, 700);
     this.patrols.push({
-      id: genId(), x: p.x, y: p.y, face: rand(0, Math.PI * 2), hp: 120, maxHp: 120, // 見回り鬼の体力（少し強く: 100→120）
+      id: genId(), x: p.x, y: p.y, face: rand(0, Math.PI * 2), hp: PATROL_HP, maxHp: PATROL_HP, // 見回り鬼の体力（少し強く: 100→120）
       state: 'patrol', target: null, lostT: 0, wanderTo: null, path: null, whistleT: 0, hitFlash: 0,
     });
   }
@@ -1789,6 +1793,29 @@ class Room {
     Ranking.record(this.weekIdx, entries).catch(e => console.error(e));
   }
 
+  // 通信量を減らす: 前と同じもの・決まった値（false など）は送らない。画面側（game.js の expandSnap）で元どおりにする
+  // 2秒に1回（と、観戦・つなぎ直しの直後）は全部送る
+  compact(s) {
+    const key = this.forceKey || !((this.snapN = (this.snapN || 0) + 1) % 30) || !this.lastSent;
+    this.forceKey = false;
+    const last = key ? (this.lastSent = { items: null, ps: {} }) : this.lastSent;
+    s.kf = key ? 1 : undefined;
+    const items = JSON.stringify(s.items);
+    if (!key && items === last.items) delete s.items; else last.items = items;
+    for (const p of s.players) {
+      const st = p.name + '|' + p.yokai + '|' + p.maxHp;
+      if (!key && last.ps[p.id] === st) { delete p.name; delete p.yokai; delete p.maxHp; } else last.ps[p.id] = st;
+      for (const k of SNAP_BOOL) if (p[k] === false) delete p[k];
+      if (p.item === null) delete p.item;
+    }
+    for (const e of s.patrols) {
+      if (e.alert === false) delete e.alert;
+      if (e.target === null) delete e.target;
+      if (e.flash === false) delete e.flash;
+      if (e.hp === e.maxHp && e.maxHp === PATROL_HP) { delete e.hp; delete e.maxHp; }
+    }
+    return s;
+  }
   snapshot() {
     const b = this.boss;
     const snap = {
@@ -1798,7 +1825,7 @@ class Room {
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
         dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
-        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoi && p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, // なぎはらい中だけ（前のバトルの向きが残っていても出さない） nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, rev: p.revT > 0 || undefined, charm: p.charmT > 0 || undefined, curse: p.curseT > 0 || undefined, crit: p.critT > 0 || undefined, dodge: !!p.dodge, sl: p.slowT > 0 || undefined, fz: p.frozenT > 0 || undefined, dk: p.darkT > 0 || undefined,
+        skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoi && p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, /* なぎはらい中だけ（前のバトルの向きが残っていても出さない） */ nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, rev: p.revT > 0 || undefined, charm: p.charmT > 0 || undefined, curse: p.curseT > 0 || undefined, crit: p.critT > 0 || undefined, dodge: !!p.dodge, sl: p.slowT > 0 || undefined, fz: p.frozenT > 0 || undefined, dk: p.darkT > 0 || undefined,
       })),
       patrols: this.patrols.filter(e => e.hp > 0).map(e => ({ id: e.id, x: Math.round(e.x), y: Math.round(e.y), face: +e.face.toFixed(2), alert: e.state === 'alert', target: e.target, hp: Math.round(e.hp), maxHp: e.maxHp, flash: e.hitFlash > 0 })),
       boss: b && b.hp > 0 ? this.bossSnap(b) : null,
@@ -1820,7 +1847,7 @@ class Room {
       ev: this.events,
     };
     this.events = [];
-    return snap;
+    return this.compact(snap);
   }
 }
 
