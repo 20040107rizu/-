@@ -814,7 +814,7 @@
   }
   function renderShop() {
     $('shopMedals').textContent = `🏅 ${(stats.medals || 0).toLocaleString('ja-JP')}枚　（最高 ${stats.towerBest || 0}階）`;
-    $('shopList').innerHTML = S.TOWER.SHOP.map(it => `<div class="shop-row"><div class="shop-name">${esc(it.name)}${it.id === 'special' ? '<small>S 96.9%・レジェンド 3%・神 0.1%</small>' : ''}</div><button class="small shop-buy" data-id="${it.id}"${(stats.medals || 0) >= it.price ? '' : ' disabled'}>🏅 ${it.price.toLocaleString('ja-JP')}</button></div>`).join('');
+    $('shopList').innerHTML = S.TOWER.SHOP.slice().sort((a, b) => a.price - b.price).map(it => `<div class="shop-row"><div class="shop-name">${esc(it.name)}${it.id === 'special' ? '<small>S 96.9%・レジェンド 3%・神 0.1%</small>' : ''}</div><button class="small shop-buy" data-id="${it.id}"${(stats.medals || 0) >= it.price ? '' : ' disabled'}>🏅 ${it.price.toLocaleString('ja-JP')}</button></div>`).join('');
     for (const b of document.querySelectorAll('#shopList .shop-buy')) b.onclick = () => {
       const it = S.TOWER.SHOP.find(x => x.id === b.dataset.id);
       if (!it || (stats.medals || 0) < it.price) return;
