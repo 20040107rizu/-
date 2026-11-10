@@ -2791,17 +2791,6 @@
     const top = img ? -62 : -29;
     ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#fff'; ctx.fillText(p.name, 0, top - 5);
-    { // やりこみ称号: 名前の上に紋章と光る称号
-      const lp = lobby && lobby.players && lobby.players.find(q => q.id === p.id), t = lp && lp.title && S.TITLE_BY_ID[lp.title];
-      if (t && t.fx) {
-        const em = art('title/emblem_' + t.emblem), tt = performance.now() / 1000, txt = `《${t.name}》`;
-        ctx.font = 'bold 11px sans-serif';
-        const col = { fire: '#ff8a1a', bolt: '#6ac8ff', ice: '#9ad8ff', dark: '#a05aff', divine: '#ffd23a', gold: '#ffd23a', rainbow: `hsl(${(tt * 120) % 360},90%,65%)`, creator: `hsl(${(tt * 90) % 360},95%,70%)` }[t.fx] || '#fff';
-        const w = ctx.measureText(txt).width, ty = top - 20;
-        ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 8 + Math.sin(tt * 6) * 3; ctx.lineWidth = 3; ctx.strokeStyle = '#1a0820'; ctx.strokeText(txt, 7, ty); ctx.fillStyle = col; ctx.fillText(txt, 7, ty); ctx.restore();
-        if (em) ctx.drawImage(em, -w / 2 - 12 + 7, ty - 14, 18, 18);
-      }
-    }
     bar(-22, top, 44, 5, p.hp / p.maxHp, '#5be07a');
     // ダッシュのスタミナ（減っているときだけ）
     if (!p.down && !p.inf && (p.stam < 100 || p.exh)) {
