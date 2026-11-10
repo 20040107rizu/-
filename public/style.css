@@ -713,3 +713,44 @@ html.art-ui .gs-divine .gs-charabox::before { background-image: var(--sp-burst-d
 .gs-divine .gs-charabox::after { content: ""; position: absolute; inset: -38%; z-index: -1; background: var(--sp-halo) center/contain no-repeat; animation: gsSpin 14s linear infinite reverse; }
 .gs-rainbow .gs-stamp, .gs-divine .gs-stamp { background: var(--sp-mark-legend) center/contain no-repeat; border: none; box-shadow: none; color: #fff; text-shadow: 0 0 4px #000, 0 2px 0 #000; width: min(19vmin, 108px); }
 .gs-divine .gs-stamp { background-image: var(--sp-mark-god); }
+/* ===== やりこみ称号（光る文字・紋章・名札の台） ===== */
+.ttl.tfx { position: relative; display: inline-block; isolation: isolate; padding: 0 2px; }
+.ttl.tfx::before { content: ""; position: absolute; pointer-events: none; z-index: -1; }
+.temb-s { width: 1.7em; height: 1.7em; object-fit: contain; vertical-align: -0.55em; margin-right: 1px; filter: drop-shadow(0 0 3px #000); }
+.tplate { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
+.temb { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 0 4px #000); flex: none; }
+.tpl { display: inline-flex; align-items: center; justify-content: center; min-width: 190px; height: 50px; padding: 0 34px; background: center/100% 100% no-repeat; }
+.tpl .ttl.tfx { font-size: 14px; }
+.tplate.creator .temb { width: 58px; height: 58px; } .tplate.creator .tpl { height: 62px; min-width: 250px; padding: 0 46px; } .tplate.creator .ttl.tfx { font-size: 15px; }
+.title-row .tplate { margin: 2px 0; }
+:root { --tol: drop-shadow(1px 1px 0 #1a0820) drop-shadow(-1px -1px 0 #1a0820) drop-shadow(1px -1px 0 #1a0820) drop-shadow(-1px 1px 0 #1a0820); }
+/* 🔥 炎 */
+.fx-fire { color: #fff3d0 !important; text-shadow: 0 0 4px #ff8a1a, 0 0 9px #ff3a0a, 0 -2px 12px #ff5a00; animation: tFireTx .9s ease-in-out infinite alternate; }
+.fx-fire::before { left: -4px; right: -4px; bottom: -3px; height: 75%; background: radial-gradient(ellipse at 15% 100%, #ff3a0a 0 30%, transparent 60%), radial-gradient(ellipse at 40% 100%, #ffb01a 0 25%, transparent 60%), radial-gradient(ellipse at 65% 100%, #ff5a0a 0 30%, transparent 60%), radial-gradient(ellipse at 88% 100%, #ffd23a 0 22%, transparent 60%); filter: blur(3px); opacity: .8; animation: tFlame .45s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+@keyframes tFlame { 0% { transform: scaleY(.8) skewX(-4deg); } 100% { transform: scaleY(1.25) skewX(4deg); } }
+@keyframes tFireTx { to { text-shadow: 0 0 6px #ffb01a, 0 0 14px #ff3a0a, 0 -4px 18px #ff5a00; } }
+/* ⚡ 雷 */
+.fx-bolt { color: #eaf6ff !important; text-shadow: 0 0 5px #6ac8ff, 0 0 12px #2a7aff; animation: tBoltTx 1.6s steps(1) infinite; }
+.fx-bolt::before { inset: -8px -12px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 50'%3E%3Cpath d='M8 4 L22 22 L14 24 L30 46' stroke='%23bfe8ff' stroke-width='2.5' fill='none'/%3E%3Cpath d='M190 6 L176 20 L186 24 L168 44' stroke='%23bfe8ff' stroke-width='2.5' fill='none'/%3E%3C/svg%3E") center/100% 100% no-repeat; filter: drop-shadow(0 0 4px #6ac8ff); opacity: 0; animation: tZap 1.6s steps(1) infinite; }
+@keyframes tZap { 0%, 100% { opacity: 0; } 8% { opacity: 1; } 12% { opacity: 0; } 16% { opacity: 1; } 22% { opacity: 0; } 61% { opacity: 1; } 65% { opacity: 0; } }
+@keyframes tBoltTx { 8%, 16%, 61% { color: #fff; text-shadow: 0 0 8px #fff, 0 0 18px #6ac8ff; } 12%, 22%, 65% { color: #eaf6ff; text-shadow: 0 0 5px #6ac8ff, 0 0 12px #2a7aff; } }
+/* ❄️ 氷 */
+.fx-ice { background: linear-gradient(100deg, #9ad8ff 20%, #fff 40%, #9ad8ff 60%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent !important; filter: var(--tol) drop-shadow(0 0 5px #6ac8ff); animation: tShine 2.4s linear infinite; }
+/* 🌑 闇 */
+.fx-dark { color: #e8d0ff !important; text-shadow: 0 0 5px #8a3aff, 0 0 12px #3a0a6a; }
+.fx-dark::before { inset: -4px -6px; border-radius: 50%; background: conic-gradient(from 0deg, transparent, #6a1ab888, transparent 30%, #2a0a4a99, transparent 60%, #8a3aff77, transparent); filter: blur(5px); animation: tSpin 3s linear infinite; }
+/* ✨ 神光 */
+.fx-divine { background: linear-gradient(180deg, #fffbe0, #ffd23a 55%, #c8901a); -webkit-background-clip: text; background-clip: text; color: transparent !important; filter: var(--tol) drop-shadow(0 0 6px #ffd23a); }
+.fx-divine::before { left: 50%; top: 50%; width: 5em; height: 5em; margin: -2.5em 0 0 -2.5em; background: repeating-conic-gradient(from 0deg, #fff6c066 0 6deg, transparent 6deg 18deg); border-radius: 50%; -webkit-mask: radial-gradient(circle, transparent 18%, #000 30%, transparent 70%); mask: radial-gradient(circle, transparent 18%, #000 30%, transparent 70%); animation: tSpin 9s linear infinite; }
+/* 💎 金 */
+.fx-gold { background: linear-gradient(100deg, #b8801a 10%, #ffe680 30%, #fff 40%, #ffd23a 50%, #b8801a 80%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent !important; filter: var(--tol) drop-shadow(0 0 5px #ffd23a88); animation: tShine 2s linear infinite; }
+/* 🌈 虹 */
+.fx-rainbow { background: linear-gradient(90deg, #ff4a4a, #ffd23a, #4ae07a, #3ac8ff, #c85aff, #ff4a4a); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent !important; filter: var(--tol) drop-shadow(0 0 3px #fffa); animation: tShine 2.5s linear infinite; }
+/* 👑 創造主 */
+.fx-creator { background: linear-gradient(90deg, #ffd23a, #fff6c0, #ff9ae8, #9ad8ff, #c85aff, #ffd23a); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent !important; filter: var(--tol) drop-shadow(0 0 7px #ffd23a) drop-shadow(0 0 12px #c85aff); animation: tShine 3s linear infinite; }
+.fx-creator::before { left: 50%; top: 50%; width: 7em; height: 7em; margin: -3.5em 0 0 -3.5em; background: repeating-conic-gradient(from 0deg, #ffffff40 0 3deg, transparent 3deg 12deg); border-radius: 50%; -webkit-mask: radial-gradient(circle, transparent 15%, #000 25%, transparent 70%); mask: radial-gradient(circle, transparent 15%, #000 25%, transparent 70%); animation: tSpin 6s linear infinite; }
+.tspark { position: absolute; inset: -6px -8px; pointer-events: none; -webkit-text-fill-color: initial; }
+.tspark i { position: absolute; width: 6px; height: 6px; background: #fff; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); animation: tTwinkle 1.4s ease-in-out infinite; }
+@keyframes tShine { to { background-position: -250% 0; } }
+@keyframes tSpin { to { transform: rotate(360deg); } }
+@keyframes tTwinkle { 0%, 100% { opacity: 0; transform: scale(.3); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }

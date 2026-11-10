@@ -71,7 +71,20 @@
   // 持っている数（レジェンドは「1＋凸」として数える。凸は封印の8体で決まる）
   const countOf = id => { const y = S.YOKAI_BY_ID[id]; return y && y.legend ? (friends[id] ? 1 + S.legendTotsu(y, friends) : 0) : friends[id] || 0; };
   const myTotsu = () => S.totsuOf(countOf(selYokai));
-  const titleTag = id => { const t = titleInfo(id), fx = t && (t.color === 'gold' || t.color === 'rainbow'); return t ? `<span class="ttl${fx ? ' ' + t.color : ''}" style="${fx ? '' : `color:${t.color}`}">《${t.name}》</span>` : ''; };
+  // 称号: やりこみ称号は光る文字＋紋章。big=true で名札の台（プレート）つき
+  const SPARK = [[8, 20, 0], [30, 70, .4], [55, 10, .8], [78, 60, .2], [92, 25, 1.1], [44, 85, .6]].map(([x, y, d]) => `<i style="left:${x}%;top:${y}%;animation-delay:${d}s"></i>`).join('');
+  const titleTag = (id, big) => {
+    const t = titleInfo(id);
+    if (!t) return '';
+    if (t.fx) {
+      const em = artUrl('title/emblem_' + t.emblem), pl = artUrl('title/plate_' + t.plate);
+      const txt = `<span class="ttl tfx fx-${t.fx}">《${t.name}》${t.fx === 'rainbow' || t.fx === 'creator' ? `<span class="tspark">${SPARK}</span>` : ''}</span>`;
+      if (big && pl) return `<span class="tplate${t.fx === 'creator' ? ' creator' : ''}">${em ? `<img class="temb" src="${em}" alt="">` : ''}<span class="tpl" style="background-image:url('${pl}')">${txt}</span></span>`;
+      return `${em ? `<img class="temb-s" src="${em}" alt="">` : ''}${txt}`;
+    }
+    const fx = t.color === 'gold' || t.color === 'rainbow';
+    return `<span class="ttl${fx ? ' ' + t.color : ''}" style="${fx ? '' : `color:${t.color}`}">《${t.name}》</span>`;
+  };
   // 称号の一覧に出す称号（隠しボスの称号は、手に入れるまで出さない）
   const titleShown = t => !t.hidden || !!stats.feats[t.feat];
   const titleTotal = () => S.TITLES.filter(titleShown).length;
@@ -111,7 +124,20 @@
   const charmTag = c => `<span class="charm-tag r${c.r}" style="--cc:${charmColor(c)}">${charmIco(c.r)} ${S.charmName(c)}</span> <span class="charm-sk">${esc(S.charmText(c))}</span>`;
   const lvOfId = id => S.lvOf(levels[id] || 0);
   const myLv = () => lvOfId(selYokai);
+  // やりこみ称号（持っているもの・記録で決まるもの）。一度とったら消えない
+  function updateFeats() {
+    const f = stats.feats;
+    if ((stats.towerBest || 0) >= 12) f.tower12 = true;
+    if ((stats.towerBest || 0) >= 15) f.tower15 = true;
+    if ((stats.plays || 0) >= 1000) f.play1000 = true;
+    if (S.GODS.every(g => friends[g.id])) f.godsall = true;
+    if (S.LEGENDS.every(l => friends[l.id] && S.legendTotsu(l, friends) >= S.TOTSU_MAX)) f.legendmax = true;
+    if (S.YOKAI.every(y => S.totsuOf(friends[y.id] || 0) >= S.TOTSU_MAX)) f.hyakkimax = true;
+    if (Object.values(levels).filter(e => S.lvOf(e) >= S.LV_MAX).length >= 10) f.lv99x10 = true;
+    if (charms.filter(c => c.r >= 4).length >= 10) f.charm10 = true;
+  }
   function saveAll() {
+    try { updateFeats(); } catch {}
     try {
       localStorage.setItem('levels', JSON.stringify(levels));
       localStorage.setItem('friends', JSON.stringify(friends));
@@ -320,7 +346,7 @@
     const prog = S.titleProgress(friends, stats.feats);
     $('zukanGrid').innerHTML = ''; $('zukanGrid').dataset.sig = '';
     $('zukanTitles').innerHTML = prog.filter(x => titleShown(x.title)).map(({ title: t, got, need, done }) => `<div class="title-row${done ? ' done' : ''}${myTitle === t.id ? ' on' : ''}">
-        <div class="tinfo">${done ? titleTag(t.id) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
+        <div class="tinfo">${done ? titleTag(t.id, true) : `<span class="ttl locked">《${t.name}》</span>`}<small>${t.desc}</small>
         <div class="tbar"><i style="width:${Math.round((got / need) * 100)}%"></i></div></div>
         <span class="tnum">${got}/${need}</span>
         ${done ? `<button class="small" data-id="${t.id}">${myTitle === t.id ? 'はずす' : 'つける'}</button>` : '<span class="tlock">🔒</span>'}</div>`).join('')
@@ -336,7 +362,7 @@
   function renderMyTitle() {
     const done = titlesDone().length;
     $('zukanInfo').innerHTML = `<div class="pv"><b>🏅 称号</b><div>${done} / ${titleTotal()} 個ゲット</div>
-      <div style="margin:6px 0">いまの称号：${myTitle ? titleTag(myTitle) : 'なし'}</div>
+      <div style="margin:6px 0">いまの称号：${myTitle ? titleTag(myTitle, true) : 'なし'}</div>
       <small>図鑑をコンプリートすると称号がもらえます。つけた称号は、ロビーやフレンド一覧で名前といっしょに表示されます。「妖怪マスター」をつけると名前が金色に！</small></div>`;
   }
   function renderZukan() {
@@ -1596,6 +1622,13 @@
       if (result.boss === 'kishin') stats.feats.kishin = true;
       if (S.BOSSES[result.boss].team && !S.BOSSES[result.boss].tower && result.players.length === 1) stats.feats.solo = true; // ひとりで出撃してたおした
     }
+    // やりこみ称号（バトルの結果で決まるもの）
+    if (mine) {
+      if (result.sanki && result.sanki.all && result.sanki.nodown) stats.feats.sankiperf = true;
+      if (result.bossDown && mine.hurt === 0 && S.BOSSES[result.boss] && S.BOSSES[result.boss].team) stats.feats.flawless = true;
+      if ((result.team || 0) >= 2000) stats.feats.orbking = true;
+    }
+    updateFeats();
     result.newTitles = mine ? titlesDone().filter(id => !titlesBefore.includes(id)) : [];
     // レジェンドの封印の欠片
     // 神の欠片と神の試練（条件を満たした人だけが知る）
@@ -1793,6 +1826,7 @@
     };
     setTimeout(open, 1800);
   }
+  try { updateFeats(); } catch {} // 前からの記録でとれるやりこみ称号
   // おわびのプレゼント②: ゲームが開けなかったおわびに、スペシャルガチャチケット 10枚（1つの端末で1回だけ）
   if (!localStorage.getItem('gift-special-20261108')) {
     try { localStorage.setItem('gift-special-20261108', '1'); } catch {}
@@ -2757,6 +2791,17 @@
     const top = img ? -62 : -29;
     ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#fff'; ctx.fillText(p.name, 0, top - 5);
+    { // やりこみ称号: 名前の上に紋章と光る称号
+      const lp = lobby && lobby.players && lobby.players.find(q => q.id === p.id), t = lp && lp.title && S.TITLE_BY_ID[lp.title];
+      if (t && t.fx) {
+        const em = art('title/emblem_' + t.emblem), tt = performance.now() / 1000, txt = `《${t.name}》`;
+        ctx.font = 'bold 11px sans-serif';
+        const col = { fire: '#ff8a1a', bolt: '#6ac8ff', ice: '#9ad8ff', dark: '#a05aff', divine: '#ffd23a', gold: '#ffd23a', rainbow: `hsl(${(tt * 120) % 360},90%,65%)`, creator: `hsl(${(tt * 90) % 360},95%,70%)` }[t.fx] || '#fff';
+        const w = ctx.measureText(txt).width, ty = top - 20;
+        ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 8 + Math.sin(tt * 6) * 3; ctx.lineWidth = 3; ctx.strokeStyle = '#1a0820'; ctx.strokeText(txt, 7, ty); ctx.fillStyle = col; ctx.fillText(txt, 7, ty); ctx.restore();
+        if (em) ctx.drawImage(em, -w / 2 - 12 + 7, ty - 14, 18, 18);
+      }
+    }
     bar(-22, top, 44, 5, p.hp / p.maxHp, '#5be07a');
     // ダッシュのスタミナ（減っているときだけ）
     if (!p.down && !p.inf && (p.stam < 100 || p.exh)) {

@@ -407,7 +407,7 @@ class Room {
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
-        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), godFighter: !!(S.YOKAI_BY_ID[p.yokai].god && S.YOKAI_BY_ID[p.yokai].role === 'fighter'), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, critT: 0, skyT: 0, regenT: 0, bondT: 0, trickUsed: false, yomiUses: 0, mimicDodge: 0, ownShade: 0, decoyHits: 0, weakDmg: 0, orbFrac: 0, gutsUsed: false, revT: 0, charmT: 0, curseT: 0, curseTick: 0, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, nyoiA: null, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
+        legend: !!(S.YOKAI_BY_ID[p.yokai].legend || S.YOKAI_BY_ID[p.yokai].god), godFighter: !!(S.YOKAI_BY_ID[p.yokai].god && S.YOKAI_BY_ID[p.yokai].role === 'fighter'), standUsed: false, auraT: 0, judgeHits: 0, dragonT: 0, fly: false, critT: 0, skyT: 0, regenT: 0, bondT: 0, trickUsed: false, yomiUses: 0, mimicDodge: 0, ownShade: 0, decoyHits: 0, weakDmg: 0, orbFrac: 0, gutsUsed: false, revT: 0, charmT: 0, curseT: 0, curseTick: 0, raT: 0, eye: false, eyeT: 0, autoRevT: 0, downs: 0, shinDowns: null, passive: S.YOKAI_BY_ID[p.yokai].passive || null, ult: 0, ultBusyUntil: 0, nyoi: null, nyoiA: null, hurtSum: 0, diveLeft: 0, // レジェンド（ultBusyUntil は前のバトルの時刻が残るとゲージがたまらないので必ず戻す）
       });
       S.collide(this.map, p, PLAYER_R);
       if (DEMO_AI) { p.maxHp *= +(process.env.DEMO_PHP || 5); p.hp = p.maxHp; p.ultBoost = Number(process.env.DEMO_ULT_BOOST || 1); }
@@ -589,7 +589,7 @@ class Room {
       this.events.push({ k: 'ring', x: Math.round(p.x), y: Math.round(p.y), r: 120, c: '#7dffd8' });
       return;
     }
-    p.hp -= amount;
+    p.hp -= amount; p.hurtSum = (p.hurtSum || 0) + amount; // 称号「無傷の英雄」用
     this.events.push({ k: 'hurt', x: Math.round(p.x), y: Math.round(p.y - 30), v: Math.round(amount), id: p.id });
     if (p.hp <= 0 && p.passive === 'yomi' && p.yomiUses < 2) { p.yomiUses++; p.autoRevT = 10; } // イザナミ: 黄泉の主（10秒で自分で起きる）
     else if (p.hp <= 0 && this.activePlayers().some(q => q !== p && q.passive === 'lastStand')) { // ジョカの五色の石: 倒れた場所に回復の石。5秒で自動で起きる
@@ -1717,7 +1717,7 @@ class Room {
     // ガチャ（または経験値）は、みんなで集めた鬼玉の合計そのままで引く
     const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
     const players = [...this.players.values()].map(p => ({
-      id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt),
+      id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
       gacha: rollGacha((p.escaped ? team : team / 2) + (this.luckTeam ? 150 : 0)), // ガネーシャ: 富の神（1つ上の色が出やすい）
@@ -1726,7 +1726,7 @@ class Room {
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),
     }));
     const bn = this.bonusBoss, sh = this.shinBoss;
-    this.lastResult = { t: 'result', players, team, luck: this.luckTeam || undefined, sanki: this.oni3 && !this.tower ? { all: this.sankiAll, types: this.oni3.map(b => b.type), down: this.oni3.filter(b => b.hp <= 0).length } : undefined, tower: this.tower ? { cleared: this.tower.cleared, f: this.tower.f } : undefined, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
+    this.lastResult = { t: 'result', players, team, luck: this.luckTeam || undefined, sanki: this.oni3 && !this.tower ? { nodown: !this.anyDown, all: this.sankiAll, types: this.oni3.map(b => b.type), down: this.oni3.filter(b => b.hp <= 0).length } : undefined, tower: this.tower ? { cleared: this.tower.cleared, f: this.tower.f } : undefined, boss: this.mainType, bossDown: this.mainDown, bonus: bn ? { type: bn.type, down: bn.hp <= 0 } : undefined, shin: sh ? { down: sh.hp <= 0 } : undefined };
     this.broadcast(this.lastResult);
     for (const p of this.players.values()) { p.missedResult = !!p.away; p.viewed = false; } // 通信が切れていた人には、つなぎ直したときに送る。viewed: ガチャを引き終わって結果を見たか
     this.broadcast(this.lobbyInfo());

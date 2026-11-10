@@ -143,6 +143,20 @@
     { id: 'gokuou', name: '獄王討伐',           color: '#ff3a1a', feat: 'gokuou', hidden: true, desc: '獄王をたおす' },
     { id: 'hyakki', name: '百鬼の覇者',         color: 'gold', feat: 'hyakki', hidden: true, desc: '百鬼王をたおす' },
     { id: 'shin',   name: '真・鬼神殺し',       color: 'rainbow', feat: 'shin', hidden: true, desc: '目覚めた鬼神・真をたおす' },
+    // やりこんだ人だけの称号（fx: 光り方 / plate: 名札の台 / emblem: 紋章）
+    { id: 'tower12',  name: '塔の覇者',   color: '#ff8a3a', feat: 'tower12',  fx: 'fire',    plate: 'fire',    emblem: 'tower12',  desc: '鬼の塔で12階に到達する' },
+    { id: 'tower15',  name: '天を衝く者', color: '#7ab8ff', feat: 'tower15',  fx: 'bolt',    plate: 'bolt',    emblem: 'tower15',  desc: '鬼の塔で15階に到達する' },
+    { id: 'sankiperf', name: '三鬼無双',  color: '#ff5a3a', feat: 'sankiperf', fx: 'fire',   plate: 'fire',    emblem: 'sanki',    desc: '三鬼合戦で、だれも倒れずに3体ぜんぶたおす' },
+    { id: 'godsall',  name: '神々の主',   color: '#ffd23a', feat: 'godsall',  fx: 'divine',  plate: 'divine',  emblem: 'gods',     hidden: true, desc: '神16柱をぜんぶ仲間にする' },
+    { id: 'legendmax', name: '伝説の継承者', color: '#ff9ae8', feat: 'legendmax', fx: 'rainbow', plate: 'rainbow', emblem: 'legend', desc: 'レジェンド6体をぜんぶ凸MAXにする' },
+    { id: 'hyakkimax', name: '百鬼全書', color: '#ff9ae8', feat: 'hyakkimax', fx: 'rainbow', plate: 'rainbow', emblem: 'hyakki',   desc: '妖怪170体をぜんぶ凸MAXにする' },
+    { id: 'lv99x10',  name: '極めし者',   color: '#9ad8ff', feat: 'lv99x10',  fx: 'ice',     plate: 'ice',     emblem: 'lv99',     desc: 'Lv99の妖怪を10体そだてる' },
+    { id: 'play1000', name: '千戦錬磨',   color: '#c890ff', feat: 'play1000', fx: 'dark',    plate: 'dark',    emblem: '1000',     desc: '1,000回遊ぶ' },
+    { id: 'orbking',  name: '鬼玉長者',   color: '#ffd23a', feat: 'orbking',  fx: 'gold',    plate: 'gold',    emblem: 'orb',      desc: '1回のバトルで、みんなの鬼玉を2,000個集める' },
+    { id: 'flawless', name: '無傷の英雄', color: '#9ad8ff', feat: 'flawless', fx: 'bolt',    plate: 'bolt',    emblem: 'flawless', desc: '金鬼から先のボス鬼を、1回もダメージを受けずにたおす' },
+    { id: 'charm10',  name: 'お守り蒐集家', color: '#ff9ae8', feat: 'charm10', fx: 'rainbow', plate: 'rainbow', emblem: 'legend',  desc: '虹のお守りを10個持つ' },
+    // 特別な称号（ふつうには手に入らない）
+    { id: 'creator',  name: '鬼バスターズの創造主', color: '#ffd23a', feat: 'creator', fx: 'creator', plate: 'creator', emblem: 'creator', hidden: true, desc: 'このゲームを作った人' },
   ];
   const TITLE_BY_ID = Object.fromEntries(TITLES.map(t => [t.id, t]));
   // friends: { id: 持っている数 }、feats: { kishin: true, ... } バトルでの手がら → [{ title, got, need, done }]
