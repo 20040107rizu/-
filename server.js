@@ -59,6 +59,16 @@ function computeVersion() {
   return h.digest('hex').slice(0, 10);
 }
 const VERSION = computeVersion();
+// プレゼント: gifts.json の [{ id, to: [pid, ...] | 'all', msg, items: { special, gold, black, exp, medals, frag, charm, title } }]
+let giftCache = { mtime: 0, list: [] };
+function giftsFor(pid) {
+  try {
+    const f = path.join(__dirname, 'gifts.json'), st = fs.statSync(f);
+    if (st.mtimeMs !== giftCache.mtime) giftCache = { mtime: st.mtimeMs, list: JSON.parse(fs.readFileSync(f, 'utf8')) };
+  } catch { return []; }
+  if (!/^[A-Za-z0-9_-]{8,40}$/.test(pid)) return [];
+  return giftCache.list.filter(g => g && g.id && (g.to === 'all' || (Array.isArray(g.to) && g.to.includes(pid)))).map(g => ({ id: g.id, msg: g.msg, items: g.items }));
+}
 function whatsNew() {
   try { return JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'whatsnew.json'), 'utf8')); } catch { return {}; }
 }
@@ -66,6 +76,10 @@ function whatsNew() {
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/' || urlPath === '/index.html') console.log(`[アクセス] ${urlPath} ${(req.headers['user-agent'] || '').slice(0, 60)}`); // 開けないときの調査用: ページを開きに来た記録
+  if (urlPath === '/gifts') { // 特定のプレイヤー（または全員）へのプレゼント（gifts.json）
+    const id = new URLSearchParams(req.url.split('?')[1] || '').get('pid') || '';
+    return sendJSON(req, res, giftsFor(id));
+  }
   if (urlPath === '/version') {
     return sendJSON(req, res, { v: VERSION, ...whatsNew() });
   }

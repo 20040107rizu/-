@@ -93,6 +93,7 @@
 
   // フレンド機能用の、この人のID（引き継ぎコードにも入る）
   const newPid = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'[b & 63]).join('');
+  let giftsGot = loadJSON('giftsGot', []); // 受け取ったプレゼントのID
   let pid = localStorage.getItem('pid');
   if (!/^[A-Za-z0-9_-]{8,40}$/.test(pid || '')) { pid = newPid(); try { localStorage.setItem('pid', pid); } catch {} }
   let selYokai = localStorage.getItem('yokai');
@@ -160,7 +161,7 @@
     return (h >>> 0).toString(36).slice(-4).toUpperCase().padStart(4, '0');
   }
   function makeSaveCode() {
-    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock, md: stats.medals || 0, tk: tickets,
+    const data = { v: 1, p: pid, t: myTitle, n: localStorage.getItem('name') || '', y: selYokai, f: S.YOKAI.map(y => friends[y.id] || 0), l: S.LEGENDS.map(l => friends[l.id] || 0), g: S.LEGENDS.map(l => [stats.seals[l.id]?.frag || 0, 0, stats.seals[l.id]?.trial ? 1 : 0]), s: [stats.plays, stats.escapes, stats.dama, stats.best, S.BOSS_ORDER.reduce((m, k, i) => m | (stats.cleared[k] ? 1 << i : 0), 0)], e: Object.keys(stats.feats).filter(k => stats.feats[k]), fv: favYokai, lv: PROF_YOKAI.map(y => levels[y.id] || 0), xs: stats.expStock, md: stats.medals || 0, tk: tickets, gc: giftsGot,
       ...(S.GODS.some(g => friends[g.id]) || stats.gods.frag ? { gd: S.GODS.map(g => friends[g.id] || 0), gx: [stats.gods.frag, ...S.GODS.map(g => stats.gods.tr[g.id] || 0)], gl: S.GODS.map(g => levels[g.id] || 0) } : {}) };
     // お守りは、つけているものとお気に入りだけ入れる
     const keep = charms.filter(c => c.fav || Object.values(equips).some(l => l.includes(c.id)));
@@ -188,7 +189,7 @@
     const cm = Array.isArray(d.cm) ? d.cm.slice(0, S.CHARM_MAX).map((a, i) => ({ id: i + 1, r: Math.max(0, Math.min(4, a[0] | 0)), fav: !!a[1], s: [[a[2], a[3]], [a[4], a[5]]].filter(([k, lv]) => S.CHARM_SKILLS[k]).map(([k, lv]) => [k, Math.max(1, Math.min(5, lv | 0))]) })).filter(c => c.s.length) : [];
     const eq = {};
     if (d.eq && typeof d.eq === 'object') for (const [k, l] of Object.entries(d.eq)) if (S.YOKAI_BY_ID[k] && Array.isArray(l)) eq[k] = l.map(i => cm[i] && cm[i].id).filter(Boolean).slice(0, charmSlots(k));
-    return { cm, eq, gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), medals: Math.max(0, Math.min(1e7, Math.floor(+d.md || 0))), tickets: Object.fromEntries(Object.entries(d.tk && typeof d.tk === 'object' ? d.tk : {}).filter(([k, v]) => ['green', 'blue', 'red', 'gold', 'black', 'special'].includes(k) && v > 0).map(([k, v]) => [k, Math.min(999, Math.floor(+v) || 0)])), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
+    return { cm, eq, gods, levels: lvs, expStock: Math.max(0, Math.min(1e8, Math.floor(+d.xs || 0))), medals: Math.max(0, Math.min(1e7, Math.floor(+d.md || 0))), giftsGot: Array.isArray(d.gc) ? d.gc.filter(x => typeof x === 'string').slice(-200) : [], tickets: Object.fromEntries(Object.entries(d.tk && typeof d.tk === 'object' ? d.tk : {}).filter(([k, v]) => ['green', 'blue', 'red', 'gold', 'black', 'special'].includes(k) && v > 0).map(([k, v]) => [k, Math.min(999, Math.floor(+v) || 0)])), fav: S.YOKAI_BY_ID[d.fv] ? d.fv : null, pid: /^[A-Za-z0-9_-]{8,40}$/.test(d.p || '') ? d.p : null, title: S.TITLE_BY_ID[d.t] || S.weeklyTitle(d.t) ? d.t : null, seals, name: String(d.n || '').slice(0, 10), yokai: d.y, friends: loadFriends(f), stats: { plays: st[0] || 0, escapes: st[1] || 0, dama: st[2] || 0, best: st[3] || 0, cleared: Object.fromEntries(S.BOSS_ORDER.filter((k, i) => (st[4] || 0) & (1 << i)).map(k => [k, true])),
       feats: Object.fromEntries((Array.isArray(d.e) ? d.e : []).filter(k => S.TITLES.some(t => t.feat === k)).map(k => [k, true])) } };
   }
 
@@ -300,7 +301,7 @@
       <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
       <div><span class="st ${live.status}">${st}</span></div>
       <div>${fav ? '⭐ お気に入り' : 'いまのお友達'}：<span style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.rank} ${esc(y.name)}</span></div>
-      ${self ? `<small class="fav-hint">右のお友達をタップすると、お気に入りにできます${fav ? '（もう一度タップではずす）' : ''}</small>` : ''}
+      ${self ? `<small class="fav-hint">右のお友達をタップすると、お気に入りにできます${fav ? '（もう一度タップではずす）' : ''}</small><small class="my-id">プレイヤーID：${esc(pid)}</small>` : ''}
       ${pr ? `<dl><dt>お友達</dt><dd>${own} / ${S.YOKAI.length}体${legends.length ? `　L レジェンド ${legends.length}体` : ''}${gods.length ? `　✨ 神 ${gods.length}体` : ''}</dd>
         <dt>遊んだ</dt><dd>${pr.s[0] || 0}回（脱出 ${pr.s[1] || 0}回）</dd>
         <dt>鬼玉</dt><dd>最高 ${pr.s[2] || 0}個・合計 ${(pr.s[3] || 0).toLocaleString('ja-JP')}個</dd>
@@ -1044,6 +1045,7 @@
     if (!confirm(`お友達${n}体のデータを読み込みます。\nこの端末の今のデータは上書きされます。よろしいですか？`)) return;
     friends = data.friends; stats = data.stats; stats.seals = data.seals; stats.gods = data.gods;
     levels = data.levels; stats.expStock = data.expStock; stats.medals = data.medals;
+    giftsGot = [...new Set([...giftsGot, ...data.giftsGot])]; try { localStorage.setItem('giftsGot', JSON.stringify(giftsGot)); } catch {}
     tickets = data.tickets; try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {} renderTicketButton();
     charms = data.cm; equips = data.eq; charmSeq = Math.max(0, ...charms.map(c => c.id)); saveCharms();
     selYokai = friends[data.yokai] ? data.yokai : 'nekomata';
@@ -1827,6 +1829,51 @@
     setTimeout(open, 1800);
   }
   try { updateFeats(); } catch {} // 前からの記録でとれるやりこみ称号
+  // ---- プレゼント（サーバーの gifts.json で、特定のプレイヤーや全員に届ける） ----
+  function giftLines(it) {
+    const out = [];
+    if (it.special) out.push(`🌈 スペシャルガチャチケット ×${it.special}`);
+    if (it.black) out.push(`🎫 黒玉チケット ×${it.black}`);
+    if (it.gold) out.push(`🎫 金玉チケット ×${it.gold}`);
+    if (it.exp) out.push(`📈 経験値 +${(+it.exp).toLocaleString('ja-JP')}`);
+    if (it.medals) out.push(`🏅 塔のメダル +${(+it.medals).toLocaleString('ja-JP')}`);
+    if (it.frag) out.push(`⚡ 神の欠片 ×${it.frag}`);
+    if (it.charm != null) out.push(`🧿 ${S.CHARM_RARITY[Math.max(0, Math.min(4, it.charm))].name}のお守り`);
+    if (it.title && S.TITLE_BY_ID[it.title]) out.push(`🏅 称号《${S.TITLE_BY_ID[it.title].name}》`);
+    return out;
+  }
+  function giveGift(it) {
+    for (const k of ['special', 'black', 'gold']) if (it[k] > 0) tickets[k] = (tickets[k] || 0) + Math.min(999, Math.floor(it[k]));
+    if (it.exp > 0) stats.expStock += Math.floor(it.exp);
+    if (it.medals > 0) stats.medals = (stats.medals || 0) + Math.floor(it.medals);
+    if (it.frag > 0) stats.gods.frag += Math.floor(it.frag);
+    if (it.charm != null) addCharm(S.makeCharm(Math.max(0, Math.min(4, +it.charm || 0))));
+    if (it.title && S.TITLE_BY_ID[it.title]) { const t = S.TITLE_BY_ID[it.title]; if (t.feat) stats.feats[t.feat] = true; }
+    try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+    saveAll(); renderTicketButton();
+  }
+  async function checkGifts() {
+    let list;
+    try { list = await fetch('gifts?pid=' + encodeURIComponent(pid), { cache: 'no-store' }).then(r => r.json()); } catch { return; }
+    const todo = (Array.isArray(list) ? list : []).filter(g => g.id && !giftsGot.includes(g.id));
+    const next = () => {
+      const g = todo.shift();
+      if (!g) return;
+      if (!$('title').classList.contains('active') || $('rewardScreen').classList.contains('active')) { todo.unshift(g); setTimeout(next, 900); return; }
+      const it = g.items || {};
+      $('rewardWeek').textContent = '🎁 プレゼントが届きました';
+      $('rewardTitle').textContent = g.msg || 'プレゼント';
+      $('rewardSub').textContent = giftLines(it).join('　');
+      $('rewardPrizes').innerHTML = `<div class="charm-big" style="--cc:#ffd23a">${artUrl('gacha/ball_rainbow') && it.special ? `<img src="${artUrl('gacha/ball_rainbow')}" alt="">` : '🎁'}</div>`;
+      $('btnRewardOk').onclick = () => {
+        if (!giftsGot.includes(g.id)) { giftsGot.push(g.id); try { localStorage.setItem('giftsGot', JSON.stringify(giftsGot.slice(-200))); } catch {} giveGift(it); }
+        show('title'); setTimeout(next, 600);
+      };
+      show('rewardScreen');
+    };
+    setTimeout(next, 3200);
+  }
+  checkGifts();
   // おわびのプレゼント②: ゲームが開けなかったおわびに、スペシャルガチャチケット 10枚（1つの端末で1回だけ）
   if (!localStorage.getItem('gift-special-20261108')) {
     try { localStorage.setItem('gift-special-20261108', '1'); } catch {}
