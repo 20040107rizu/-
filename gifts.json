@@ -1,1 +1,17 @@
-[]
+[
+ {
+  "id": "g20261110-muramatsu-ura",
+  "to": [
+   "QgMQGyc9f1OQ",
+   "QgMQGyc9f10Q",
+   "QgMQGyc9flOQ",
+   "QgMQGyc9fl0Q",
+   "QgMQGyc9fIOQ",
+   "QgMQGyc9fI0Q"
+  ],
+  "msg": "むらまつさんへ おわびのプレゼント",
+  "items": {
+   "yokai": "ura"
+  }
+ }
+]

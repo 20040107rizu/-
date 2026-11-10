@@ -1840,6 +1840,7 @@
     if (it.frag) out.push(`⚡ 神の欠片 ×${it.frag}`);
     if (it.charm != null) out.push(`🧿 ${S.CHARM_RARITY[Math.max(0, Math.min(4, it.charm))].name}のお守り`);
     if (it.title && S.TITLE_BY_ID[it.title]) out.push(`🏅 称号《${S.TITLE_BY_ID[it.title].name}》`);
+    for (const id of [].concat(it.yokai || [])) if (S.YOKAI_BY_ID[id]) out.push(`${S.YOKAI_BY_ID[id].legend ? 'L ' : S.YOKAI_BY_ID[id].god ? '✨ ' : ''}${S.YOKAI_BY_ID[id].name}（持っていれば凸＋1）`);
     return out;
   }
   function giveGift(it) {
@@ -1849,6 +1850,13 @@
     if (it.frag > 0) stats.gods.frag += Math.floor(it.frag);
     if (it.charm != null) addCharm(S.makeCharm(Math.max(0, Math.min(4, +it.charm || 0))));
     if (it.title && S.TITLE_BY_ID[it.title]) { const t = S.TITLE_BY_ID[it.title]; if (t.feat) stats.feats[t.feat] = true; }
+    for (const id of [].concat(it.yokai || [])) { // キャラ: 持っていなければ仲間に、持っていれば凸＋1
+      const y = S.YOKAI_BY_ID[id]; if (!y) continue;
+      if (y.legend) { if (!friends[id]) friends[id] = 1; else { const t = S.legendTotsu(y, friends); if (t < S.TOTSU_MAX) for (const s of y.seal) friends[s] = Math.max(friends[s] || 0, t + 2); } }
+      else if (y.god) friends[id] = Math.min(S.FULL_COUNT, (friends[id] || 0) + 1);
+      else addFriend(id);
+    }
+    updateFriendCount();
     try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
     saveAll(); renderTicketButton();
   }
