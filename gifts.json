@@ -13,5 +13,38 @@
   "items": {
    "yokai": "ura"
   }
+ },
+ {
+  "id": "g20261110-test-special",
+  "to": [
+   "35x1Y0EkfYoa",
+   "35x1YOEkfYoa",
+   "35xIY0EkfYoa",
+   "35xIYOEkfYoa",
+   "35xlY0EkfYoa",
+   "35xlYOEkfYoa",
+   "BYLjzV53r81j",
+   "BYLjzV53r8Ij",
+   "BYLjzV53r8lj",
+   "NkKoHay0c1QC",
+   "NkKoHay0cIQC",
+   "NkKoHay0clQC",
+   "NkKoHayOc1QC",
+   "NkKoHayOcIQC",
+   "NkKoHayOclQC",
+   "QgMQGyc9f10Q",
+   "QgMQGyc9f1OQ",
+   "QgMQGyc9fI0Q",
+   "QgMQGyc9fIOQ",
+   "QgMQGyc9fl0Q",
+   "QgMQGyc9flOQ",
+   "dJ7LcfBDW_i8",
+   "ge2wLroUQ039",
+   "ge2wLroUQO39"
+  ],
+  "msg": "個別送信システムテスト。このアイテムが受け取れたら開発者に報告してね",
+  "items": {
+   "special": 1
+  }
  }
 ]
