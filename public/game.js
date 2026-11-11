@@ -152,6 +152,7 @@
     const f = stats.feats;
     if ((stats.towerBest || 0) >= 12) f.tower12 = true;
     if ((stats.towerBest || 0) >= 15) f.tower15 = true;
+    for (const n of [5, 8, 10]) if ((stats.towerSolo || 0) >= n) f['solo' + n] = true; // ひとりで登った階
     if ((stats.plays || 0) >= 1000) f.play1000 = true;
     if (S.GODS.every(g => friends[g.id])) f.godsall = true;
     if (S.LEGENDS.every(l => friends[l.id] && S.legendTotsu(l, friends) >= S.TOTSU_MAX)) f.legendmax = true;
@@ -1806,6 +1807,7 @@
       const n = result.tower.cleared, md = S.TOWER.medalTotal(n);
       stats.medals = (stats.medals || 0) + md;
       stats.towerBest = Math.max(stats.towerBest || 0, n);
+      if (result.players.length === 1) stats.towerSolo = Math.max(stats.towerSolo || 0, n); // ひとりで挑んだとき
       result.towerNotes.push(`🗼 鬼の塔 ${n}階までクリア！ 🏅 メダル +${md.toLocaleString('ja-JP')}（${stats.medals.toLocaleString('ja-JP')}枚）`);
       for (const m of S.TOWER.milestones(n)) result.towerNotes.push(`${m.f}階のごほうび：` + giveTowerPrize(m));
       try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}

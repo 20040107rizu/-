@@ -146,6 +146,9 @@
     // やりこんだ人だけの称号（fx: 光り方 / plate: 名札の台 / emblem: 紋章）
     { id: 'tower12',  name: '塔の覇者',   color: '#ff8a3a', feat: 'tower12',  fx: 'fire',    plate: 'fire',    emblem: 'tower12',  desc: '鬼の塔で12階に到達する' },
     { id: 'tower15',  name: '天を衝く者', color: '#7ab8ff', feat: 'tower15',  fx: 'bolt',    plate: 'bolt',    emblem: 'tower15',  desc: '鬼の塔で15階に到達する' },
+    { id: 'solo5',    name: '孤高の登頂者', color: '#9ad8ff', feat: 'solo5',  fx: 'ice',     plate: 'ice',     emblem: 'tower15',  desc: '鬼の塔に【ひとりで】挑んで5階に到達する' },
+    { id: 'solo8',    name: '一騎当千',   color: '#c88aff', feat: 'solo8',    fx: 'dark',    plate: 'dark',    emblem: 'tower12',  desc: '鬼の塔に【ひとりで】挑んで8階に到達する' },
+    { id: 'solo10',   name: '天下無双',   color: '#ffd23a', feat: 'solo10',   fx: 'gold',    plate: 'gold',    emblem: 'tower12',  desc: '鬼の塔に【ひとりで】挑んで10階に到達する' },
     { id: 'sankiperf', name: '三鬼無双',  color: '#ff5a3a', feat: 'sankiperf', fx: 'fire',   plate: 'fire',    emblem: 'sanki',    desc: '三鬼合戦で、だれも倒れずに3体ぜんぶたおす' },
     { id: 'godsall',  name: '神々の主',   color: '#ffd23a', feat: 'godsall',  fx: 'divine',  plate: 'divine',  emblem: 'gods',     hidden: true, desc: '神16柱をぜんぶ仲間にする' },
     { id: 'legendmax', name: '伝説の継承者', color: '#ff9ae8', feat: 'legendmax', fx: 'rainbow', plate: 'rainbow', emblem: 'legend', desc: 'レジェンド6体をぜんぶ凸MAXにする' },
