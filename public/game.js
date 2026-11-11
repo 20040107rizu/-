@@ -261,7 +261,7 @@
       const st = f.status === 'off' ? `オフライン（${ago(f.seen)}）` : f.status === 'lobby' ? `募集中（${f.n}/4人）` : STATUS[f.status];
       const btn = f.room && f.status === 'lobby' ? `<button class="join" data-code="${f.room}">参加</button>`
         : f.room && f.status === 'battle' ? `<button class="watch" data-code="${f.room}">観戦</button>` : '';
-      return `<li class="${f.status}" data-pid="${f.pid}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)} ${f.title ? titleTag(f.title) : ''}</b><span class="st ${f.status}">${st}</span></div>${btn}</li>`;
+      return `<li class="${f.status}" data-pid="${f.pid}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)}</b>${f.title ? `<span class="rtitle">${titleTag(f.title)}</span>` : ''}<span class="st ${f.status}">${st}</span></div>${btn}</li>`;
     }).join('');
     if (ul._last === html) return; // 3秒ごとの更新で中身が同じなら作り直さない（軽くするため）
     ul.innerHTML = html; ul._last = html;
@@ -742,7 +742,7 @@
     $('rankList').innerHTML = rows.length ? rows.map(r => {
       const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
       return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}
-        <div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b><small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
+        <div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title)}</span>` : ''}<small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
     }).join('') : `<p class="sub empty">${ended ? 'この回の記録はありません' : 'まだ記録がありません。一番乗りをめざそう！'}</p>`;
     const me = d.me;
     const prizes = d.idx >= 1 ? '🥇 限定称号＋黒玉チケット　🥈 金玉チケット　🥉 赤玉チケット' : '🥇 限定称号＋金玉チケット　🥈🥉 赤玉チケット';
@@ -846,7 +846,7 @@
     if (!d) { $('evRank').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
     const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
     const row = r => { const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
-      return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}<div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b></div><span class="val">🏮 ${r.score.toLocaleString('ja-JP')}</span></div>`; };
+      return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}<div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title)}</span>` : ''}</div><span class="val">🏮 ${r.score.toLocaleString('ja-JP')}</span></div>`; };
     $('evRank').innerHTML = `<div class="ev-rk-head">みんなの累計 祭り提灯（${d.total}人）${d.me ? `　あなた <b>${d.me.rank}位</b>` : ''}</div>`
       + (d.rows.length ? d.rows.map(row).join('') : '<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>');
   }

@@ -324,6 +324,7 @@ button.mid { font-size: 15px; font-weight: bold; padding: 8px 16px; background: 
 .buddy-list img, .buddy-list .noimg { width: 44px; height: 44px; object-fit: contain; flex: none; }
 .buddy-list .who { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 11px; line-height: 1.3; }
 .buddy-list .who b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.buddy-list .who .rtitle { white-space: nowrap; font-size: 11px; line-height: 1.5; }
 .buddy-list .st { white-space: nowrap; }
 .buddy-list .st::before { content: "●"; margin-right: 3px; }
 .st.home::before, .st.lobby::before { color: #2fbf6a; }
@@ -402,6 +403,8 @@ button.ticket-btn { background: linear-gradient(90deg, #8a5a10, #c8901a); border
 .rrow img { width: 32px; height: 32px; object-fit: contain; }
 .rrow .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
 .rrow .nm b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rrow .nm .rtitle { white-space: nowrap; font-size: 11px; line-height: 1.5; padding: 1px 0; }
+.rrow .nm .rtitle img.temb-s { width: 1.7em; height: 1.7em; }
 .rrow .nm small { font-size: 9px; opacity: .75; }
 .rrow .val { font-weight: bold; font-size: 15px; color: #ffe36b; white-space: nowrap; }
 .rank-reward { font-size: 10px; background: #0006; border-radius: 8px; padding: 4px 8px; line-height: 1.5; }
