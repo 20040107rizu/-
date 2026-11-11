@@ -6,10 +6,23 @@
   const $ = id => document.getElementById(id);
   let rotated = false; // スマホを縦に持っていて、画面を90度回して見せているか
   const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen', 'eventScreen', 'ticketScreen'];
+  // 称号の札が行に入りきらないときは、はみ出さないように縮める（ランキング・フレンドなど）
+  function fitTitles() {
+    for (const el of document.querySelectorAll('.rtitle')) {
+      if (!el.offsetParent) continue;
+      el.style.transform = '';
+      const w = el.clientWidth, sw = el.scrollWidth;
+      if (sw > w + 1) el.style.transform = `scale(${(w / sw).toFixed(3)})`;
+    }
+  }
+  { let t = 0; const later = () => { cancelAnimationFrame(t); t = requestAnimationFrame(fitTitles); };
+    new MutationObserver(ms => { if (ms.some(m => [...m.addedNodes].some(n => n.nodeType === 1 && (n.classList.contains('rtitle') || n.querySelector?.('.rtitle'))))) later(); }).observe(document.body, { childList: true, subtree: true });
+    addEventListener('resize', later); }
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
     refreshUpdateBar();
+    requestAnimationFrame(fitTitles);
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す

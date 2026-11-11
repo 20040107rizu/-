@@ -871,3 +871,5 @@ html.art-ui .g10s-skip { background: #0008; background-image: none; border: 1px 
 #result > :first-child { margin-top: auto; } #result > :last-child { margin-bottom: auto; }
 #result > * { flex: none; }
 #result .res-unlock { font-size: clamp(12px, 3.4vmin, 16px); line-height: 1.5; }
+.rrow .nm .rtitle, .buddy-list .who .rtitle { display: block; transform-origin: left center; }
+.rrow .val { position: relative; z-index: 1; }
