@@ -1744,14 +1744,15 @@ class Room {
   finish() {
     this.state = 'result';
     // ガチャ（または経験値）は、みんなで集めた鬼玉の合計そのままで引く
-    const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
+    // イベント「百鬼祭」では鬼玉は集められない（拾ったぶんは祭り提灯になる。ガチャ・鬼玉の記録はなし）
+    const evB = this.lanOn, team = evB ? 0 : [...this.players.values()].reduce((a, p) => a + p.dama, 0);
     const lanN = this.players.size, lanSpN = this.lanOn && this.mainDown && this.lanSp ? S.EVENT.get.bossSp : 0;
     const players = [...this.players.values()].map(p => ({
       lan: this.lanOn ? Math.round((S.EVENT.lanOf(p.dama) + lanSpN) * S.EVENT.mul(p.yokai, lanN, p.totsu)) : undefined, // 祭り提灯 = 集めた鬼玉（特攻・チームの倍率つき）。スペシャル祭りの鬼王はおまけ 600
-      id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
+      id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: evB ? 0 : p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
-      gacha: rollGacha((p.escaped ? team : team / 2) + (this.luckTeam ? 150 : 0)), // ガネーシャ: 富の神（1つ上の色が出やすい）
+      gacha: evB ? null : rollGacha((p.escaped ? team : team / 2) + (this.luckTeam ? 150 : 0)), // ガネーシャ: 富の神（1つ上の色が出やすい）
       // レジェンドの封印の欠片と試練（封印の地でボスを倒したとき）
       god: this.godResult(p),
       seal: S.sealDrop({ stage: this.stage, boss: this.mainType, bossDown: this.mainDown, seen: p.atKill ? p.atKill.seen : true, anyDown: this.anyDownAtKill, blizKill: this.blizKill, dama: p.atKill ? p.atKill.dama : 0 }),

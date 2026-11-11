@@ -1084,6 +1084,8 @@
   let bossType = 'red';
   let sankiTypes = null; // 三鬼合戦で出てきた3体
   let lans = new Map(); // イベントの祭り提灯 id -> {x,y}
+  const evBattle = () => !!(snap && snap.players && snap.players.some(p => p.ln != null)); // イベント「百鬼祭」のバトル中（鬼玉が祭り提灯になる）
+  const orbWord = () => (evBattle() ? '祭り提灯' : '鬼玉');
   let towerF = 0; // 鬼の塔: 今の階（塔でなければ 0）
   let stage = 'oni';
   let offline = false;        // 試合のあとで接続が切れた（結果はそのまま見られる）
@@ -1435,7 +1437,7 @@
         spectateId = null;
         introMovie = m.movie || 0; introCount = m.countdown || 0;
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0; cutin = null; dropAnim = 0;
-        banner = started ? { text: m.tower ? `🗼 鬼の塔 1階：${S.BOSSES[m.tower.boss].name}` : m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: m.boss === 'matsuri_sp' ? '✨ レア出現！ たおすと祭り提灯 600個！' : m.tower ? 'ボスを倒せばクリア！ どこまで登れるかな' : '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
+        banner = started ? { text: m.tower ? `🗼 鬼の塔 1階：${S.BOSSES[m.tower.boss].name}` : m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: m.boss === 'matsuri_sp' ? '✨ レア出現！ たおすと祭り提灯 600個！' : m.boss === 'matsuri' ? '祭り提灯を集めて、襖から脱出しよう' : m.tower ? 'ボスを倒せばクリア！ どこまで登れるかな' : '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
         if (m.rejoin) banner = { text: '📡 つなぎ直しました！', t: 1.6, c: '#7dff9a' };
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }
@@ -1664,7 +1666,7 @@
     const titlesBefore = titlesDone();
     if (mine) {
       stats.plays++;
-      stats.dama += mine.dama;
+      if (mine.lan == null) stats.dama += mine.dama; // イベントでは鬼玉は集められない
       stats.best = Math.max(stats.best, mine.dama);
       if (mine.escaped) stats.escapes++;
     }
@@ -1762,6 +1764,7 @@
     }
     if (mine) { saveAll(); updateFriendCount(); helloAgain(); }
     if (mine && mine.gacha) { showChoice(true); return; }
+    if (mine && mine.lan != null) { renderResult(); show('result', true); menuMusic(); return; } // イベント: ガチャなし（集めたのは祭り提灯）
     playGacha(null, true);
   }
 
@@ -2051,7 +2054,8 @@
     const anyEsc = result.players.some(p => p.escaped);
     $('result').classList.toggle('lose', !anyEsc); // 背景: 脱出成功は朝日、失敗は暗い夜
     $('resTitle').textContent = anyEsc ? '鬼の世界から脱出！' : '全員脱出できなかった…';
-    $('resTitle').textContent += `（みんなの鬼玉 ${result.team ?? 0}個）`;
+    const evRes = result.players.some(p => p.lan != null);
+    $('resTitle').textContent += evRes ? '' : `（みんなの鬼玉 ${result.team ?? 0}個）`;
     const notes = [];
     if (result.newClear) {
       const next = S.BOSS_LIST.find(k => S.BOSSES[k].need === result.boss && !S.BOSSES[k].hidden);
@@ -2069,11 +2073,11 @@
     for (const id of result.newTitles || []) notes.push(`🏅 称号 ${titleTag(id)} をゲット！（図鑑の「称号」でつけられます）`);
     $('resUnlock').hidden = !notes.length;
     $('resUnlock').innerHTML = notes.join('<br>');
-    $('resTable').innerHTML = '<tr><th>なまえ</th><th>お友達</th><th>脱出</th><th>集めた鬼玉</th><th>ガチャ</th></tr>' +
+    $('resTable').innerHTML = `<tr><th>なまえ</th><th>お友達</th><th>脱出</th><th>${evRes ? '祭り提灯' : '集めた鬼玉'}</th><th>ガチャ</th></tr>` +
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
-        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
+        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.lan != null ? `🏮 ${p.lan}` : p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
           : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
           : result.myChoice === 'seal' ? 'L 封印ガチャ'
           : result.myChoice === 'charm' ? '🧿 お守りガチャ' : result.myChoice === 'pick' ? '🎯 指名召喚'
@@ -2181,12 +2185,12 @@
         dama.delete(ev.id);
         if (ev.by === myId) {
           beep(1200, 0.08, 'triangle', 0.05, 400);
-          if (ev.v > 1) { banner = { text: `どデカい鬼玉ゲット！ +${ev.v}`, t: 2.4, c: '#ff8ad8' }; [523, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.08), i * 90)); }
-        } else if (ev.v > 1) banner = { text: `${nameOf(ev.by)}がどデカい鬼玉をゲット！`, t: 1.8, c: '#ff8ad8' };
+          if (ev.v > 1) { banner = { text: `どデカい${orbWord()}ゲット！ +${ev.v}`, t: 2.4, c: '#ff8ad8' }; [523, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'triangle', 0.08), i * 90)); }
+        } else if (ev.v > 1) banner = { text: `${nameOf(ev.by)}がどデカい${orbWord()}をゲット！`, t: 1.8, c: '#ff8ad8' };
         break;
       case 'da':
         dama.set(ev.id, { id: ev.id, x: ev.x, y: ev.y, v: ev.v || 1, b: ev.b });
-        if (ev.v > 1) banner = { text: `どデカい鬼玉（${ev.v}個分）が落ちた！`, t: 2.4, c: '#ff8ad8' };
+        if (ev.v > 1) banner = { text: `どデカい${orbWord()}（${ev.v}個分）が落ちた！`, t: 2.4, c: '#ff8ad8' };
         break;
       case 'pick':
         if (ev.id === myId) { banner = { text: `${S.ITEMS[ev.item].icon} ${S.ITEMS[ev.item].name}をひろった`, t: 1.2, c: '#ffe36b' }; beep(880, 0.12, 'square', 0.04); }
@@ -3247,7 +3251,12 @@
     }
 
     // 鬼玉の数
-    if (me) {
+    if (me && me.ln != null) { // イベント: 自分の祭り提灯（鬼玉は出さない）
+      ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+      const label = `× ${me.ln}`, tw = ctx.measureText(label).width, im = art('item/lantern');
+      if (im) ctx.drawImage(im, W - 54 - tw, 12, 34, 34); else { ctx.font = '22px sans-serif'; ctx.fillText('🏮', W - 26 - tw, 39); ctx.font = 'bold 24px sans-serif'; }
+      ctx.strokeText(label, W - 20, 39); ctx.fillStyle = '#ffd23a'; ctx.fillText(label, W - 20, 39);
+    } else if (me) {
       ctx.textAlign = 'right';
       ctx.font = 'bold 24px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
       const team = snap.players.reduce((a, p) => a + p.dama, 0); // みんなで集めた合計
@@ -3258,7 +3267,6 @@
       ctx.fillStyle = '#ffd0f0'; ctx.beginPath(); ctx.arc(W - 38 - tw, 26, 4, 0, Math.PI * 2); ctx.fill();
       ctx.strokeText(label, W - 20, 39); ctx.fillStyle = '#ffd0f0'; ctx.fillText(label, W - 20, 39);
       if (snap.players.length > 1) { ctx.font = '11px sans-serif'; ctx.fillStyle = '#fffc'; ctx.fillText(`みんなの鬼玉（自分 ${me.dama}）`, W - 20, 54); }
-      if (me.ln != null) { ctx.font = 'bold 15px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000'; const t = `🏮 ${me.ln}`; ctx.strokeText(t, W - 20, 74); ctx.fillStyle = '#ffb03a'; ctx.fillText(t, W - 20, 74); }
     }
 
     // 仲間
@@ -3620,6 +3628,8 @@
       if (Math.abs(d.x - cam.x) > cam.vw / 2 + 30 || Math.abs(d.y - cam.y) > cam.vh / 2 + 30) continue;
       const bob = Math.sin(now * 4 + d.id) * 3;
       const r = d.v > 1 ? 30 + Math.sin(now * 6) * 2 : 9;
+      const lim = evBattle() && art('item/lantern'); // イベント: 鬼玉のかわりに祭り提灯
+      if (lim) { const s = d.v > 1 ? 70 : 28; ctx.drawImage(lim, d.x - s / 2, d.y + bob - s * 0.62, s, s); } else
       drawOrb(d.x, d.y + bob, r, d.v > 1, d.b);
       if (d.v > 1) {
                 ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
