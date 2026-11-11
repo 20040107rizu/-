@@ -156,8 +156,8 @@
     { id: 'flawless', name: '無傷の英雄', color: '#9ad8ff', feat: 'flawless', fx: 'bolt',    plate: 'bolt',    emblem: 'flawless', desc: '金鬼から先のボス鬼を、1回もダメージを受けずにたおす' },
     { id: 'charm10',  name: 'お守り蒐集家', color: '#ff9ae8', feat: 'charm10', fx: 'rainbow', plate: 'rainbow', emblem: 'legend',  desc: '虹のお守りを10個持つ' },
     // 特別な称号（ふつうには手に入らない）
-    { id: 'matsuri1', name: '百鬼祭の主', color: '#ff8a3a', feat: 'matsuri1', fx: 'fire', plate: 'fire', emblem: 'orb', hidden: true, desc: 'イベント「月夜の百鬼祭」で祭り提灯を10,000個集める（期間限定）' },
-    { id: 'matsuri2', name: '百鬼祭の覇王', color: '#ffd23a', feat: 'matsuri2', fx: 'creator', plate: 'gold', emblem: 'orb', hidden: true, desc: 'イベント「月夜の百鬼祭」で祭り提灯を100,000個集める（期間限定）' },
+    { id: 'matsuri1', name: '百鬼祭の主', color: '#ff8a3a', feat: 'matsuri1', fx: 'fire', plate: 'matsuri', emblem: 'matsuri', hidden: true, desc: 'イベント「月夜の百鬼祭」で祭り提灯を10,000個集める（期間限定）' },
+    { id: 'matsuri2', name: '百鬼祭の覇王', color: '#ffd23a', feat: 'matsuri2', fx: 'creator', plate: 'gold', emblem: 'matsuri', hidden: true, desc: 'イベント「月夜の百鬼祭」で祭り提灯を100,000個集める（期間限定）' },
     { id: 'creator',  name: '鬼バスターズの創造主', color: '#ffd23a', feat: 'creator', fx: 'creator', plate: 'creator', emblem: 'creator', hidden: true, desc: 'このゲームを作った人' },
   ];
   const TITLE_BY_ID = Object.fromEntries(TITLES.map(t => [t.id, t]));

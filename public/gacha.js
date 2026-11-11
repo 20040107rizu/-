@@ -2,7 +2,7 @@
 // opts: { team, ticket: チケットの名前（チケットガチャのとき）, failed: {from} | null（脱出失敗で半分になったとき）, ball: {key, name, color}, yokai: {name, rank, rankColor, role, img}, isNew, dupCount, totsu, totsuMax, totsuStep }
 (function () {
   'use strict';
-  const TIER = { green: 0, blue: 1, red: 2, gold: 3, black: 4 };
+  const TIER = { green: 0, blue: 1, red: 2, gold: 3, black: 4, matsuri: 4 };
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
   // ---------- 効果音（Web Audio） ----------

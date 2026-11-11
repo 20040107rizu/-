@@ -830,7 +830,7 @@
       return `<div class="ev-b${own ? '' : ' no'}"><span class="ev-rk" style="color:${S.RANKS[rk].color}">${rk}</span>${faceImg(y, false)}<em>${esc(y.name)}</em><span>+${Math.round(S.EVENT.boostOf(id, own ? t : 0) * 100)}%</span></div>`;
     }).join('');
     const evT = [['matsuri', '🏮 祭りガチャ', 'S 90%・L 9%・？？？ 1%'], ['legendSure', 'L レジェンド確定', 'レジェンドが必ず出る'], ['godSure', '？？？確定', '？？？が必ず出る']];
-    $('evGacha').innerHTML = evT.map(([k, n, d]) => `<button class="ev-g" data-k="${k}"${tickets[k] > 0 ? '' : ' disabled'}><b>${n}</b><small>${d}</small><span>×${tickets[k] || 0}</span></button>`).join('');
+    $('evGacha').innerHTML = evT.map(([k, n, d]) => `<button class="ev-g" data-k="${k}"${tickets[k] > 0 ? '' : ' disabled'}>${k === 'matsuri' && artUrl('gacha/ball_matsuri') ? `<img class="ev-gb" src="${artUrl('gacha/ball_matsuri')}" alt="">` : ''}<b>${n}</b><small>${d}</small><span>×${tickets[k] || 0}</span></button>`).join('');
     for (const b of $('evGacha').querySelectorAll('.ev-g')) b.onclick = () => { if (tickets[b.dataset.k] > 0) pullTicket(b.dataset.k); };
     $('evRewards').innerHTML = S.EVENT.rewards.map(([need, prizes]) => `<div class="ev-r${pts >= need ? ' got' : ''}"><b>${need.toLocaleString('ja-JP')}</b><span>${prizes.map(evPrizeText).join('・')}</span>${pts >= need ? '<i>✓</i>' : ''}</div>`).join('')
       + `<div class="ev-r"><b>${(top + S.EVENT.every).toLocaleString('ja-JP')}〜</b><span>5,000個ごとに ${TK_LABEL.matsuri}（上限なし）</span></div>`;
@@ -950,7 +950,7 @@
     $('gachaFail').hidden = true;
     GachaShow.run($('gachaStage'), {
       team: 0, ticket: spT ? `${TICKET_NAME[key]}${spNote}` : `${ball.name}玉チケット`, special: spKind === 'S' ? null : spKind, tease: !!spKind && (spKind !== 'S' || Math.random() < 0.15),
-      ball: { key: ball.key, name: ball.name, color: ball.color },
+      ball: key === 'matsuri' ? { key: 'matsuri', name: '祭り', color: '#ff5a3a' } : { key: ball.key, name: ball.name, color: ball.color },
       yokai: (() => { const rk = spKind === 'god' ? 'G' : spKind === 'legend' ? 'L' : y.rank; return { name: y.name, rank: rk, rankColor: (S.RANKS[rk] || S.RANKS.S).color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' }; })(),
       isNew, overExp, dupCount: spTotsu != null ? spTotsu + 1 : friends[y.id], totsu: spTotsu != null ? spTotsu : S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
     }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
