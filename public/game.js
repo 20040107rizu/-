@@ -962,7 +962,7 @@
     let x = Math.random(), rank = ball.ranks[0][0];
     for (const [rk, w] of ball.ranks) { if (x < w) { rank = rk; break; } x -= w; }
     const pool = S.YOKAI.filter(y => y.rank === rank);
-    let y = pool[Math.floor(Math.random() * pool.length)], spNote = '', spKind = null;
+    let y = pool[Math.floor(Math.random() * pool.length)], spNote = '', spKind = null, legendOver = 0;
     if (spT) { // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%（祭りガチャ: S 90%・L 9%・神 1%／確定ガチャ）
       const sp = S.rollSpecial(Math.random, key === 'matsuri' ? S.MATSURI_ODDS : key === 'legendSure' ? 'legend' : key === 'godSure' ? 'god' : undefined); y = sp.y; spKind = sp.kind;
       // 持っているレジェンド・神が出たら凸+1（凸MAXなら欠片に変わる）
@@ -973,11 +973,11 @@
       if (sp.kind === 'legend' && friends[y.id]) { // レジェンドの凸は封印の8体のいちばん低い凸で決まるので、8体を1段ずつ上げる
         const t = S.legendTotsu(y, friends);
         if (t < S.TOTSU_MAX) { for (const id of y.seal) friends[id] = Math.max(friends[id] || 0, t + 2); }
-        else { const sl = (stats.seals[y.id] = stats.seals[y.id] || { frag: 0 }); sl.frag += S.SEAL.gacha; spNote = `（凸MAXなので封印の欠片 +${S.SEAL.gacha}）`; }
+        else { legendOver = S.OVER_EXP.L; stats.expStock += legendOver; } // 凸MAXなら経験値に変わる
       }
     }
     const isNew = !friends[y.id];
-    const overExp = (y.legend || y.god) ? (friends[y.id] ? 0 : (friends[y.id] = 1, 0)) : addFriend(y.id);
+    const overExp = legendOver || ((y.legend || y.god) ? (friends[y.id] ? 0 : (friends[y.id] = 1, 0)) : addFriend(y.id));
     const spTotsu = spKind === 'legend' ? S.legendTotsu(y, friends) : null;
     const rk = spKind === 'god' ? 'G' : spKind === 'legend' ? 'L' : y.rank;
     return { key, spT, ball, y, spKind, spNote, isNew, overExp, spTotsu, rk, totsu: spTotsu != null ? spTotsu : S.totsuOf(friends[y.id]) };

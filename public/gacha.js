@@ -236,7 +236,7 @@
     stamp.textContent = o.yokai.rank === 'G' ? '神' : o.yokai.rank; stamp.classList.add('on'); SFX.stamp(); shakeScreen(o.special ? 'gs-quake-big' : 'gs-quake');
     await wait(350);
     $('.gs-name').textContent = o.yokai.name; $('.gs-name').classList.add('on');
-    $('.gs-msg').textContent = o.isNew ? `${o.yokai.role}の${o.yokai.name}がお友達になった！` : o.overExp ? `${o.yokai.name}は凸MAX！ あふれた分が 📈 経験値 +${o.overExp.toLocaleString('ja-JP')} に変わった` : o.totsu != null ? (o.dupCount - 1 > o.totsuMax ? `${o.yokai.name}は凸MAX！ これ以上は強くならないけど仲良し（×${o.dupCount}）` : `${o.yokai.name}が凸${o.totsu}になった！ HP・攻撃 +${Math.round(o.totsu * o.totsuStep * 100)}%`) : `${o.yokai.name}とさらに仲良くなった！（×${o.dupCount}）`;
+    $('.gs-msg').textContent = o.isNew ? `${o.yokai.role}の${o.yokai.name}がお友達になった！` : o.overExp ? `${o.yokai.name}は凸MAX！ あふれた分が 📈 経験値 +${o.overExp.toLocaleString('ja-JP')} に変わった` : o.totsu != null ? (o.dupCount - 1 > o.totsuMax || (o.totsu >= o.totsuMax && o.special) ? `${o.yokai.name}は凸MAX！ これ以上は強くならないけど仲良し（×${o.dupCount}）` : `${o.yokai.name}が凸${o.totsu}になった！ HP・攻撃 +${Math.round(o.totsu * o.totsuStep * 100)}%`) : `${o.yokai.name}とさらに仲良くなった！（×${o.dupCount}）`;
     $('.gs-msg').classList.add('on');
     SFX.fanfare(o.special ? 4 : tier);
     if (o.special) { // レジェンド・神: いちばん長いファンファーレと、虹・金の紙吹雪

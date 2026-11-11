@@ -37,7 +37,7 @@
   const TOTSU_MAX = 5, TOTSU_STEP = 0.03;
   const totsuOf = count => Math.max(0, Math.min(TOTSU_MAX, (count | 0) - 1));
   // 完凸（6体）よりあふれた分は経験値ストックに変わる（ランクごとの量）
-  const FULL_COUNT = TOTSU_MAX + 1, OVER_EXP = { C: 100, B: 300, A: 1000, S: 3000 };
+  const FULL_COUNT = TOTSU_MAX + 1, OVER_EXP = { C: 100, B: 300, A: 1000, S: 3000, L: 10000 }; // L: 凸MAXのレジェンドがガチャでまた出たとき
   // ---- お友達レベル（経験値ストックを使って上げる。Lv1 が今までの強さ、1レベルごとに HP・攻撃 +0.8%） ----
   const LV_MAX = 99, LV_STEP = 0.008;
   const PICK_ANY = 1500, PICK_COPIES = 1; // 鬼玉がこの数以上なら、Sランクまでの好きな妖怪を1体指名してもらえる
