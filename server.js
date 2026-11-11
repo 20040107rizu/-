@@ -355,7 +355,7 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined, ok: p.ready || !p.rdy || undefined, gw: this.state === 'result' && !p.viewed && !p.away ? 1 : undefined })), // gw: まだガチャ中
+      players: [...this.players.values()].map(p => ({ id: p.id, pid: p.pid || undefined, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined, ok: p.ready || !p.rdy || undefined, gw: this.state === 'result' && !p.viewed && !p.away ? 1 : undefined })), // gw: まだガチャ中
     };
   }
 

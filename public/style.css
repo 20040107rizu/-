@@ -921,3 +921,4 @@ html.art-ui .lb-panel { background: linear-gradient(#0b0514e0, #0b0514f2), var(-
 .boss-panel { flex-direction: column; align-items: center; justify-content: center; }
 .boss-panel .boss-pick { flex-wrap: wrap; justify-content: center; overflow-y: auto; max-width: 860px; gap: 8px; }
 .boss-panel .boss-card { width: 112px; height: 82px; flex: none; }
+.yk, .plist li, #profGrid .yk { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

@@ -6,6 +6,15 @@
   const $ = id => document.getElementById(id);
   let rotated = false; // スマホを縦に持っていて、画面を90度回して見せているか
   const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen', 'eventScreen', 'ticketScreen'];
+  // タップと長押し（長押し 0.45秒で hold。長押ししたあとのタップは出さない）
+  function onPress(el, tap, hold) {
+    let t = 0, held = false, sx = 0, sy = 0;
+    el.addEventListener('pointerdown', e => { held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(() => { held = true; if (navigator.vibrate) navigator.vibrate(15); hold(); }, 450); });
+    el.addEventListener('pointermove', e => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) clearTimeout(t); });
+    for (const k of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(k, () => clearTimeout(t));
+    el.addEventListener('contextmenu', e => e.preventDefault());
+    el.onclick = e => { if (held) { held = false; e.preventDefault(); return; } if (tap) tap(e); };
+  }
   // 称号の札が行に入りきらないときは、はみ出さないように縮める（ランキング・フレンドなど）
   function fitTitles() {
     for (const el of document.querySelectorAll('.rtitle')) {
@@ -283,9 +292,9 @@
     for (const b of ul.querySelectorAll('button.watch')) b.onclick = () => { $('buddyMsg').textContent = ''; connect({ t: 'watch', code: b.dataset.code }); };
   }
   // ---------- フレンドのプロフィール ----------
-  let profPid = null, profTab = 'all';
-  function openProfile(id) {
-    profPid = id; profTab = 'all';
+  let profPid = null, profTab = 'all', profFrom = 'buddyScreen', profHint = null;
+  function openProfile(id, from, hint) {
+    profPid = id; profTab = 'all'; profFrom = from || 'buddyScreen'; profHint = hint || null;
     show('profileScreen');
     renderProfile();
     if (id !== pid && pws && pws.readyState === 1) pws.send(JSON.stringify({ t: 'profile', pid: id }));
@@ -297,7 +306,7 @@
   function renderProfile(state) {
     // 自分のプロフィールは、この端末の記録から作る（フレンドに見えているのと同じ内容）
     const self = profPid === pid;
-    const b = self ? { name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() } : buddies[profPid] || {};
+    const b = self ? { name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle, prof: myProfile() } : buddies[profPid] || profHint || {};
     const live = self ? { status: 'me' } : buddyLive.find(f => f.pid === profPid) || { status: 'off', seen: b.seen };
     const pr = b.prof;
     // レジェンド・神は、自分がもう解放している人にだけ見せる
@@ -321,7 +330,7 @@
         <dt>称号</dt><dd>${pr.tc || 0}個${(pr.wt || []).length ? `（限定 ${pr.wt.map(titleTag).join(' ')}）` : ''}</dd>
         <dt>ボス鬼</dt><dd>${bosses}</dd></dl>`
         : `<small>${state === 'none' ? 'まだくわしい情報がありません（この人が新しいバージョンで遊ぶと見られるようになります）' : '読み込み中…'}</small>`}</div>`;
-    const btn = live.room && live.status === 'lobby' ? `<button class="big" id="profJoin">参加</button>` : live.room && live.status === 'battle' ? `<button class="big alt" id="profWatch">観戦</button>` : '';
+    const btn = live.room && ws && lobby && live.room === lobby.code ? '' : live.room && live.status === 'lobby' ? `<button class="big" id="profJoin">参加</button>` : live.room && live.status === 'battle' ? `<button class="big alt" id="profWatch">観戦</button>` : '';
     $('profAction').innerHTML = btn;
     if ($('profJoin')) $('profJoin').onclick = () => connect({ t: 'join', code: live.room });
     if ($('profWatch')) $('profWatch').onclick = () => connect({ t: 'watch', code: live.room });
@@ -340,15 +349,15 @@
       const n = counts[q.id], tt = S.totsuOf(n), qlv = lvs[q.id] || 1;
       return `<div class="yk${q.legend ? ' legend' : ''}${q.god ? ' god' : ''}${fav && fav.id === q.id ? ' fav' : ''}" data-id="${q.id}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.god ? "神" : q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${qlv > 1 ? `<span class="lvc">Lv${qlv}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
     }).join('') : '<p class="sub">このランクのお友達はまだいません</p>';
-    if (!self && pr) for (const el of $('profGrid').querySelectorAll('.yk')) el.onclick = () => { const id = el.dataset.id; showMember({ name: b.name || live.name, title: live.title || b.title, yokai: id, lv: lvs[id] || 1, totsu: S.totsuOf(counts[id]), noCharm: true }); };
     if (self) for (const el of $('profGrid').querySelectorAll('.yk')) el.onclick = () => {
       favYokai = favYokai === el.dataset.id ? null : el.dataset.id;
       try { if (favYokai) localStorage.setItem('fav', favYokai); else localStorage.removeItem('fav'); } catch {}
       helloAgain(); // フレンドにも見えるように送る
       const top = $('profGrid').scrollTop; renderProfile(state); $('profGrid').scrollTop = top;
     };
+    if (pr) for (const el of $('profGrid').querySelectorAll('.yk')) { const id = el.dataset.id, q = S.YOKAI_BY_ID[id]; onPress(el, el.onclick, () => showMember(self ? { yokai: id, lv: lvOfId(id), totsu: q.legend ? S.legendTotsu(q, friends) : S.totsuOf(friends[id]), charms: equippedOf(id) } : { name: b.name || live.name, title: live.title || b.title, yokai: id, lv: lvs[id] || 1, totsu: S.totsuOf(counts[id]), noCharm: true })); }
   }
-  $('btnProfClose').onclick = () => { show('buddyScreen'); renderBuddies(); };
+  $('btnProfClose').onclick = () => { if (profFrom === 'lobby' && ws && lobby && lobby.state === 'lobby') { renderLobby(); show('lobby'); } else { show('buddyScreen'); renderBuddies(); } };
 
   $('btnBuddies').onclick = () => { $('buddyMsg').textContent = ''; show('buddyScreen'); renderBuddies(); presenceConnect(); };
   $('btnBuddyClose').onclick = () => show('title');
@@ -414,7 +423,7 @@
       d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${owned && lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y, !owned)}`
         + (owned ? `<span class="nm">${y.name}</span>` : `<span class="unk nm">${'？'.repeat([...y.name].length)}</span>`) + `<small class="nm">${y.origin}</small>`;
       d.dataset.id = y.id;
-      d.onclick = () => { const again = zukanSel === y.id; zukanSel = y.id; selectZukanCard(); renderZukanInfo(); if (owned) showMember({ yokai: y.id, lv: lvOfId(y.id), totsu: S.totsuOf(owned), charms: equippedOf(y.id) }); };
+      onPress(d, () => { zukanSel = y.id; selectZukanCard(); renderZukanInfo(); }, () => { if (owned) showMember({ yokai: y.id, lv: lvOfId(y.id), totsu: S.totsuOf(owned), charms: equippedOf(y.id) }); });
       grid.appendChild(d);
     }
     grid.scrollTop = keep;
@@ -568,7 +577,7 @@
       d.className = 'yk god' + (g.id === zukanSel ? ' sel' : '') + (n ? '' : ' locked');
       d.innerHTML = `<span class="rk" style="color:${S.RANKS.G.color}">神</span>${can ? '<span class="cnt">✨</span>' : n > 1 ? `<span class="cnt">${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>` : ''}${n && lvOfId(g.id) > 1 ? `<span class="lvc">Lv${lvOfId(g.id)}</span>` : ''}${faceImg(g, !n)}<span class="nm">${g.name}</span><small class="nm">${g.origin}</small>`;
       d.dataset.id = g.id;
-      d.onclick = () => { zukanSel = g.id; renderZukan(); if (friends[g.id]) showMember({ yokai: g.id, lv: lvOfId(g.id), totsu: S.totsuOf(friends[g.id]), charms: equippedOf(g.id) }); };
+      onPress(d, () => { zukanSel = g.id; renderZukan(); }, () => { if (friends[g.id]) showMember({ yokai: g.id, lv: lvOfId(g.id), totsu: S.totsuOf(friends[g.id]), charms: equippedOf(g.id) }); });
       grid.appendChild(d);
     }
     const g = S.YOKAI_BY_ID[zukanSel], n = friends[g.id] || 0, tr = stats.gods.tr[g.id] || 0, frag = stats.gods.frag;
@@ -622,7 +631,7 @@
       d.className = 'yk legend' + (l.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : lt ? `<span class="cnt">${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</span>` : ''}${owned && lvOfId(l.id) > 1 ? `<span class="lvc">Lv${lvOfId(l.id)}</span>` : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
       d.dataset.id = l.id;
-      d.onclick = () => { zukanSel = l.id; renderZukan(); if (friends[l.id]) showMember({ yokai: l.id, lv: lvOfId(l.id), totsu: S.legendTotsu(l, friends), charms: equippedOf(l.id) }); };
+      onPress(d, () => { zukanSel = l.id; renderZukan(); }, () => { if (friends[l.id]) showMember({ yokai: l.id, lv: lvOfId(l.id), totsu: S.legendTotsu(l, friends), charms: equippedOf(l.id) }); });
       grid.appendChild(d);
     }
     const l = S.YOKAI_BY_ID[zukanSel], owned = friends[l.id];
@@ -1473,7 +1482,7 @@
         for (const p of m.players || []) if (!S.YOKAI_BY_ID[p.yokai]) p.yokai = 'nekomata';
         lobby = m;
         if (m.state === 'result' && result && $('result').classList.contains('active')) renderResult(); // だれがまだガチャ中か
-        if (m.state === 'lobby') { renderLobby(); if (!$('zukan').classList.contains('active')) show('lobby'); } // 図鑑を開いているあいだはそのまま
+        if (m.state === 'lobby') { renderLobby(); if (!$('zukan').classList.contains('active') && !$('profileScreen').classList.contains('active')) show('lobby'); } // 図鑑を開いているあいだはそのまま
         else if (m.state === 'battle') show('game');
         break;
       case 'start':
@@ -1621,7 +1630,7 @@
         // みんなが連れていく妖怪が絵でわかるように
         const y = S.YOKAI_BY_ID[p.yokai];
         if (p.id === myId) li.className = 'me';
-        li.onclick = () => showMember(p); // タップでくわしく
+        onPress(li, () => (p.pid ? openProfile(p.pid, 'lobby', { name: p.name, yokai: p.yokai, title: p.title }) : showMember(p)), () => showMember(p)); // タップでプロフィール・長押しで連れている妖怪のくわしい画面
         if (p.ok) li.classList.add('ok');
         const rk = y.god ? 'G' : y.legend ? 'L' : y.rank;
         li.innerHTML = `${faceImg(y)}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b><span class="pyk" style="color:${(S.RANKS[rk] || S.RANKS[y.rank]).color}">${y.god ? '神' : rk} ${y.name}</span>`
@@ -1730,6 +1739,7 @@
         helloAgain();
         renderFriends();
       };
+      if (owned) onPress(d, d.onclick, () => showMember({ yokai: y.id, lv: lvOfId(y.id), totsu: y.legend ? S.legendTotsu(y, friends) : S.totsuOf(friends[y.id]), charms: equippedOf(y.id) })); // 長押しでくわしく
       el.appendChild(d);
     }
     el.scrollTop = keep;
