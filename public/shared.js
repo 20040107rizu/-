@@ -407,7 +407,7 @@
     boostPer: 0.2,
     boostOf(yokai, totsu = 0) { return EVENT.boost[yokai] ? EVENT.boost[yokai] + EVENT.boostPer * Math.max(0, Math.min(TOTSU_MAX, totsu | 0)) : 0; },
     team: [0, 0, 0.1, 0.2, 0.4], // チームの人数ごと（1人 +0%・2人 +10%・3人 +20%・4人 +40%）
-    orb: 0.3, // 鬼玉 → 祭り提灯（鬼玉 10個で提灯 3個。そのあと特攻・チームの倍率がかかる）
+    orb: 1, // 鬼玉 → 祭り提灯（拾った数がそのまま提灯。そのあと特攻・チームの倍率がかかる）
     lanOf(dama) { return Math.floor((dama || 0) * EVENT.orb); },
     get: { bossSp: 600 }, // スペシャル祭りの鬼王をたおすと、おまけで提灯 600（倍率つき）
     spRate: 0.1, // スペシャル祭りの鬼王が出る確率
