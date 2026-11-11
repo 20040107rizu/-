@@ -1693,9 +1693,17 @@
       const lines = eventGain(mine.lan);
       const x = mine.lx, f = n => n.toLocaleString('ja-JP');
       if (x) { // 内訳: 拾った数 × 倍率（特攻・チーム） = もらえる数
-        const m = 1 + x.bo + x.tm, why = [x.bo ? `特攻 +${Math.round(x.bo * 100)}%` : '', x.tm ? `${result.players.length}人 +${Math.round(x.tm * 100)}%` : ''].filter(Boolean).join('・');
-        result.towerNotes.push(`🏮 拾った提灯 ${f(x.b)}個${x.sp ? ` ＋ スペシャル祭りの鬼王 ${f(x.sp)}個` : ''}${m > 1 ? ` × ${+m.toFixed(2)}倍（${why}）` : ''} ＝ +${f(mine.lan)}個`);
-        result.towerNotes.push(x.bo ? `🏮 合計 ${f(eventPts())}個` : `🏮 合計 ${f(eventPts())}個　💡 特攻妖怪を連れていくと +100%〜+200%！`);
+        const ps = result.players.filter(p => p.lx), solo = ps.length <= 1;
+        const part = p => { const m = 1 + p.lx.bo + p.lx.tm, why = [p.lx.bo ? `特攻 +${Math.round(p.lx.bo * 100)}%` : '', p.lx.tm ? `${ps.length}人 +${Math.round(p.lx.tm * 100)}%` : ''].filter(Boolean).join('・');
+          return `${f(p.lx.b)}個${m > 1 ? ` × ${+m.toFixed(2)}倍（${why}）` : ''}`; };
+        const sp = x.sp ? `スペシャル祭りの鬼王 ${f(x.sp)}個${x.spm > 1 ? ` × ${x.spm}倍` : ''}` : '';
+        if (solo) result.towerNotes.push(`🏮 拾った提灯 ${part(mine)}${sp ? ` ＋ ${sp}` : ''} ＝ +${f(mine.lan)}個`);
+        else {
+          result.towerNotes.push(`🏮 みんなの祭り提灯 ＝ +${f(mine.lan)}個（全員が同じ数もらえる）`);
+          for (const p of ps) result.towerNotes.push(`${p.id === myId ? '👉 ' : ''}${p.name}：${part(p)}`);
+          if (sp) result.towerNotes.push(`✨ ${sp}`);
+        }
+        result.towerNotes.push(ps.some(p => p.lx.bo) ? `🏮 合計 ${f(eventPts())}個` : `🏮 合計 ${f(eventPts())}個　💡 特攻妖怪を連れていくと +100%〜+200%！`);
       } else result.towerNotes.push(`🏮 祭り提灯 +${f(mine.lan)}（合計 ${f(eventPts())}個）`);
       for (const l of lines) result.towerNotes.push('🏮 ' + l);
     }
@@ -2082,7 +2090,7 @@
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
-        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.lan != null ? `🏮 ${p.lan}` : p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
+        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.lx ? `🏮 ${Math.round(p.lx.b * (1 + p.lx.bo + p.lx.tm))}` : p.lan != null ? `🏮 ${p.lan}` : p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
           : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
           : result.myChoice === 'seal' ? 'L 封印ガチャ'
           : result.myChoice === 'charm' ? '🧿 お守りガチャ' : result.myChoice === 'pick' ? '🎯 指名召喚'
