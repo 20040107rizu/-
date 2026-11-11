@@ -968,7 +968,7 @@
       // 持っているレジェンド・神が出たら凸+1（凸MAXなら欠片に変わる）
       if (sp.kind === 'god' && friends[y.id]) {
         if (friends[y.id] < S.FULL_COUNT) friends[y.id]++;
-        else { stats.gods.frag += (y.frag || S.GOD_FRAG); spNote = `（凸MAXなので神の欠片 +${y.frag || S.GOD_FRAG}）`; }
+        else { legendOver = S.OVER_EXP.G; stats.expStock += legendOver; } // 凸MAXなら経験値に変わる
       }
       if (sp.kind === 'legend' && friends[y.id]) { // レジェンドの凸は封印の8体のいちばん低い凸で決まるので、8体を1段ずつ上げる
         const t = S.legendTotsu(y, friends);
