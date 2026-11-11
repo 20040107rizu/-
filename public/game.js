@@ -340,6 +340,7 @@
       const n = counts[q.id], tt = S.totsuOf(n), qlv = lvs[q.id] || 1;
       return `<div class="yk${q.legend ? ' legend' : ''}${q.god ? ' god' : ''}${fav && fav.id === q.id ? ' fav' : ''}" data-id="${q.id}"><span class="rk" style="color:${S.RANKS[q.rank].color}">${q.god ? "神" : q.rank}</span>${tt ? `<span class="cnt">${tt >= S.TOTSU_MAX ? '凸MAX' : `凸${tt}`}</span>` : ''}${qlv > 1 ? `<span class="lvc">Lv${qlv}</span>` : ''}${faceImg(q)}<span class="nm">${q.name}</span><small class="nm">${S.ROLES[q.role].name}・${q.origin}</small></div>`;
     }).join('') : '<p class="sub">このランクのお友達はまだいません</p>';
+    if (!self && pr) for (const el of $('profGrid').querySelectorAll('.yk')) el.onclick = () => { const id = el.dataset.id; showMember({ name: b.name || live.name, title: live.title || b.title, yokai: id, lv: lvs[id] || 1, totsu: S.totsuOf(counts[id]), noCharm: true }); };
     if (self) for (const el of $('profGrid').querySelectorAll('.yk')) el.onclick = () => {
       favYokai = favYokai === el.dataset.id ? null : el.dataset.id;
       try { if (favYokai) localStorage.setItem('fav', favYokai); else localStorage.removeItem('fav'); } catch {}
@@ -413,7 +414,7 @@
       d.innerHTML = `<span class="rk" style="color:${S.RANKS[y.rank].color}">${y.rank}</span>${owned > 1 ? `<span class="cnt">${S.totsuOf(owned) >= S.TOTSU_MAX ? '凸MAX' : `凸${S.totsuOf(owned)}`}</span>` : ''}${owned && lvOfId(y.id) > 1 ? `<span class="lvc">Lv${lvOfId(y.id)}</span>` : ''}${faceImg(y, !owned)}`
         + (owned ? `<span class="nm">${y.name}</span>` : `<span class="unk nm">${'？'.repeat([...y.name].length)}</span>`) + `<small class="nm">${y.origin}</small>`;
       d.dataset.id = y.id;
-      d.onclick = () => { zukanSel = y.id; selectZukanCard(); renderZukanInfo(); };
+      d.onclick = () => { const again = zukanSel === y.id; zukanSel = y.id; selectZukanCard(); renderZukanInfo(); if (owned) showMember({ yokai: y.id, lv: lvOfId(y.id), totsu: S.totsuOf(owned), charms: equippedOf(y.id) }); };
       grid.appendChild(d);
     }
     grid.scrollTop = keep;
@@ -567,7 +568,7 @@
       d.className = 'yk god' + (g.id === zukanSel ? ' sel' : '') + (n ? '' : ' locked');
       d.innerHTML = `<span class="rk" style="color:${S.RANKS.G.color}">神</span>${can ? '<span class="cnt">✨</span>' : n > 1 ? `<span class="cnt">${t >= S.TOTSU_MAX ? '凸MAX' : `凸${t}`}</span>` : ''}${n && lvOfId(g.id) > 1 ? `<span class="lvc">Lv${lvOfId(g.id)}</span>` : ''}${faceImg(g, !n)}<span class="nm">${g.name}</span><small class="nm">${g.origin}</small>`;
       d.dataset.id = g.id;
-      d.onclick = () => { zukanSel = g.id; renderZukan(); };
+      d.onclick = () => { zukanSel = g.id; renderZukan(); if (friends[g.id]) showMember({ yokai: g.id, lv: lvOfId(g.id), totsu: S.totsuOf(friends[g.id]), charms: equippedOf(g.id) }); };
       grid.appendChild(d);
     }
     const g = S.YOKAI_BY_ID[zukanSel], n = friends[g.id] || 0, tr = stats.gods.tr[g.id] || 0, frag = stats.gods.frag;
@@ -621,7 +622,7 @@
       d.className = 'yk legend' + (l.id === zukanSel ? ' sel' : '') + (owned ? '' : ' locked');
       d.innerHTML = `<span class="rk" style="color:${S.RANKS.L.color}">L</span>${ready ? '<span class="cnt">🔓</span>' : lt ? `<span class="cnt">${lt >= S.TOTSU_MAX ? '凸MAX' : `凸${lt}`}</span>` : ''}${owned && lvOfId(l.id) > 1 ? `<span class="lvc">Lv${lvOfId(l.id)}</span>` : ''}${faceImg(l, !owned)}<span class="nm">${l.name}</span><small class="nm">${S.STAGES[l.stage].name}</small>`;
       d.dataset.id = l.id;
-      d.onclick = () => { zukanSel = l.id; renderZukan(); };
+      d.onclick = () => { zukanSel = l.id; renderZukan(); if (friends[l.id]) showMember({ yokai: l.id, lv: lvOfId(l.id), totsu: S.legendTotsu(l, friends), charms: equippedOf(l.id) }); };
       grid.appendChild(d);
     }
     const l = S.YOKAI_BY_ID[zukanSel], owned = friends[l.id];
@@ -1593,18 +1594,18 @@
   // ルームの仲間（自分も）の妖怪をくわしく見る
   function showMember(p) {
     let box = $('memberPop');
-    if (!box) { box = document.createElement('div'); box.id = 'memberPop'; box.className = 'lv-confirm member-pop'; $('lobby').appendChild(box); }
+    if (!box) { box = document.createElement('div'); box.id = 'memberPop'; box.className = 'lv-confirm member-pop'; document.body.appendChild(box); box.onclick = e => { if (e.target === box) box.hidden = true; }; }
     const y = S.YOKAI_BY_ID[p.yokai], at = Attacks.of(y.id), el = Attacks.ELEMENT[at.el], sk = Attacks.SKILL[y.role], url = artUrl('yokai/' + y.id);
     const pct = Math.round(((p.totsu || 0) * S.TOTSU_STEP + ((p.lv || 1) - 1) * S.LV_STEP) * 1000) / 10;
-    const cs = p.id === myId ? equippedOf(selYokai) : (p.cs || []).map(a => ({ r: a[0], s: [[a[1], a[2]], [a[3], a[4]]].filter(([k]) => S.CHARM_SKILLS[k]) }));
+    const cs = p.charms || (p.id === myId ? equippedOf(selYokai) : (p.cs || []).map(a => ({ r: a[0], s: [[a[1], a[2]], [a[3], a[4]]].filter(([k]) => S.CHARM_SKILLS[k]) })));
     box.hidden = false;
     box.innerHTML = `<div class="mp-in">${url ? `<img class="big-face" src="${url}" alt="">` : ''}<div class="pv">
-      <b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>
-      <div><b style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.rank} ${esc(y.name)}</b> <span class="lv-tag">Lv${p.lv || 1}</span> ${totsuTag(p.totsu)}</div>
+      ${p.name ? `<b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>` : ''}${p.title ? `<div class="mp-title">${titleTag(p.title, 'm')}</div>` : ''}
+      <div><b style="color:${S.RANKS[y.god ? 'G' : y.legend ? 'L' : y.rank]?.color || S.RANKS[y.rank].color}">${y.god ? '神' : y.legend ? 'L' : y.rank} ${esc(y.name)}</b> <span class="lv-tag">Lv${p.lv || 1}</span> ${totsuTag(p.totsu)}</div>
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>${pct ? `・<span class="totsu-up">HP・攻撃 +${pct}%</span>` : ''}</div>
       <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd>
         ${y.ultName ? `<dt>必殺技</dt><dd>${esc(y.ultName)}：${esc(y.ultDesc)}</dd>` : ''}${y.passiveDesc ? `<dt>特性</dt><dd>${esc(y.passiveDesc)}</dd>` : ''}
-        <dt>お守り</dt><dd>${cs.length ? cs.map(c => `${charmTag(c)}<br><small>${Object.entries(S.charmEffects([c])).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}</small>`).join('<br>') : 'なし'}</dd></dl>
+        ${p.noCharm ? '' : `<dt>お守り</dt><dd>${cs.length ? cs.map(c => `${charmTag(c)}<br><small>${Object.entries(S.charmEffects([c])).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}</small>`).join('<br>') : 'なし'}</dd>`}</dl>
       <button class="big" id="memberClose">とじる</button></div></div>`;
     $('memberClose').onclick = () => { box.hidden = true; };
   }
@@ -1621,10 +1622,11 @@
         const y = S.YOKAI_BY_ID[p.yokai];
         if (p.id === myId) li.className = 'me';
         li.onclick = () => showMember(p); // タップでくわしく
-        li.innerHTML = `${faceImg(y)}${totsuTag(p.totsu)}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>${p.title ? titleTag(p.title) : ''}<span style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.rank} ${y.name}</span>${p.lv > 1 ? ` <small class="lv-tag">Lv${p.lv}</small>` : ''}${p.away ? '<small class="away">📡 つなぎ直し中…</small>' : ''}</div>`;
+        li.innerHTML = `${faceImg(y)}${totsuTag(p.totsu)}${p.lv > 1 ? `<span class="plv">Lv${p.lv}</span>` : ''}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>${p.title ? `<span class="rtitle">${titleTag(p.title)}</span>` : ''}<span style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.legend ? 'L' : y.rank} ${y.name}</span>${p.away ? '<small class="away">📡 つなぎ直し中…</small>' : ''}</div>`;
       } else { li.className = 'empty'; li.textContent = 'あき'; }
       ul.appendChild(li);
     }
+    requestAnimationFrame(fitTitles);
     renderFriends();
     const me = lobby.players.find(p => p.id === myId);
     const isHost = me && me.host;
