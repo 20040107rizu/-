@@ -1749,7 +1749,8 @@ class Room {
     const evB = this.lanOn, team = evB ? 0 : [...this.players.values()].reduce((a, p) => a + p.dama, 0);
     const lanN = this.players.size, lanSpN = this.lanOn && this.mainDown && this.lanSp ? S.EVENT.get.bossSp : 0;
     const players = [...this.players.values()].map(p => ({
-      lan: this.lanOn ? Math.round((S.EVENT.lanOf(p.dama) + lanSpN) * S.EVENT.mul(p.yokai, lanN, p.totsu)) : undefined, // 祭り提灯 = 集めた鬼玉（特攻・チームの倍率つき）。スペシャル祭りの鬼王はおまけ 600
+      lan: this.lanOn ? Math.round((S.EVENT.lanOf(p.dama) + lanSpN) * S.EVENT.mul(p.yokai, lanN, p.totsu)) : undefined,
+      lx: this.lanOn ? { b: S.EVENT.lanOf(p.dama), sp: lanSpN, bo: S.EVENT.boostOf(p.yokai, p.totsu), tm: S.EVENT.team[Math.min(4, lanN)] || 0 } : undefined, // 結果に出す内訳（拾った数・特攻・チーム） // 祭り提灯 = 集めた鬼玉（特攻・チームの倍率つき）。スペシャル祭りの鬼王はおまけ 600
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: evB ? 0 : p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),

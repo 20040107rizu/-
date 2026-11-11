@@ -1691,7 +1691,12 @@
     // イベント「百鬼祭」: 祭り提灯をためて、届いたごほうびをもらう
     if (mine && mine.lan > 0) {
       const lines = eventGain(mine.lan);
-      result.towerNotes.push(`🏮 祭り提灯 +${mine.lan.toLocaleString('ja-JP')}（${S.EVENT.boostOf(mine.yokai, S.totsuOf(countOf(mine.yokai))) ? `特攻 +${Math.round(S.EVENT.boostOf(mine.yokai, S.totsuOf(countOf(mine.yokai))) * 100)}%・` : ''}合計 ${eventPts().toLocaleString('ja-JP')}個）`);
+      const x = mine.lx, f = n => n.toLocaleString('ja-JP');
+      if (x) { // 内訳: 拾った数 × 倍率（特攻・チーム） = もらえる数
+        const m = 1 + x.bo + x.tm, why = [x.bo ? `特攻 +${Math.round(x.bo * 100)}%` : '', x.tm ? `${result.players.length}人 +${Math.round(x.tm * 100)}%` : ''].filter(Boolean).join('・');
+        result.towerNotes.push(`🏮 拾った提灯 ${f(x.b)}個${x.sp ? ` ＋ スペシャル祭りの鬼王 ${f(x.sp)}個` : ''}${m > 1 ? ` × ${+m.toFixed(2)}倍（${why}）` : ''} ＝ +${f(mine.lan)}個`);
+        result.towerNotes.push(x.bo ? `🏮 合計 ${f(eventPts())}個` : `🏮 合計 ${f(eventPts())}個　💡 特攻妖怪を連れていくと +100%〜+200%！`);
+      } else result.towerNotes.push(`🏮 祭り提灯 +${f(mine.lan)}（合計 ${f(eventPts())}個）`);
       for (const l of lines) result.towerNotes.push('🏮 ' + l);
     }
     // 三鬼合戦のごほうび（毎回）: 倒した数に応じて。3体ぜんぶ倒すと豪華
