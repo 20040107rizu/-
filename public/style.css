@@ -859,3 +859,10 @@ html.art-ui .g10s-skip { background: #0008; background-image: none; border: 1px 
 .g10s-big.new .g10s-stamp { background: radial-gradient(color-mix(in srgb, var(--rc) 60%, #fff), var(--rc)); }
 .g10s-newb { font-style: normal; font-size: .6em; background: #ff3a5a; color: #fff; border-radius: 8px; padding: 1px 8px; margin-right: 8px; vertical-align: middle; box-shadow: 0 0 10px #ff3a5a; text-shadow: none; animation: gsBlink 1s infinite; }
 .buddy-list .who .rtitle img.temb-s { width: 1.7em; height: 1.7em; }
+/* 名札の台（小さめ）: ランキング・フレンド・プロフィール・ロビー */
+.tplate.mid .temb { width: 30px; height: 30px; }
+.tplate.mid .tpl { min-width: 0; height: 30px; padding: 0 32px; }
+.tplate.mid .tpl .ttl.tfx { font-size: 11px; }
+.tplate.mid.creator .temb { width: 36px; height: 36px; } .tplate.mid.creator .tpl { height: 36px; min-width: 0; padding: 0 28px; } .tplate.mid.creator .ttl.tfx { font-size: 11.5px; }
+.rrow .nm .rtitle .tplate.mid, .buddy-list .who .rtitle .tplate.mid { margin: 1px 0; }
+.rrow .nm .rtitle img.temb, .buddy-list .who .rtitle img.temb { width: 30px; height: 30px; }

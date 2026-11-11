@@ -79,7 +79,7 @@
     if (t.fx) {
       const em = artUrl('title/emblem_' + t.emblem), pl = artUrl('title/plate_' + t.plate);
       const txt = `<span class="ttl tfx fx-${t.fx}">《${t.name}》${t.fx === 'rainbow' || t.fx === 'creator' ? `<span class="tspark">${SPARK}</span>` : ''}</span>`;
-      if (big && pl) return `<span class="tplate${t.fx === 'creator' ? ' creator' : ''}">${em ? `<img class="temb" src="${em}" alt="">` : ''}<span class="tpl" style="background-image:url('${pl}')">${txt}</span></span>`;
+      if (big && pl) return `<span class="tplate${t.fx === 'creator' ? ' creator' : ''}${big === 'm' ? ' mid' : ''}">${em ? `<img class="temb" src="${em}" alt="">` : ''}<span class="tpl" style="background-image:url('${pl}')">${txt}</span></span>`;
       return `${em ? `<img class="temb-s" src="${em}" alt="">` : ''}${txt}`;
     }
     const fx = t.color === 'gold' || t.color === 'rainbow';
@@ -261,7 +261,7 @@
       const st = f.status === 'off' ? `オフライン（${ago(f.seen)}）` : f.status === 'lobby' ? `募集中（${f.n}/4人）` : STATUS[f.status];
       const btn = f.room && f.status === 'lobby' ? `<button class="join" data-code="${f.room}">参加</button>`
         : f.room && f.status === 'battle' ? `<button class="watch" data-code="${f.room}">観戦</button>` : '';
-      return `<li class="${f.status}" data-pid="${f.pid}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)}</b>${f.title ? `<span class="rtitle">${titleTag(f.title)}</span>` : ''}<span class="st ${f.status}">${st}</span></div>${btn}</li>`;
+      return `<li class="${f.status}" data-pid="${f.pid}">${url ? `<img src="${url}" alt="">` : '<span class="noimg"></span>'}<div class="who"><b>${nameTag(f.name, f.title)}</b>${f.title ? `<span class="rtitle">${titleTag(f.title, 'm')}</span>` : ''}<span class="st ${f.status}">${st}</span></div>${btn}</li>`;
     }).join('');
     if (ul._last === html) return; // 3秒ごとの更新で中身が同じなら作り直さない（軽くするため）
     ul.innerHTML = html; ul._last = html;
@@ -298,7 +298,7 @@
     const st = live.status === 'off' ? `オフライン（${ago(live.seen || Date.now())}）` : live.status === 'lobby' ? `募集中（${live.n}/4人）` : STATUS[live.status];
     const bosses = S.BOSS_LIST.map(k => [k, S.BOSS_ORDER.indexOf(k)]).map(([k, i]) => S.BOSSES[k].hidden && !(pr && pr.c & (1 << i)) ? '' : `<span class="pboss bk-${k}${pr && pr.c & (1 << i) ? ' on' : ''}">${S.BOSSES[k].gimmick && !(pr && pr.c & (1 << i)) && !S.bossUnlocked(k, stats.cleared) ? '？？' : S.BOSSES[k].name}${pr && pr.c & (1 << i) ? '✔' : ''}</span>`).join(''); // 並びは BOSS_LIST、ビットは BOSS_ORDER の位置
     $('profInfo').innerHTML = `${url ? `<img class="big-face" src="${url}" alt="">` : ''}
-      <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title) : ''}
+      <div class="pv"><b>${nameTag(b.name || live.name || '？', live.title || b.title)}</b> ${(live.title || b.title) ? titleTag(live.title || b.title, 'm') : ''}
       <div><span class="st ${live.status}">${st}</span></div>
       <div>${fav ? '⭐ お気に入り' : 'いまのお友達'}：<span style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.rank} ${esc(y.name)}</span></div>
       ${self ? `<small class="fav-hint">右のお友達をタップすると、お気に入りにできます${fav ? '（もう一度タップではずす）' : ''}</small><small class="my-id">プレイヤーID：${esc(pid)}</small>` : ''}
@@ -742,7 +742,7 @@
     $('rankList').innerHTML = rows.length ? rows.map(r => {
       const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
       return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}
-        <div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title)}</span>` : ''}<small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
+        <div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title, 'm')}</span>` : ''}<small>${esc(r.detail || '')}</small></div><span class="val">${esc(S.fmtScore(th, r.score))}</span></div>`;
     }).join('') : `<p class="sub empty">${ended ? 'この回の記録はありません' : 'まだ記録がありません。一番乗りをめざそう！'}</p>`;
     const me = d.me;
     const prizes = d.idx >= 1 ? '🥇 限定称号＋黒玉チケット　🥈 金玉チケット　🥉 赤玉チケット' : '🥇 限定称号＋金玉チケット　🥈🥉 赤玉チケット';
@@ -846,7 +846,7 @@
     if (!d) { $('evRank').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
     const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
     const row = r => { const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
-      return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}<div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title)}</span>` : ''}</div><span class="val">🏮 ${r.score.toLocaleString('ja-JP')}</span></div>`; };
+      return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}<div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title, 'm')}</span>` : ''}</div><span class="val">🏮 ${r.score.toLocaleString('ja-JP')}</span></div>`; };
     $('evRank').innerHTML = `<div class="ev-rk-head">みんなの累計 祭り提灯（${d.total}人）${d.me ? `　あなた <b>${d.me.rank}位</b>` : ''}</div>`
       + (d.rows.length ? d.rows.map(row).join('') : '<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>');
   }
