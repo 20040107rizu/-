@@ -331,11 +331,32 @@
     await W(700);
     $('.gs-machine').classList.add('away');
 
-    // 3) ふつうの玉を順番にあける
+    // キャラを大きく見せて、タップを待つ（レジェンド・神・初ゲットのキャラ）
+    const bigShow = async (it, kind) => {
+      if (skip) return;
+      const bg = $('.g10s-big');
+      bg.className = 'g10s-big ' + kind; bg.hidden = false;
+      bg.style.setProperty('--rc', it.rankColor);
+      bg.querySelector('img').src = it.img || '';
+      bg.querySelector('.g10s-stamp').textContent = it.rank === 'G' ? '神' : it.rank;
+      bg.querySelector('.g10s-name').innerHTML = (it.isNew ? '<i class="g10s-newb">NEW!</i>' : '') + it.name.replace(/</g, '&lt;');
+      bg.querySelector('.g10s-msg').textContent = it.isNew ? `${it.name}がお友達になった！` : (it.note || `${it.name}とさらに仲良くなった！`);
+      void bg.offsetWidth; bg.classList.add('show');
+      const rare = kind === 'legend' || kind === 'god';
+      snd(SFX.stamp); snd(() => SFX.fanfare(rare ? 4 : Math.min(3, tier + 1))); if (rare) setTimeout(() => snd(() => SFX.fanfare(4)), 900);
+      const cols = kind === 'god' ? ['#ffffff', '#fff6c0', '#ffd23a', '#ffe680'] : kind === 'legend' ? ['#ff4a4a', '#ffd23a', '#4ae07a', '#3ac8ff', '#c85aff'] : [it.rankColor, '#ffffff', '#ff8ad8', '#7ad8ff'];
+      confetti($('.gs-cfl'), cols, rare ? 120 : 60); if (rare) setTimeout(() => { if (!skip) confetti($('.gs-cfl'), cols, 90); }, 600);
+      await W(rare ? 1400 : 900);
+      await tap('タップで次へ');
+      bg.hidden = true; bg.classList.remove('show');
+    };
+
+    // 3) ふつうの玉を順番にあける（初ゲットのキャラが出たら止まって大きく見せる）
     await tap('タップでぜんぶあける！');
     for (let i = 0; i < 10; i++) {
       if (items[i].special) continue;
       slots[i].classList.add('pop'); await W(120);
+      if (items[i].isNew && !skip) { snd(SFX.burst); flash('#ffffff', 450); quake('gs-quake'); open(i, true); await W(250); await bigShow(items[i], 'new'); continue; }
       open(i); await W(items[i].rank === 'S' ? 260 : 170);
     }
     // 4) レジェンド・神の玉は最後に1個ずつ
@@ -352,22 +373,7 @@
       for (let k = 0; k < 3; k++) { sl.classList.remove('wob'); void sl.offsetWidth; sl.classList.add('wob'); snd(SFX.shake); await W(380); }
       snd(SFX.burst); flash('#ffffff', 800); quake('gs-quake-big');
       open(i, true);
-      // 大きく見せる
-      const bg = $('.g10s-big');
-      if (!skip) {
-        bg.className = 'g10s-big ' + it.special; bg.hidden = false;
-        bg.querySelector('img').src = it.img || '';
-        bg.querySelector('.g10s-stamp').textContent = it.rank === 'G' ? '神' : it.rank;
-        bg.querySelector('.g10s-name').textContent = it.name;
-        bg.querySelector('.g10s-msg').textContent = it.isNew ? `${it.name}がお友達になった！` : (it.note || `${it.name}とさらに仲良くなった！`);
-        void bg.offsetWidth; bg.classList.add('show');
-        snd(SFX.stamp); snd(() => SFX.fanfare(4)); setTimeout(() => snd(() => SFX.fanfare(4)), 900);
-        const cols = it.special === 'god' ? ['#ffffff', '#fff6c0', '#ffd23a', '#ffe680'] : ['#ff4a4a', '#ffd23a', '#4ae07a', '#3ac8ff', '#c85aff'];
-        confetti($('.gs-cfl'), cols, 120); setTimeout(() => { if (!skip) confetti($('.gs-cfl'), cols, 90); }, 600);
-        await W(1400);
-        await tap('タップで次へ');
-        bg.hidden = true; bg.classList.remove('show');
-      }
+      await bigShow(it, it.special);
       g.classList.remove('gs-divine', 'gs-rainbow');
     }
     for (let i = 0; i < 10; i++) if (!slots[i].classList.contains('open')) open(i, true);

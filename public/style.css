@@ -854,3 +854,7 @@ html.art-ui button.mid.ev-btn { border-image: none !important; }
 html.art-ui .g10s-skip { background: #0008; background-image: none; border: 1px solid #fff6; }
 .g10s .gs-hint { bottom: 4%; }
 .g10s .gs-balltext { position: absolute; top: 12%; z-index: 8; font-size: clamp(16px, 5vmin, 26px); font-weight: bold; text-shadow: 0 2px 6px #000; }
+/* 10連: 初ゲットのキャラ */
+.g10s-big.new .g10s-rays { background: repeating-conic-gradient(from 0deg, var(--rc) 0 6deg, transparent 6deg 18deg); opacity: .45; }
+.g10s-big.new .g10s-stamp { background: radial-gradient(color-mix(in srgb, var(--rc) 60%, #fff), var(--rc)); }
+.g10s-newb { font-style: normal; font-size: .6em; background: #ff3a5a; color: #fff; border-radius: 8px; padding: 1px 8px; margin-right: 8px; vertical-align: middle; box-shadow: 0 0 10px #ff3a5a; text-shadow: none; animation: gsBlink 1s infinite; }
