@@ -835,7 +835,33 @@
     $('evRewards').innerHTML = S.EVENT.rewards.map(([need, prizes]) => `<div class="ev-r${pts >= need ? ' got' : ''}"><b>${need.toLocaleString('ja-JP')}</b><span>${prizes.map(evPrizeText).join('・')}</span>${pts >= need ? '<i>✓</i>' : ''}</div>`).join('')
       + `<div class="ev-r"><b>${(top + S.EVENT.every).toLocaleString('ja-JP')}〜</b><span>5,000個ごとに ${TK_LABEL.matsuri}（上限なし）</span></div>`;
   }
-  $('btnEvent').onclick = () => { renderEvent(); show('eventScreen'); };
+  // みんなの累計（ランキング）
+  let evTab = 'r', evRankData = null;
+  function evTabs() {
+    $('evTabR').classList.toggle('on', evTab === 'r'); $('evTabK').classList.toggle('on', evTab === 'k');
+    $('evRewards').hidden = evTab !== 'r'; $('evRank').hidden = evTab !== 'k';
+  }
+  function renderEvRank() {
+    const d = evRankData;
+    if (!d) { $('evRank').innerHTML = '<p class="sub">読み込み中…</p>'; return; }
+    const medal = n => (n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : n);
+    const row = r => { const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
+      return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}<div class="nm"><b>${nameTag(r.name, r.title)} ${r.title ? titleTag(r.title) : ''}</b></div><span class="val">🏮 ${r.score.toLocaleString('ja-JP')}</span></div>`; };
+    $('evRank').innerHTML = `<div class="ev-rk-head">みんなの累計 祭り提灯（${d.total}人）${d.me ? `　あなた <b>${d.me.rank}位</b>` : ''}</div>`
+      + (d.rows.length ? d.rows.map(row).join('') : '<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>');
+  }
+  async function loadEvRank() {
+    try {
+      const q = new URLSearchParams({ pid, pts: eventPts(), name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle || '' });
+      const r = await fetch(`evrank?${q}`, { cache: 'no-cache' });
+      if (!r.ok) return;
+      evRankData = await r.json();
+    } catch { return; }
+    if ($('eventScreen').classList.contains('active')) renderEvRank();
+  }
+  $('evTabR').onclick = () => { evTab = 'r'; evTabs(); };
+  $('evTabK').onclick = () => { evTab = 'k'; evTabs(); renderEvRank(); loadEvRank(); };
+  $('btnEvent').onclick = () => { renderEvent(); evTabs(); renderEvRank(); loadEvRank(); show('eventScreen'); };
   $('btnEventClose').onclick = () => show('title');
   setTimeout(renderEventButton, 0);
   setInterval(renderEventButton, 60000);

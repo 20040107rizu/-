@@ -91,6 +91,14 @@ const server = http.createServer((req, res) => {
     req.on('end', () => { try { const e = JSON.parse(body); clientErrs.unshift({ t: new Date().toISOString(), v: String(e.v).slice(0, 20), y: String(e.y).slice(0, 20), b: String(e.b).slice(0, 20), m: String(e.m).slice(0, 600) }); clientErrs.length = Math.min(clientErrs.length, 20); } catch {} res.writeHead(204); res.end(); });
     return;
   }
+  // イベントの累計ランキング: /evrank?pid=...&pts=（端末にたまっている数。サーバーの記録より多ければ合わせる）
+  if (urlPath === '/evrank') {
+    const q = new URL(req.url, 'http://x').searchParams, me = cleanPid(q.get('pid')), pts = Math.floor(+q.get('pts') || 0);
+    const yk = q.get('yokai'), tt = q.get('title');
+    const sync = me && pts > 0 && Date.now() < S.EVENT.end + 3600000 ? { pid: me, name: String(q.get('name') || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yk] ? yk : null, title: cleanTitle(tt), pts: Math.min(pts, 1e7) } : null;
+    Ranking.eventBoard(S.EVENT.id, me, sync).then(b => sendJSON(req, res, b), e => { console.error(e); res.writeHead(500); res.end('{}'); });
+    return;
+  }
   if (urlPath === '/clienterrs') return sendJSON(req, res, clientErrs);
   // 週替わりランキング: /ranking?pid=...&week=prev（先週）／week=3（第4回。終わった週の結果も見られる）
   if (urlPath === '/ranking') {
@@ -444,9 +452,8 @@ class Room {
     for (const d of this.dama) { d.x += rand(-15, 15); d.y += rand(-15, 15); }
     // 取られた鬼玉は、少しずつ別の場所に湧き直す（街に出ている数はこの上限まで）
     this.damaCap = damaCount;
-    // イベント「百鬼祭」: 祭りの鬼王のバトルだけ、町に祭り提灯が落ちている
-    this.lans = []; this.lanOn = (process.env.TEST_BOSS || this.bossSel) === S.EVENT.boss && !this.challenge && (S.EVENT.active() || !!process.env.EVENT_TEST); this.lanT = 0;
-    if (this.lanOn) for (let k = 0; k < 40; k++) this.lans.push({ id: genId(), ...this.gridS.randomFreePoint() });
+    // イベント「百鬼祭」: 祭りの鬼王のバトルだけ、集めた鬼玉がそのまま祭り提灯になる（町に提灯は落ちていない）
+    this.lans = []; this.lanOn = (process.env.TEST_BOSS || this.bossSel) === S.EVENT.boss && !this.challenge && (S.EVENT.active() || !!process.env.EVENT_TEST);
     this.damaRespawnT = DAMA_RESPAWN;
 
     // アイテム
@@ -728,7 +735,6 @@ class Room {
     if (src && src.passive === 'godArmor') this.makeMinion(src, e); // オニガミ: 倒した見回り鬼も手下になる
     if (src && src.passive === 'kuniumi') this.zones.push({ id: genId(), owner: src.id, x: e.x, y: e.y, r: 120, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#fff2a0' }); // イザナギ: 国生み（回復の島）
     this.calmPatrol(e); // 伝達はここで途切れる
-    if (this.lanOn && src) src.lan += S.EVENT.get.patrol; // 祭り提灯
     this.dropDama(e.x, e.y, this.patrolDrop() + Math.floor(Math.random() * 3)); // 強いボスの戦いほど多い（赤鬼 3〜5個 … 天邪鬼 9〜11個）
     e.respawnT = 25;
   }
@@ -876,6 +882,7 @@ class Room {
   // 乱入ボス（プレイヤーには知らせていない仕組み）:
   // 残り2分以上でボスを倒すと、30%で新しいボス鬼が空から降ってくる。ひとりなら赤鬼・青鬼・黒鬼、2人以上ならすべての鬼から
   maybeBonus() {
+    if (this.mainType === S.EVENT.boss) return; // イベントの祭りの鬼王では乱入なし
     if (this.timeLeft < 120 || Math.random() >= BONUS_RATE) return;
     const pool = (this.players.size === 1 ? ['red', 'blue', 'black'] : S.BOSS_ORDER).filter(k => k !== this.mainType && !S.BOSSES[k].hidden && !S.BOSSES[k].gimmick); // 隠しボスは乱入しない
     const type = pool[Math.floor(Math.random() * pool.length)];
@@ -1510,9 +1517,6 @@ class Room {
         this.events.push({ k: 'dg', id: d.id, by: p.id, v: d.v });
       }
     }
-    if (this.lanOn) for (const l of this.lans) { // 祭り提灯
-      if (!l.taken && Math.hypot(l.x - p.x, l.y - p.y) < 34) { l.taken = true; p.lan += S.EVENT.get.pick; this.events.push({ k: 'lg', id: l.id, by: p.id }); }
-    }
     if (!p.item) {
       for (const it of this.items) {
         if (!it.taken && Math.hypot(it.x - p.x, it.y - p.y) < 34) {
@@ -1584,10 +1588,6 @@ class Room {
         this.dama.push(d);
         this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: 1 });
       }
-    }
-    if (this.lanOn && (this.lanT -= DT) <= 0) { // 取られた提灯は少しずつ湧き直す
-      this.lanT = 3; this.lans = this.lans.filter(l => !l.taken);
-      if (this.lans.length < 40) { const near = [...this.players.values()].filter(p => !p.escaped); const l = { id: genId(), ...this.farFromAll(this.gridS, near, 400) }; this.lans.push(l); this.events.push({ k: 'la', id: l.id, x: Math.round(l.x), y: Math.round(l.y) }); }
     }
     this.itemRespawnT -= DT;
     if (this.itemRespawnT <= 0) { this.itemRespawnT = 40; if (this.items.length < this.itemCap) this.spawnItem(); }
@@ -1745,9 +1745,9 @@ class Room {
     this.state = 'result';
     // ガチャ（または経験値）は、みんなで集めた鬼玉の合計そのままで引く
     const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
-    const lanN = this.players.size, lanBoss = this.lanOn && this.mainDown, lanBossN = this.lanSp ? S.EVENT.get.bossSp : S.EVENT.get.boss;
+    const lanN = this.players.size, lanSpN = this.lanOn && this.mainDown && this.lanSp ? S.EVENT.get.bossSp : 0;
     const players = [...this.players.values()].map(p => ({
-      lan: this.lanOn ? Math.round((p.lan + (p.escaped ? S.EVENT.get.escape : 0) + (lanBoss ? lanBossN : 0)) * S.EVENT.mul(p.yokai, lanN, p.totsu)) : undefined, // 祭り提灯（特攻・チームの倍率つき）
+      lan: this.lanOn ? Math.round((S.EVENT.lanOf(p.dama) + lanSpN) * S.EVENT.mul(p.yokai, lanN, p.totsu)) : undefined, // 祭り提灯 = 集めた鬼玉（特攻・チームの倍率つき）。スペシャル祭りの鬼王はおまけ 600
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
@@ -1763,6 +1763,7 @@ class Room {
     this.broadcast(this.lobbyInfo());
     this.watchers.clear(); // 観戦はここまで（観戦していた人は結果を見てホームへ）
     this.recordRanking(players);
+    if (this.lanOn) Ranking.addEvent(S.EVENT.id, [...this.players.values()].filter(p => p.pid).map(p => ({ pid: p.pid, name: p.name, yokai: p.yokai, title: p.title, value: (players.find(x => x.id === p.id) || {}).lan || 0 }))).catch(e => console.error(e)); // イベントの累計ランキング
   }
 
   // 神の欠片と神の試練（隠しボスを倒したときだけ。持っているかどうかは各自の端末で判定する）
@@ -1854,7 +1855,7 @@ class Room {
       players: [...this.players.values()].map(p => ({
         id: p.id, name: p.name, yokai: p.yokai, x: Math.round(p.x), y: Math.round(p.y), face: +p.face.toFixed(2),
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
-        dama: p.dama, ln: this.lanOn ? p.lan : undefined, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
+        dama: p.dama, ln: this.lanOn ? S.EVENT.lanOf(p.dama) : undefined, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
         skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoi && p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, /* なぎはらい中だけ（前のバトルの向きが残っていても出さない） */ nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, rev: p.revT > 0 || undefined, charm: p.charmT > 0 || undefined, curse: p.curseT > 0 || undefined, crit: p.critT > 0 || undefined, dodge: !!p.dodge, sl: p.slowT > 0 || undefined, fz: p.frozenT > 0 || undefined, dk: p.darkT > 0 || undefined,
       })),

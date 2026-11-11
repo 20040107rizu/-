@@ -101,4 +101,58 @@ async function recentPlayers(idx) {
   } catch (e) { console.error('フレンドの読み込みに失敗:', e.message); return []; }
 }
 
-module.exports = { enabled, record, board, recentPlayers };
+
+// ---------- イベントの累計ランキング（月夜の百鬼祭など） ----------
+// 週のランキングと同じ weekly_scores 表に、week をイベントごとのマイナスの番号にして入れる（週の番号とはかぶらない）
+const events = new Map(); // イベントID → { rows: Map(pid → row), loading }
+const evWeek = id => -(1000 + [...String(id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 900000, 7));
+function eventStore(id) {
+  let w = events.get(id);
+  if (!w) {
+    w = { rows: new Map(), loading: null };
+    events.set(id, w);
+    if (enabled) {
+      w.loading = fetch(`${BASE}/rest/v1/weekly_scores?week=eq.${evWeek(id)}&select=pid,name,yokai,title,score,detail&limit=5000`, { headers: headers() })
+        .then(r => (r.ok ? r.json() : r.text().then(t => { throw new Error(`${r.status} ${t}`); })))
+        .then(list => { for (const row of list) if (!w.rows.has(row.pid)) w.rows.set(row.pid, row); })
+        .catch(e => { console.error('イベントランキングの読み込みに失敗:', e.message); dbError = e.message.slice(0, 200); });
+    }
+  }
+  return w;
+}
+function putEvent(id, w, e, score) {
+  const row = { pid: e.pid, name: e.name, yokai: e.yokai, title: e.title || null, score: Math.round(score), detail: null };
+  w.rows.set(e.pid, row);
+  save(evWeek(id), row);
+}
+// バトルで集めた提灯を足す。entries: [{ pid, name, yokai, title, value }]
+async function addEvent(id, entries) {
+  const w = eventStore(id);
+  if (w.loading) await w.loading;
+  for (const e of entries) {
+    if (!e.pid || !(e.value > 0)) continue;
+    const old = w.rows.get(e.pid);
+    putEvent(id, w, e, (old ? old.score : 0) + e.value);
+  }
+}
+// 順位表。sync: 端末にたまっている数（サーバーが再起動して記録が消えたときなどに、多いほうに合わせる）
+async function eventBoard(id, pid, sync) {
+  const w = eventStore(id);
+  if (w.loading) await w.loading;
+  if (sync) {
+    const old = w.rows.get(sync.pid);
+    if (!old || sync.pts > old.score) putEvent(id, w, sync, sync.pts);
+    else if (old.name !== sync.name || old.yokai !== sync.yokai || old.title !== sync.title) putEvent(id, w, { ...sync, yokai: sync.yokai || old.yokai }, old.score); // 名前・キャラ・称号を新しくする
+  }
+  const ranked = [...w.rows.values()].filter(r => r.score > 0).sort((a, b) => b.score - a.score);
+  const ranks = new Map();
+  ranked.forEach((r, i) => { const prev = ranked[i - 1]; ranks.set(r, prev && prev.score === r.score ? ranks.get(prev) : i + 1); });
+  const meRow = pid && w.rows.get(pid);
+  return {
+    id, saved: enabled && !dbError, total: ranked.length,
+    rows: ranked.slice(0, 100).map(r => ({ pid: r.pid, name: r.name, yokai: r.yokai, title: r.title, score: r.score, rank: ranks.get(r) })),
+    me: meRow && meRow.score > 0 ? { rank: ranks.get(meRow), score: meRow.score } : null,
+  };
+}
+
+module.exports = { enabled, record, board, recentPlayers, addEvent, eventBoard };

@@ -771,6 +771,10 @@ html.art-ui #eventScreen { background: linear-gradient(#0b051470, #0b0514d8), va
 .ev-b { position: relative; background: #ffffff10; border-radius: 8px; text-align: center; padding: 2px; }
 .ev-b .face { width: 100%; height: 40px; object-fit: contain; } .ev-b span { display: block; font-size: 10px; font-weight: bold; color: #ffd23a; }
 .ev-b.no { opacity: .55; }
+.ev-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.ev-tabs { display: flex; gap: 4px; flex: none; } .ev-tabs button { flex: 1; opacity: .6; } .ev-tabs button.on { opacity: 1; outline: 2px solid #ffd23a; }
+.ev-rk-head { font-size: 12px; color: #ffd23a; text-align: center; flex: none; } .ev-rk-head b { color: #fff; }
+.ev-rewards[hidden] { display: none; }
 .ev-rewards { flex: 1; min-width: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 3px; padding-right: 4px; }
 .ev-r { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; background: #ffffff0d; font-size: 12px; }
 .ev-r b { width: 62px; flex: none; color: #ffb03a; text-align: right; } .ev-r span { flex: 1; } .ev-r i { color: #7dff9a; font-style: normal; font-weight: bold; }
