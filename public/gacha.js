@@ -249,5 +249,134 @@
     await wait(900);
   }
 
-  window.GachaShow = { run };
+  // ---------- 10連 ----------
+  // GachaShow.run10(root, { ticket, ball: {key, name, color}, items: [{ name, rank, rankColor, img, isNew, note, special: 'legend'|'god'|null, tease }] })
+  // ハンドルを回す → ガチャ玉が10個ころがり出る → 順番にあける（レジェンド・神の玉は最後に1個ずつ大きく）
+  async function run10(root, o) {
+    const tier = TIER[o.ball.key] ?? 0, items = o.items, rares = items.filter(it => it.special);
+    const god = rares.some(it => it.special === 'god');
+    root.innerHTML = `
+      <div class="gs gs-t${tier} g10s">
+        <div class="gs-bg"></div>
+        <div class="gs-flash"></div>
+        <div class="gs-bolts"></div>
+        <div class="gs-info">🎫 ${o.ticket}</div>
+        <div class="gs-stage"><div class="gs-machine">${MACHINE}</div></div>
+        <div class="g10s-grid">${items.map((it, i) => `<div class="g10s-slot" data-i="${i}"><div class="g10s-ball"></div><div class="g10s-card" style="--rc:${it.rankColor}"></div></div>`).join('')}</div>
+        <div class="g10s-big" hidden><div class="g10s-rays"></div><img alt=""><div class="g10s-stamp"></div><div class="g10s-name"></div><div class="g10s-msg"></div></div>
+        <div class="gs-balltext" hidden></div>
+        <div class="gs-hint">タップでハンドルを回す！</div>
+        <button class="g10s-skip">スキップ ▶▶</button>
+        <div class="gs-cfl"></div>
+      </div>`;
+    const $ = sel => root.querySelector(sel), $$ = sel => [...root.querySelectorAll(sel)];
+    const g = $('.gs'), hint = $('.gs-hint');
+    const au = window.artUrl || (() => null);
+    if (au('gacha/machine')) $('.gs-machine').innerHTML = `<img class="gs-mimg" src="${au('gacha/machine')}" alt="">`;
+    for (const k of ['ball_rainbow', 'ball_divine', 'ball_tease', 'burst_divine', 'rays_rainbow', 'halo', 'mark_legend', 'mark_god']) if (au('gacha/' + k)) g.style.setProperty('--sp-' + k.replace('_', '-'), `url("${au('gacha/' + k)}")`);
+    const bimg = au('gacha/ball_' + o.ball.key);
+    g.style.setProperty('--ball', o.ball.color);
+    if (bimg) g.style.setProperty('--ballimg', `url("${bimg}")`);
+    let skip = false;
+    const W = ms => (skip ? Promise.resolve() : wait(ms));
+    const tap = text => (skip ? Promise.resolve() : new Promise(res => {
+      hint.textContent = text; hint.hidden = false;
+      const h = e => { if (e.target.closest('.g10s-skip')) return; e.preventDefault(); g.removeEventListener('pointerdown', h); hint.hidden = true; g._skipRes = null; res(); };
+      g.addEventListener('pointerdown', h);
+      g._skipRes = () => { g.removeEventListener('pointerdown', h); hint.hidden = true; res(); };
+    }));
+    $('.g10s-skip').addEventListener('pointerdown', e => { e.stopPropagation(); skip = true; if (g._skipRes) g._skipRes(); });
+    const flash = (color, ms = 500) => { if (skip) return; const f = $('.gs-flash'); f.style.background = color; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); setTimeout(() => f.classList.remove('on'), ms); };
+    const quake = cls => { if (skip) return; g.classList.remove(cls); void g.offsetWidth; g.classList.add(cls); };
+    const snd = f => { if (!skip) f(); };
+    const slots = $$('.g10s-slot');
+    const cardHtml = it => `<span class="g10s-rk">${it.rank === 'G' ? '神' : it.rank}</span>${it.img ? `<img src="${it.img}" alt="">` : ''}<b>${it.name}</b><small>${it.isNew ? '<i class="g10-new">NEW</i>' : it.note || ''}</small>`;
+    const open = (i, big) => {
+      const it = items[i], sl = slots[i];
+      sl.querySelector('.g10s-card').innerHTML = cardHtml(it);
+      sl.classList.remove('tease', 'focus', 'rainbow', 'divine');
+      sl.classList.add('open'); if (it.special) sl.classList.add('rare', it.special);
+      if (!big) { snd(SFX.pop); if (it.rank === 'S') flash(it.rankColor + '55', 250); }
+    };
+
+    // 1) ハンドルを回す（10回ぶん）
+    await tap('タップでハンドルを回す！');
+    g.classList.add('gs-turning');
+    for (let i = 0; i < 10; i++) setTimeout(() => snd(SFX.click), i * 110);
+    snd(SFX.rumble); quake('gs-quake');
+    await W(1200);
+    // 前ぶれ: レジェンド・神が入っていると、目が光って雷（神ならさらに真っ白）
+    if (rares.length || tier >= 3) { g.classList.add('gs-eyes'); snd(SFX.shimmer); await W(600); }
+    if (rares.length) {
+      g.classList.add('gs-gold'); snd(SFX.thunder); flash('#fff8c0', 400); quake('gs-quake'); $('.gs-bolts').classList.add('on');
+      const bt = $('.gs-balltext'); bt.textContent = god ? '✨ なにか神々しい気配が…！？' : '⚡ なにかすごいのが混じってる…！？'; bt.style.color = god ? '#fff6c0' : '#ff9ae8'; bt.hidden = skip;
+      await W(1100);
+      if (god) { snd(SFX.thunder); flash('#ffffff', 900); quake('gs-quake-big'); await W(900); }
+      bt.hidden = true;
+    }
+    g.classList.remove('gs-turning');
+
+    // 2) ガチャ玉が10個ころがり出る
+    const mc = $('.gs-stage').getBoundingClientRect();
+    $('.gs-machine').classList.add('back');
+    g.classList.add('g10s-pour');
+    for (let i = 0; i < 10; i++) {
+      const sl = slots[i], r = sl.getBoundingClientRect();
+      sl.style.setProperty('--fx', `${mc.left + mc.width / 2 - (r.left + r.width / 2)}px`);
+      sl.style.setProperty('--fy', `${mc.top + mc.height * 0.7 - (r.top + r.height / 2)}px`);
+      sl.classList.add('in'); if (items[i].tease || items[i].special) sl.classList.add('tease');
+      snd(SFX.drop);
+      await W(170);
+    }
+    await W(700);
+    $('.gs-machine').classList.add('away');
+
+    // 3) ふつうの玉を順番にあける
+    await tap('タップでぜんぶあける！');
+    for (let i = 0; i < 10; i++) {
+      if (items[i].special) continue;
+      slots[i].classList.add('pop'); await W(120);
+      open(i); await W(items[i].rank === 'S' ? 260 : 170);
+    }
+    // 4) レジェンド・神の玉は最後に1個ずつ
+    for (const it of rares) {
+      const i = items.indexOf(it), sl = slots[i];
+      if (skip) { open(i, true); continue; }
+      sl.classList.remove('tease'); sl.classList.add('focus', it.special === 'god' ? 'divine' : 'rainbow');
+      g.classList.add(it.special === 'god' ? 'gs-divine' : 'gs-rainbow');
+      snd(SFX.thunder); quake('gs-quake-big'); flash(it.special === 'god' ? '#ffffff' : '#ff9ae8', it.special === 'god' ? 1200 : 700);
+      const bt = $('.gs-balltext'); bt.textContent = it.special === 'god' ? '✨ 神々しく光る玉…！？' : '🌈 虹のガチャ玉！？'; bt.style.color = it.special === 'god' ? '#fff6c0' : '#ff9ae8'; bt.hidden = false;
+      await W(1000);
+      await tap('タップであける！');
+      bt.hidden = true;
+      for (let k = 0; k < 3; k++) { sl.classList.remove('wob'); void sl.offsetWidth; sl.classList.add('wob'); snd(SFX.shake); await W(380); }
+      snd(SFX.burst); flash('#ffffff', 800); quake('gs-quake-big');
+      open(i, true);
+      // 大きく見せる
+      const bg = $('.g10s-big');
+      if (!skip) {
+        bg.className = 'g10s-big ' + it.special; bg.hidden = false;
+        bg.querySelector('img').src = it.img || '';
+        bg.querySelector('.g10s-stamp').textContent = it.rank === 'G' ? '神' : it.rank;
+        bg.querySelector('.g10s-name').textContent = it.name;
+        bg.querySelector('.g10s-msg').textContent = it.isNew ? `${it.name}がお友達になった！` : (it.note || `${it.name}とさらに仲良くなった！`);
+        void bg.offsetWidth; bg.classList.add('show');
+        snd(SFX.stamp); snd(() => SFX.fanfare(4)); setTimeout(() => snd(() => SFX.fanfare(4)), 900);
+        const cols = it.special === 'god' ? ['#ffffff', '#fff6c0', '#ffd23a', '#ffe680'] : ['#ff4a4a', '#ffd23a', '#4ae07a', '#3ac8ff', '#c85aff'];
+        confetti($('.gs-cfl'), cols, 120); setTimeout(() => { if (!skip) confetti($('.gs-cfl'), cols, 90); }, 600);
+        await W(1400);
+        await tap('タップで次へ');
+        bg.hidden = true; bg.classList.remove('show');
+      }
+      g.classList.remove('gs-divine', 'gs-rainbow');
+    }
+    for (let i = 0; i < 10; i++) if (!slots[i].classList.contains('open')) open(i, true);
+    // 5) まとめ
+    g.classList.add('g10s-done'); $('.g10s-skip').hidden = true; hint.hidden = true;
+    $('.gs-info').textContent = '🎫 ' + o.ticket.replace(/！$/, '') + 'の結果';
+    if (!skip) { SFX.fanfare(rares.length ? 4 : tier); confetti($('.gs-cfl'), ['#ffe14a', '#fff6c0', '#ff8ad8', '#7ad8ff', '#ffffff'], 70); }
+    await wait(300);
+  }
+
+  window.GachaShow = { run, run10 };
 })();

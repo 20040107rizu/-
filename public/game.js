@@ -982,7 +982,6 @@
     const rk = spKind === 'god' ? 'G' : spKind === 'legend' ? 'L' : y.rank;
     return { key, spT, ball, y, spKind, spNote, isNew, overExp, spTotsu, rk, totsu: spTotsu != null ? spTotsu : S.totsuOf(friends[y.id]) };
   }
-  const RK_ORDER = { G: 7, L: 6, S: 5, A: 4, B: 3, C: 2, D: 1 };
   function showTicketDraw(r, label, after) {
     saveAll(); updateFriendCount(); renderTicketButton(); helloAgain();
     try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
@@ -1003,19 +1002,25 @@
     if (!key || !(tickets[key] > 0)) return;
     showTicketDraw(drawTicket(key));
   }
-  // 10連: チケット10枚で10回引く。いちばん良いのを演出で見せて、そのあと10体ぜんぶを並べる
+  // 10連: チケット10枚で10回引く。ガチャ玉が10個出てきて、順番にあける（レジェンド・神は最後に大きく）
   function pullTicket10(key) {
     if (!(tickets[key] >= 10)) return;
     const rs = Array.from({ length: 10 }, () => drawTicket(key));
-    const best = rs.reduce((a, r) => ((RK_ORDER[r.rk] || 0) > (RK_ORDER[a.rk] || 0) || ((RK_ORDER[r.rk] || 0) === (RK_ORDER[a.rk] || 0) && r.isNew && !a.isNew) ? r : a), rs[0]);
-    const name = TICKET_NAME[key] || `${S.BALLS.find(b => b.key === key).name}玉チケット`;
-    showTicketDraw(best, `${name} 10連！`, () => {
-      const g = document.createElement('div'); g.className = 'g10';
-      g.innerHTML = `<div class="g10-h">🎫 ${esc(name)} 10連の結果</div><div class="g10-grid">${rs.map((r, i) => `<div class="g10-c r-${r.rk}" style="--rc:${(S.RANKS[r.rk] || S.RANKS.S).color};animation-delay:${i * 0.08}s">`
-        + `<span class="g10-rk">${r.rk === 'G' ? '神' : r.rk}</span>${artUrl('yokai/' + r.y.id) ? `<img src="${artUrl('yokai/' + r.y.id)}" alt="">` : ''}<b>${esc(r.y.name)}</b>`
-        + `<small>${r.isNew ? '<i class="g10-new">NEW</i>' : r.spNote ? esc(r.spNote.replace(/[（）]/g, '')) : r.overExp ? `📈+${r.overExp}` : r.totsu ? (r.totsu >= S.TOTSU_MAX ? '凸MAX' : `凸${r.totsu}`) : ''}</small></div>`).join('')}</div>`;
-      $('gachaStage').appendChild(g);
-    });
+    saveAll(); updateFriendCount(); renderTicketButton(); helloAgain();
+    try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+    ticketMode = true;
+    const id = ++gachaRun, ball = rs[0].ball;
+    const name = TICKET_NAME[key] || `${ball.name}玉チケット`;
+    $('btnToResult').hidden = true; $('btnToResult').textContent = 'ホームへ';
+    $('gachaFail').hidden = true;
+    GachaShow.run10($('gachaStage'), {
+      ticket: `${name} 10連！`,
+      ball: key === 'matsuri' ? { key: 'matsuri', name: '祭り', color: '#ff5a3a' } : { key: ball.key, name: ball.name, color: ball.color },
+      items: rs.map(r => ({ name: r.y.name, rank: r.rk, rankColor: (S.RANKS[r.rk] || S.RANKS.S).color, img: artUrl('yokai/' + r.y.id) || '', isNew: r.isNew,
+        special: r.spKind === 'god' || r.spKind === 'legend' ? r.spKind : null, tease: !!r.spKind && Math.random() < 0.12,
+        note: r.spNote ? r.spNote.replace(/[（）]/g, '') : r.overExp ? `📈 経験値 +${r.overExp}` : r.totsu ? (r.totsu >= S.TOTSU_MAX ? '凸MAX' : `凸${r.totsu}`) : '' })),
+    }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
+    show('gacha');
   }
 
   // ---------- 状態 ----------
