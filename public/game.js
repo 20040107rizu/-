@@ -1981,6 +1981,10 @@
     if (it.special) out.push(`🌈 スペシャルガチャチケット ×${it.special}`);
     if (it.black) out.push(`🎫 黒玉チケット ×${it.black}`);
     if (it.gold) out.push(`🎫 金玉チケット ×${it.gold}`);
+    if (it.matsuri) out.push(`🏮 祭りガチャチケット ×${it.matsuri}`);
+    if (it.legendSure) out.push(`L レジェンド確定ガチャチケット ×${it.legendSure}`);
+    if (it.godSure) out.push(`？？？確定ガチャチケット ×${it.godSure}`);
+    for (const [k, n] of [['red', '赤'], ['blue', '青'], ['green', '緑']]) if (it[k]) out.push(`🎫 ${n}玉チケット ×${it[k]}`);
     if (it.exp) out.push(`📈 経験値 +${(+it.exp).toLocaleString('ja-JP')}`);
     if (it.medals) out.push(`🏅 塔のメダル +${(+it.medals).toLocaleString('ja-JP')}`);
     if (it.frag) out.push(`⚡ 神の欠片 ×${it.frag}`);
@@ -1990,7 +1994,7 @@
     return out;
   }
   function giveGift(it) {
-    for (const k of ['special', 'black', 'gold']) if (it[k] > 0) tickets[k] = (tickets[k] || 0) + Math.min(999, Math.floor(it[k]));
+    for (const k of ['special', 'black', 'gold', 'red', 'blue', 'green', 'matsuri', 'legendSure', 'godSure']) if (it[k] > 0) tickets[k] = (tickets[k] || 0) + Math.min(999, Math.floor(it[k]));
     if (it.exp > 0) stats.expStock += Math.floor(it.exp);
     if (it.medals > 0) stats.medals = (stats.medals || 0) + Math.floor(it.medals);
     if (it.frag > 0) stats.gods.frag += Math.floor(it.frag);

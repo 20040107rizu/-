@@ -71,5 +71,22 @@
   "items": {
    "special": 10
   }
+ },
+ {
+  "id": "g20261111-matsuri2-mura-yumo",
+  "to": [
+   "QgMQGyc9f1OQ",
+   "QgMQGyc9f10Q",
+   "QgMQGyc9flOQ",
+   "QgMQGyc9fl0Q",
+   "QgMQGyc9fIOQ",
+   "QgMQGyc9fI0Q",
+   "ge2wLroUQ039",
+   "ge2wLroUQO39"
+  ],
+  "msg": "祭りガチャチケット2枚のプレゼント！",
+  "items": {
+   "matsuri": 2
+  }
  }
 ]
