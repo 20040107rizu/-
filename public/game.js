@@ -1502,7 +1502,7 @@
         spectateId = null;
         introMovie = m.movie || 0; introCount = m.countdown || 0;
         landed = false; lastCount = 0; started = !(introMovie + introCount > 0); chaseHold = 0; cutin = null; dropAnim = 0;
-        banner = started ? { text: m.tower ? `🗼 鬼の塔 1階：${S.BOSSES[m.tower.boss].name}` : m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: m.boss === 'matsuri_sp' ? '✨ レア出現！ たおすと祭り提灯 600個！' : m.boss === 'matsuri' ? '祭り提灯を集めて、襖から脱出しよう' : m.tower ? 'ボスを倒せばクリア！ どこまで登れるかな' : '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
+        banner = started ? { text: m.tower ? `🗼 鬼の塔 1階：${S.BOSSES[m.tower.boss].name}` : m.sanki ? `${m.sanki.map(t => S.BOSSES[t].name).join('・')}が現れた！` : `${S.BOSSES[m.boss].name}が現れた！`, sub: m.boss === 'matsuri_sp' ? '✨ レア出現！ たおすと祭り提灯 1,800個！' : m.boss === 'matsuri' ? '祭り提灯を集めて、襖から脱出しよう' : m.tower ? 'ボスを倒せばクリア！ どこまで登れるかな' : '鬼玉を集めて、襖から脱出しよう', t: 3.2, c: BOSS_UI[m.boss] } : null;
         Music.play(introMovie > 0 ? 'intro' : 'normal');
         if (m.rejoin) banner = { text: '📡 つなぎ直しました！', t: 1.6, c: '#7dff9a' };
         if (m.watch) { banner = { text: '👀 観戦中', sub: `${S.BOSSES[m.boss].name}・${S.STAGES[stage].name}`, t: 2.5, c: '#5aa7ff' }; show('game'); }

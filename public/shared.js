@@ -416,7 +416,7 @@
     orb: 1, // 鬼玉 → 祭り提灯（拾った数がそのまま提灯。そのあと特攻・チームの倍率がかかる）
     lanOf(dama) { return Math.floor((dama || 0) * EVENT.orb); },
     get: { bossSp: 600 }, // スペシャル祭りの鬼王をたおすと、おまけで提灯 600（倍率つき）
-    spRate: 0.1, // スペシャル祭りの鬼王が出る確率
+    spRate: 0.3, // スペシャル祭りの鬼王が出る確率
     // 累計ランキングの順位ごとのごほうび（イベントが終わったときの順位で決まる。経験値）
     rankPrize: [[1, 150000], [2, 100000], [3, 50000], [5, 30000], [Infinity, 10000]],
     rankExp(rank) { const p = EVENT.rankPrize.find(([r]) => rank <= r); return p ? p[1] : 0; },
