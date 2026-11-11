@@ -1613,7 +1613,7 @@
       <div><b style="color:${S.RANKS[y.god ? 'G' : y.legend ? 'L' : y.rank]?.color || S.RANKS[y.rank].color}">${y.god ? '神' : y.legend ? 'L' : y.rank} ${esc(y.name)}</b> <span class="lv-tag">Lv${p.lv || 1}</span> ${totsuTag(p.totsu)}</div>
       <div>${S.ROLES[y.role].name}・<span style="color:${el.color}">${el.name}属性</span>${pct ? `・<span class="totsu-up">HP・攻撃 +${pct}%</span>` : ''}</div>
       <dl><dt>通常</dt><dd>${esc(at.normalName)}</dd><dt>強攻撃</dt><dd>${esc(at.strongName)}</dd><dt>スキル</dt><dd>${sk.label}</dd>
-        ${y.ultName ? `<dt>必殺技</dt><dd>${esc(y.ultName)}：${esc(y.ultDesc)}</dd>` : ''}${y.passiveDesc ? `<dt>特性</dt><dd>${esc(y.passiveDesc)}</dd>` : ''}
+        ${y.ultName ? `<dt>必殺技</dt><dd>${esc(y.ultName)}：${esc(y.ultDesc)}</dd>` : ''}${y.passiveDesc ? `<dt>特性</dt><dd>${esc(y.passiveDesc)}</dd>` : ''}<dt>属性</dt><dd>${el.name}属性：${esc(el.effect)}</dd>
         ${p.noCharm ? '' : `<dt>お守り</dt><dd>${cs.length ? cs.map(c => `${charmTag(c)}<br><small>${Object.entries(S.charmEffects([c])).map(([k, v]) => S.CHARM_SKILLS[k].text(v)).join('／')}</small>`).join('<br>') : 'なし'}</dd>`}</dl>
       <button class="big" id="memberClose">とじる</button></div></div>`;
     $('memberClose').onclick = () => { box.hidden = true; };
