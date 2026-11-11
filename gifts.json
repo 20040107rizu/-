@@ -49,5 +49,16 @@
   "items": {
    "special": 1
   }
+ },
+ {
+  "id": "g20261111-yumoto-special10",
+  "to": [
+   "ge2wLroUQ039",
+   "ge2wLroUQO39"
+  ],
+  "msg": "スペシャルガチャチケット10枚のプレゼント！",
+  "items": {
+   "special": 10
+  }
  }
 ]
