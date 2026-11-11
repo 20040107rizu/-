@@ -411,6 +411,9 @@
     lanOf(dama) { return Math.floor((dama || 0) * EVENT.orb); },
     get: { bossSp: 600 }, // スペシャル祭りの鬼王をたおすと、おまけで提灯 600（倍率つき）
     spRate: 0.1, // スペシャル祭りの鬼王が出る確率
+    // 累計ランキングの順位ごとのごほうび（イベントが終わったときの順位で決まる。経験値）
+    rankPrize: [[1, 150000], [2, 100000], [3, 50000], [5, 30000], [Infinity, 10000]],
+    rankExp(rank) { const p = EVENT.rankPrize.find(([r]) => rank <= r); return p ? p[1] : 0; },
     // ごほうび（届くたびにもらえる）。k: exp / ticket(gold,black,special,matsuri,legendSure,godSure) / charm(レア度) / frag / title
     rewards: [
       [200, [['exp', 5000]]], [500, [['ticket', 'gold']]], [1000, [['charm', 3]]], [2000, [['ticket', 'special']]], [3000, [['ticket', 'black']]],

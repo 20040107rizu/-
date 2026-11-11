@@ -861,6 +861,7 @@
     const row = r => { const y = S.YOKAI_BY_ID[r.yokai] || S.YOKAI[0], url = artUrl('yokai/' + y.id);
       return `<div class="rrow${r.pid === pid ? ' me' : ''}"><span class="rk r${r.rank}">${medal(r.rank)}</span>${url ? `<img src="${url}" alt="">` : ''}<div class="nm"><b>${nameTag(r.name, r.title)}</b>${r.title ? `<span class="rtitle">${titleTag(r.title, 'm')}</span>` : ''}</div><span class="val">🏮 ${r.score.toLocaleString('ja-JP')}</span></div>`; };
     $('evRank').innerHTML = `<div class="ev-rk-head">みんなの累計 祭り提灯（${d.total}人）${d.me ? `　あなた <b>${d.me.rank}位</b>` : ''}</div>`
+      + `<div class="ev-rk-prize">🎁 終了時の順位でごほうび：🥇 経験値15万　🥈 10万　🥉 5万　4・5位 3万　6位〜 1万</div>`
       + (d.rows.length ? d.rows.map(row).join('') : '<p class="sub empty">まだ記録がありません。一番乗りをめざそう！</p>');
   }
   async function loadEvRank() {
@@ -2027,6 +2028,15 @@
     let list;
     try { list = await fetch('gifts?pid=' + encodeURIComponent(pid), { cache: 'no-store' }).then(r => r.json()); } catch { return; }
     const todo = (Array.isArray(list) ? list : []).filter(g => g.id && !giftsGot.includes(g.id));
+    // イベントの累計ランキング: 終わったときの順位でごほうび（終わって10分後から。1人1回）
+    const ev = S.EVENT, evGiftId = 'evrank-' + ev.id;
+    if (Date.now() >= ev.end + 600000 && !giftsGot.includes(evGiftId) && eventPts() > 0) {
+      try {
+        const d = await fetch(`evrank?${new URLSearchParams({ pid, pts: eventPts(), name: $('name').value.trim() || 'プレイヤー', yokai: selYokai, title: myTitle || '' })}`, { cache: 'no-store' }).then(r => r.json());
+        const rank = d && d.me && d.me.rank;
+        if (rank) todo.push({ id: evGiftId, msg: `🏮 ${ev.name} ランキング ${rank}位のごほうび！`, items: { exp: ev.rankExp(rank) } });
+      } catch {}
+    }
     const next = () => {
       const g = todo.shift();
       if (!g) return;
@@ -2045,6 +2055,7 @@
     setTimeout(next, 3200);
   }
   checkGifts();
+  { const t = S.EVENT.end + 610000 - Date.now(); if (t > 0 && t < 8 * 86400000) setTimeout(checkGifts, t); } // 開いたままイベントが終わったときも
   // おわびのプレゼント②: ゲームが開けなかったおわびに、スペシャルガチャチケット 10枚（1つの端末で1回だけ）
   if (!localStorage.getItem('gift-special-20261108')) {
     try { localStorage.setItem('gift-special-20261108', '1'); } catch {}

@@ -95,7 +95,7 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/evrank') {
     const q = new URL(req.url, 'http://x').searchParams, me = cleanPid(q.get('pid')), pts = Math.floor(+q.get('pts') || 0);
     const yk = q.get('yokai'), tt = q.get('title');
-    const sync = me && pts > 0 && Date.now() < S.EVENT.end + 3600000 ? { pid: me, name: String(q.get('name') || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yk] ? yk : null, title: cleanTitle(tt), pts: Math.min(pts, 1e7) } : null;
+    const sync = me && pts > 0 && Date.now() < S.EVENT.end + 14 * 86400000 ? /* 終わってからも2週間は送り直せる（サーバーが再起動して記録が消えても、順位のごほうびが決まるように） */ { pid: me, name: String(q.get('name') || 'プレイヤー').slice(0, 10), yokai: S.YOKAI_BY_ID[yk] ? yk : null, title: cleanTitle(tt), pts: Math.min(pts, 1e7) } : null;
     Ranking.eventBoard(S.EVENT.id, me, sync).then(b => sendJSON(req, res, b), e => { console.error(e); res.writeHead(500); res.end('{}'); });
     return;
   }
