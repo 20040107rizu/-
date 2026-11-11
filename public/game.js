@@ -5,7 +5,7 @@
 
   const $ = id => document.getElementById(id);
   let rotated = false; // スマホを縦に持っていて、画面を90度回して見せているか
-  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen', 'eventScreen'];
+  const screens = ['title', 'lobby', 'game', 'gacha', 'result', 'installHelp', 'saveScreen', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen', 'eventScreen', 'ticketScreen'];
   function show(id, keepGame) {
     for (const s of screens) $(s).classList.toggle('active', s === id || (!!keepGame && s === 'game'));
     if (MENU_SCREENS.includes(id) && !keepGame) menuMusic();
@@ -13,7 +13,7 @@
     try { showBuildInfo(); } catch {}
   }
   // タイトル・ロビー・結果などではタイトルの曲を流す
-  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen', 'eventScreen'];
+  const MENU_SCREENS = ['title', 'lobby', 'saveScreen', 'installHelp', 'whatsNew', 'buddyScreen', 'zukan', 'rankScreen', 'rewardScreen', 'profileScreen', 'inviteHelp', 'choiceScreen', 'historyScreen', 'shopScreen', 'eventScreen', 'ticketScreen'];
   function menuMusic() { if (window.Music && Music.enabled) Music.play('title'); }
   const onMenu = () => MENU_SCREENS.some(id => document.getElementById(id).classList.contains('active')) || document.getElementById('result').classList.contains('active');
   // スマホは画面に触れるまで音を出せないので、最初に触れたときに鳴らし始める
@@ -830,8 +830,8 @@
       return `<div class="ev-b${own ? '' : ' no'}"><span class="ev-rk" style="color:${S.RANKS[rk].color}">${rk}</span>${faceImg(y, false)}<em>${esc(y.name)}</em><span>+${Math.round(S.EVENT.boostOf(id, own ? t : 0) * 100)}%</span></div>`;
     }).join('');
     const evT = [['matsuri', '🏮 祭りガチャ', 'S 90%・L 9%・？？？ 1%'], ['legendSure', 'L レジェンド確定', 'レジェンドが必ず出る'], ['godSure', '？？？確定', '？？？が必ず出る']];
-    $('evGacha').innerHTML = evT.map(([k, n, d]) => `<button class="ev-g" data-k="${k}"${tickets[k] > 0 ? '' : ' disabled'}>${k === 'matsuri' && artUrl('gacha/ball_matsuri') ? `<img class="ev-gb" src="${artUrl('gacha/ball_matsuri')}" alt="">` : ''}<b>${n}</b><small>${d}</small><span>×${tickets[k] || 0}</span></button>`).join('');
-    for (const b of $('evGacha').querySelectorAll('.ev-g')) b.onclick = () => { if (tickets[b.dataset.k] > 0) pullTicket(b.dataset.k); };
+    $('evGacha').innerHTML = evT.map(([k, n, d]) => `<button class="ev-g" data-k="${k}"${tickets[k] > 0 ? '' : ' disabled'}>${k === 'matsuri' && artUrl('gacha/ball_matsuri') ? `<img class="ev-gb" src="${artUrl('gacha/ball_matsuri')}" alt="">` : ''}<b>${n}</b><small>${d}</small><span>×${tickets[k] || 0}</span>${tickets[k] >= 10 ? `<i class="ev-g10" data-k="${k}">10連</i>` : ''}</button>`).join('');
+    for (const b of $('evGacha').querySelectorAll('.ev-g')) b.onclick = e => { const k = b.dataset.k; if (e.target.classList.contains('ev-g10')) pullTicket10(k); else if (tickets[k] > 0) pullTicket(k); };
     $('evRewards').innerHTML = S.EVENT.rewards.map(([need, prizes]) => `<div class="ev-r${pts >= need ? ' got' : ''}"><b>${need.toLocaleString('ja-JP')}</b><span>${prizes.map(evPrizeText).join('・')}</span>${pts >= need ? '<i>✓</i>' : ''}</div>`).join('')
       + `<div class="ev-r"><b>${(top + S.EVENT.every).toLocaleString('ja-JP')}〜</b><span>5,000個ごとに ${TK_LABEL.matsuri}（上限なし）</span></div>`;
   }
@@ -940,11 +940,22 @@
   // チケットガチャ: その色のガチャ玉が必ず出る
   const TICKET_NAME = { special: '🌈スペシャルガチャチケット', matsuri: '🏮祭りガチャチケット', legendSure: 'L レジェンド確定ガチャチケット', godSure: '？？？確定ガチャチケット' };
   let ticketMode = false;
-  $('btnTicket').onclick = () => pullTicket();
-  function pullTicket(want) {
-    const key = want || ['godSure', 'legendSure', 'matsuri', 'special', 'black', 'gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
+  // チケットガチャの画面: 種類ごとに「1回」と「10連」（10枚あるとき）
+  const TK_ORDER = ['godSure', 'legendSure', 'matsuri', 'special', 'black', 'gold', 'red', 'blue', 'green'];
+  function renderTickets() {
+    const ks = TK_ORDER.filter(k => tickets[k] > 0);
+    $('tkList').innerHTML = ks.length ? ks.map(k => {
+      const nm = TICKET_NAME[k] || `🎫 ${S.BALLS.find(b => b.key === k).name}玉チケット`, img = artUrl('gacha/ball_' + (k === 'matsuri' ? 'matsuri' : ['special', 'legendSure', 'godSure'].includes(k) ? 'rainbow' : k));
+      return `<div class="tk-row">${img ? `<img src="${img}" alt="">` : ''}<b>${nm}</b><span class="tk-n">×${tickets[k]}</span><button class="tk-1" data-k="${k}">1回</button><button class="tk-10" data-k="${k}"${tickets[k] >= 10 ? '' : ' disabled'}>10連</button></div>`;
+    }).join('') : '<p class="sub">チケットがありません</p>';
+    for (const b of $('tkList').querySelectorAll('.tk-1')) b.onclick = () => pullTicket(b.dataset.k);
+    for (const b of $('tkList').querySelectorAll('.tk-10')) b.onclick = () => pullTicket10(b.dataset.k);
+  }
+  $('btnTicket').onclick = () => { renderTickets(); show('ticketScreen'); };
+  $('btnTicketClose').onclick = () => show('title');
+  // チケットを1枚使って1回引く（演出なし。仲間・凸・欠片の反映まで）
+  function drawTicket(key) {
     const spT = ['special', 'matsuri', 'legendSure', 'godSure'].includes(key);
-    if (!key || !(tickets[key] > 0)) return;
     tickets[key]--;
     if (!tickets[key]) delete tickets[key];
     const ball = S.BALLS.find(b => b.key === (spT ? 'black' : key));
@@ -965,23 +976,47 @@
         else { const sl = (stats.seals[y.id] = stats.seals[y.id] || { frag: 0 }); sl.frag += S.SEAL.gacha; spNote = `（凸MAXなので封印の欠片 +${S.SEAL.gacha}）`; }
       }
     }
-    const spTotsu = spKind === 'legend' ? S.legendTotsu(y, friends) : null;
     const isNew = !friends[y.id];
     const overExp = (y.legend || y.god) ? (friends[y.id] ? 0 : (friends[y.id] = 1, 0)) : addFriend(y.id);
-    try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
+    const spTotsu = spKind === 'legend' ? S.legendTotsu(y, friends) : null;
+    const rk = spKind === 'god' ? 'G' : spKind === 'legend' ? 'L' : y.rank;
+    return { key, spT, ball, y, spKind, spNote, isNew, overExp, spTotsu, rk, totsu: spTotsu != null ? spTotsu : S.totsuOf(friends[y.id]) };
+  }
+  const RK_ORDER = { G: 7, L: 6, S: 5, A: 4, B: 3, C: 2, D: 1 };
+  function showTicketDraw(r, label, after) {
     saveAll(); updateFriendCount(); renderTicketButton(); helloAgain();
+    try { localStorage.setItem('tickets', JSON.stringify(tickets)); } catch {}
     ticketMode = true;
-    const id = ++gachaRun;
+    const id = ++gachaRun, { key, spT, ball, y, spKind } = r;
     $('btnToResult').hidden = true; $('btnToResult').textContent = 'ホームへ';
     $('gachaFail').hidden = true;
     GachaShow.run($('gachaStage'), {
-      team: 0, ticket: spT ? `${TICKET_NAME[key]}${spNote}` : `${ball.name}玉チケット`, special: spKind === 'S' ? null : spKind, tease: !!spKind && (spKind !== 'S' || Math.random() < 0.15),
+      team: 0, ticket: label || (spT ? `${TICKET_NAME[key]}${r.spNote}` : `${ball.name}玉チケット`), special: spKind === 'S' ? null : spKind, tease: !!spKind && (spKind !== 'S' || Math.random() < 0.15),
       ball: key === 'matsuri' ? { key: 'matsuri', name: '祭り', color: '#ff5a3a' } : { key: ball.key, name: ball.name, color: ball.color },
-      yokai: (() => { const rk = spKind === 'god' ? 'G' : spKind === 'legend' ? 'L' : y.rank; return { name: y.name, rank: rk, rankColor: (S.RANKS[rk] || S.RANKS.S).color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' }; })(),
-      isNew, overExp, dupCount: spTotsu != null ? spTotsu + 1 : friends[y.id], totsu: spTotsu != null ? spTotsu : S.totsuOf(friends[y.id]), totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
-    }).then(() => { if (id === gachaRun) $('btnToResult').hidden = false; });
+      yokai: { name: y.name, rank: r.rk, rankColor: (S.RANKS[r.rk] || S.RANKS.S).color, role: S.ROLES[y.role].name, img: artUrl('yokai/' + y.id) || '' },
+      isNew: r.isNew, overExp: r.overExp, dupCount: r.spTotsu != null ? r.spTotsu + 1 : friends[y.id], totsu: r.totsu, totsuMax: S.TOTSU_MAX, totsuStep: S.TOTSU_STEP,
+    }).then(() => { if (id !== gachaRun) return; if (after) after(); $('btnToResult').hidden = false; });
     show('gacha');
-  };
+  }
+  function pullTicket(want) {
+    const key = want || ['godSure', 'legendSure', 'matsuri', 'special', 'black', 'gold', 'red', 'blue', 'green'].find(k => tickets[k] > 0);
+    if (!key || !(tickets[key] > 0)) return;
+    showTicketDraw(drawTicket(key));
+  }
+  // 10連: チケット10枚で10回引く。いちばん良いのを演出で見せて、そのあと10体ぜんぶを並べる
+  function pullTicket10(key) {
+    if (!(tickets[key] >= 10)) return;
+    const rs = Array.from({ length: 10 }, () => drawTicket(key));
+    const best = rs.reduce((a, r) => ((RK_ORDER[r.rk] || 0) > (RK_ORDER[a.rk] || 0) || ((RK_ORDER[r.rk] || 0) === (RK_ORDER[a.rk] || 0) && r.isNew && !a.isNew) ? r : a), rs[0]);
+    const name = TICKET_NAME[key] || `${S.BALLS.find(b => b.key === key).name}玉チケット`;
+    showTicketDraw(best, `${name} 10連！`, () => {
+      const g = document.createElement('div'); g.className = 'g10';
+      g.innerHTML = `<div class="g10-h">🎫 ${esc(name)} 10連の結果</div><div class="g10-grid">${rs.map((r, i) => `<div class="g10-c r-${r.rk}" style="--rc:${(S.RANKS[r.rk] || S.RANKS.S).color};animation-delay:${i * 0.08}s">`
+        + `<span class="g10-rk">${r.rk === 'G' ? '神' : r.rk}</span>${artUrl('yokai/' + r.y.id) ? `<img src="${artUrl('yokai/' + r.y.id)}" alt="">` : ''}<b>${esc(r.y.name)}</b>`
+        + `<small>${r.isNew ? '<i class="g10-new">NEW</i>' : r.spNote ? esc(r.spNote.replace(/[（）]/g, '')) : r.overExp ? `📈+${r.overExp}` : r.totsu ? (r.totsu >= S.TOTSU_MAX ? '凸MAX' : `凸${r.totsu}`) : ''}</small></div>`).join('')}</div>`;
+      $('gachaStage').appendChild(g);
+    });
+  }
 
   // ---------- 状態 ----------
   let ws = null;
@@ -1694,15 +1729,10 @@
       const x = mine.lx, f = n => n.toLocaleString('ja-JP');
       if (x) { // 内訳: 拾った数 × 倍率（特攻・チーム） = もらえる数
         const ps = result.players.filter(p => p.lx), solo = ps.length <= 1;
-        const part = p => { const m = 1 + p.lx.bo + p.lx.tm, why = [p.lx.bo ? `特攻 +${Math.round(p.lx.bo * 100)}%` : '', p.lx.tm ? `${ps.length}人 +${Math.round(p.lx.tm * 100)}%` : ''].filter(Boolean).join('・');
-          return `${f(p.lx.b)}個${m > 1 ? ` × ${+m.toFixed(2)}倍（${why}）` : ''}`; };
-        const sp = x.sp ? `スペシャル祭りの鬼王 ${f(x.sp)}個${x.spm > 1 ? ` × ${x.spm}倍` : ''}` : '';
-        if (solo) result.towerNotes.push(`🏮 拾った提灯 ${part(mine)}${sp ? ` ＋ ${sp}` : ''} ＝ +${f(mine.lan)}個`);
-        else {
-          result.towerNotes.push(`🏮 みんなの祭り提灯 ＝ +${f(mine.lan)}個（全員が同じ数もらえる）`);
-          for (const p of ps) result.towerNotes.push(`${p.id === myId ? '👉 ' : ''}${p.name}：${part(p)}`);
-          if (sp) result.towerNotes.push(`✨ ${sp}`);
-        }
+        const why = [...ps.filter(p => p.lx.bo).map(p => `${solo ? '' : p.name + ' '}特攻 +${Math.round(p.lx.bo * 100)}%`), x.tm ? `${ps.length}人 +${Math.round(x.tm * 100)}%` : ''].filter(Boolean).join('・');
+        const picked = solo ? `拾った提灯 ${f(x.b)}個` : `みんなで拾った提灯 ${f(x.sum - x.sp)}個`;
+        result.towerNotes.push(`🏮 ${picked}${x.sp ? ` ＋ スペシャル祭りの鬼王 ${f(x.sp)}個` : ''}${x.m > 1 ? ` × ${x.m}倍` : ''} ＝ +${f(mine.lan)}個${solo ? '' : '（全員が同じ数もらえる）'}`);
+        if (why) result.towerNotes.push(`倍率 ${x.m}倍 ＝ 1 ＋ ${why}`);
         result.towerNotes.push(ps.some(p => p.lx.bo) ? `🏮 合計 ${f(eventPts())}個` : `🏮 合計 ${f(eventPts())}個　💡 特攻妖怪を連れていくと +100%〜+200%！`);
       } else result.towerNotes.push(`🏮 祭り提灯 +${f(mine.lan)}（合計 ${f(eventPts())}個）`);
       for (const l of lines) result.towerNotes.push('🏮 ' + l);
@@ -2090,7 +2120,7 @@
       result.players.map(p => {
         const y = S.YOKAI_BY_ID[p.yokai];
         const g = p.gacha ? S.YOKAI_BY_ID[p.gacha.yokai] : null;
-        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.lx ? `🏮 ${Math.round(p.lx.b * (1 + p.lx.bo + p.lx.tm))}` : p.lan != null ? `🏮 ${p.lan}` : p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
+        return `<tr><td>${esc(p.name)}</td><td>${y.name}</td><td>${p.escaped ? '⭕' : '❌'}</td><td>${p.lx ? `🏮 ${p.lx.b}${p.lx.bo ? ` <small>特攻+${Math.round(p.lx.bo * 100)}%</small>` : ''}` : p.lan != null ? `🏮 ${p.lan}` : p.dama}</td><td>${!g ? '-' : p.id !== myId ? `<small>鬼玉${p.count ?? '?'}個ぶん</small>`
           : result.myChoice === 'exp' ? `📈 経験値 +${expOf(p.count ?? 0).toLocaleString('ja-JP')}`
           : result.myChoice === 'seal' ? 'L 封印ガチャ'
           : result.myChoice === 'charm' ? '🧿 お守りガチャ' : result.myChoice === 'pick' ? '🎯 指名召喚'
@@ -3266,9 +3296,11 @@
     // 鬼玉の数
     if (me && me.ln != null) { // イベント: 自分の祭り提灯（鬼玉は出さない）
       ctx.textAlign = 'right'; ctx.font = 'bold 24px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-      const label = `× ${me.ln}`, tw = ctx.measureText(label).width, im = art('item/lantern');
+      const sum = snap.players.reduce((a, q) => a + (q.ln || 0), 0); // みんなで拾った合計
+      const label = `× ${sum}`, tw = ctx.measureText(label).width, im = art('item/lantern');
       if (im) ctx.drawImage(im, W - 54 - tw, 12, 34, 34); else { ctx.font = '22px sans-serif'; ctx.fillText('🏮', W - 26 - tw, 39); ctx.font = 'bold 24px sans-serif'; }
       ctx.strokeText(label, W - 20, 39); ctx.fillStyle = '#ffd23a'; ctx.fillText(label, W - 20, 39);
+      if (snap.lm > 1) { ctx.font = 'bold 12px sans-serif'; ctx.lineWidth = 3; const t = `特攻 ×${snap.lm} → ${Math.round(sum * snap.lm).toLocaleString('ja-JP')}個`; ctx.strokeText(t, W - 20, 56); ctx.fillStyle = '#ffe8b0'; ctx.fillText(t, W - 20, 56); }
     } else if (me) {
       ctx.textAlign = 'right';
       ctx.font = 'bold 24px sans-serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
