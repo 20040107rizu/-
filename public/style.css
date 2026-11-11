@@ -777,3 +777,12 @@ html.art-ui #eventScreen { background: linear-gradient(#2a0808c8, #0b0514f0), va
 .ev-r.got { opacity: .55; }
 .boss-card.bk-matsuri { background: linear-gradient(135deg, #c8241a, #5a0a1a 60%, #ffb03a); border-color: #ffd23a; box-shadow: 0 0 12px #ff6a1a88; }
 .pboss.on.bk-matsuri { background: #c8241a; color: #fff; border: 1px solid #ffd23a; }
+.ev-gacha { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.ev-g { display: flex; flex-direction: column; align-items: center; padding: 5px 2px; border-radius: 10px; background: linear-gradient(#c8241a, #6a0a1a); border: 2px solid #ffd23a; color: #fff; }
+.ev-g b { font-size: 12px; } .ev-g small { font-size: 9px; opacity: .8; } .ev-g span { font-size: 13px; font-weight: bold; color: #ffd23a; }
+.ev-g:disabled { opacity: .4; }
+.ev-b { padding: 2px 1px 3px; } .ev-rk { position: absolute; left: 4px; top: 1px; font-size: 11px; font-weight: bold; }
+.ev-b em { display: block; font-style: normal; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-b.no { opacity: 1; } .ev-b.no .face { filter: brightness(.25) grayscale(.6); } .ev-b.no em, .ev-b.no span { opacity: .5; }
+.yk .evb { position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; font-size: 9px; font-weight: bold; color: #fff; background: #c8241aee; border: 1px solid #ffd23a; border-radius: 6px; padding: 0 4px; z-index: 2; white-space: nowrap; }
+html.art-ui button.mid.ev-btn { border-image: none !important; }

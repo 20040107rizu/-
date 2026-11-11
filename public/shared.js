@@ -346,6 +346,7 @@
     hyakki: { name: '百鬼王', color: '#5a1a8a', hp: 5.5, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 400, need: 'gokuou', team: true, hidden: true, time: 480,
               rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
     shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
+    matsuri_sp: { name: 'スペシャル祭りの鬼王', color: '#ffd23a', hp: 4.2, dmg: 2.4, atkGap: 0.5, warn: 0.78, drop: 600, team: true, hidden: true, secret: true }, // 祭りの鬼王のかわりに 10% で出る（たおすと提灯 600）
     matsuri: { name: '祭りの鬼王', color: '#ff5a3a', hp: 3.6, dmg: 2.2, atkGap: 0.52, warn: 0.8, drop: 250, need: null, team: true, event: true }, // 期間限定イベント「百鬼祭」のボス（期間中だけ選べる）
     tower:  { name: '鬼の塔', color: '#c8a0ff', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 0, need: 'kishin', team: true, tower: true }, // 1階ずつボスを倒して登る（毎回1階から・終わりなし）
     sanki:  { name: '三鬼合戦', color: '#ff2a6a', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 600, need: 'amanojaku', team: true, sanki: true, time: 420 }, // ボス鬼3体が同時に出る（超高難易度）
@@ -400,14 +401,14 @@
   const EVENT = {
     id: 'matsuri2611', name: '月夜の百鬼祭', boss: 'matsuri',
     start: Date.UTC(2026, 10, 11, 3, 0), end: Date.UTC(2026, 10, 18, 3, 0), // 11/11 12:00 〜 11/18 12:00（日本時間）
-    // 特攻妖怪（C +150%・B +100%・A +70%・S +50%・L +30%）
-    boost: { chochin: 1.5, mamedanuki: 1.5, kogitsune: 1.5, sunekosuri: 1.5, hitodama: 1.5,
-      chouchin2: 1.0, taiko: 1.0, kitsunemen: 1.0, nekomusume: 1.0, kijimuna: 1.0,
-      kitsunebi: 0.7, oni_child: 0.7, hannya: 0.7, kasha: 0.7,
-      tamamo: 0.5, houou: 0.5, shuten: 0.5, amaterasu: 0.5,
-      ura: 0.3, nurarihyon: 0.3 },
+    // 特攻妖怪20体（だれでも +100%。凸1つごとに +20%、凸MAXで +200%）
+    boost: Object.fromEntries(['chochin', 'mamedanuki', 'kogitsune', 'sunekosuri', 'hitodama', 'chouchin2', 'taiko', 'kitsunemen', 'nekomusume', 'kijimuna',
+      'kitsunebi', 'oni_child', 'hannya', 'kasha', 'tamamo', 'houou', 'shuten', 'amaterasu', 'ura', 'nurarihyon'].map(id => [id, 1.0])),
+    boostPer: 0.2,
+    boostOf(yokai, totsu = 0) { return EVENT.boost[yokai] ? EVENT.boost[yokai] + EVENT.boostPer * Math.max(0, Math.min(TOTSU_MAX, totsu | 0)) : 0; },
     team: [0, 0, 0.1, 0.2, 0.4], // チームの人数ごと（1人 +0%・2人 +10%・3人 +20%・4人 +40%）
-    get: { pick: 1, patrol: 2, boss: 60, escape: 20 },
+    get: { pick: 1, patrol: 2, boss: 60, bossSp: 600, escape: 20 },
+    spRate: 0.1, // スペシャル祭りの鬼王が出る確率
     // ごほうび（届くたびにもらえる）。k: exp / ticket(gold,black,special,matsuri,legendSure,godSure) / charm(レア度) / frag / title
     rewards: [
       [200, [['exp', 5000]]], [500, [['ticket', 'gold']]], [1000, [['charm', 3]]], [2000, [['ticket', 'special']]], [3000, [['ticket', 'black']]],
@@ -419,7 +420,7 @@
     ],
     every: 5000, // 100,000 から先は 5,000 ごとに祭りガチャ ×1
     active(now = Date.now()) { return now >= EVENT.start && now < EVENT.end; },
-    mul(yokai, n) { return 1 + (EVENT.boost[yokai] || 0) + (EVENT.team[Math.min(4, n)] || 0); },
+    mul(yokai, n, totsu = 0) { return 1 + EVENT.boostOf(yokai, totsu) + (EVENT.team[Math.min(4, n)] || 0); },
   };
   // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%（祭りガチャ: S 90%・レジェンド 9%・神 1%）
   const SPECIAL_ODDS = { god: 0.001, legend: 0.03 };

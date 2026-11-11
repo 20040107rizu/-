@@ -462,10 +462,12 @@ class Room {
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
     if (S.BOSSES[this.bossSel] && S.BOSSES[this.bossSel].event && !S.EVENT.active() && !process.env.EVENT_TEST) this.bossSel = 'red'; // イベントが終わっていたら
-    const type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
+    let type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
+    this.lanSp = false;
+    if (type === S.EVENT.boss && (Math.random() < S.EVENT.spRate || process.env.TEST_SP)) { type = 'matsuri_sp'; this.lanSp = true; } // 10% でスペシャル祭りの鬼王
     const kind = S.BOSSES[type];
     if (kind.time && !this.challenge) { this.timeLimit = kind.time; this.timeLeft = kind.time; } // 隠しボスは制限時間が長い
-    this.mainType = type;       // 選んだボス（結果・解放・封印・ランキングはこのボスで決める）
+    this.mainType = this.lanSp ? S.EVENT.boss : type;       // 選んだボス（結果・解放・封印・ランキングはこのボスで決める）
     this.mainDown = false;
     this.drop = null;           // これから空から降ってくるボス（乱入・ボスラッシュの次・百鬼王・鬼神・真）
     this.bonusBoss = null; this.shinBoss = null;
@@ -1743,9 +1745,9 @@ class Room {
     this.state = 'result';
     // ガチャ（または経験値）は、みんなで集めた鬼玉の合計そのままで引く
     const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
-    const lanN = this.players.size, lanBoss = this.lanOn && this.mainDown;
+    const lanN = this.players.size, lanBoss = this.lanOn && this.mainDown, lanBossN = this.lanSp ? S.EVENT.get.bossSp : S.EVENT.get.boss;
     const players = [...this.players.values()].map(p => ({
-      lan: this.lanOn ? Math.round((p.lan + (p.escaped ? S.EVENT.get.escape : 0) + (lanBoss ? S.EVENT.get.boss : 0)) * S.EVENT.mul(p.yokai, lanN)) : undefined, // 祭り提灯（特攻・チームの倍率つき）
+      lan: this.lanOn ? Math.round((p.lan + (p.escaped ? S.EVENT.get.escape : 0) + (lanBoss ? lanBossN : 0)) * S.EVENT.mul(p.yokai, lanN, p.totsu)) : undefined, // 祭り提灯（特攻・チームの倍率つき）
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
