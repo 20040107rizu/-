@@ -300,7 +300,13 @@
   const fmtScore = (theme, v) => theme.lower ? `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}` : `${Math.round(v).toLocaleString('ja-JP')}${theme.unit}`;
   // 順位ごとの報酬（チケットは、ホームの「チケットガチャ」でその色の玉が必ず出る）
   // 第2回（idx 1）から: 1位 黒玉＋称号、2位 金玉、3位 赤玉、〜10位 青玉、それより下は緑玉（参加賞）
+  // 週替わりランキングの報酬。第4回からはスペシャルガチャチケット（順位で枚数が変わる）
+  const WEEKLY_SP = [[1, 5], [2, 3], [3, 2], [10, 1]];
   function weeklyReward(rank, idx = weekIndex()) {
+    if (idx >= 3) {
+      const sp = WEEKLY_SP.find(([r]) => rank <= r);
+      return sp ? { ticket: 'special', n: sp[1], title: rank === 1 } : { ticket: 'green' }; // 参加賞は緑玉チケット
+    }
     if (idx >= 1) {
       if (rank === 1) return { ticket: 'black', title: true };
       if (rank === 2) return { ticket: 'gold' };
