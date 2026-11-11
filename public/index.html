@@ -176,16 +176,31 @@
         <ul id="inviteList" class="invite-list"></ul>
         <p id="inviteMsg" class="sub"></p>
       </div>
-      <div id="yokaiInfo" class="lb-preview"></div>
       <ul id="plist" class="plist"></ul>
-      <div id="bossPick" class="boss-pick"></div>
-      <button id="btnStart" class="big">鬼の世界へ！</button>
-      <span id="waitMsg" class="sub wait">ホストの開始を待っています…</span>
       <p id="lobbyMsg" class="lobby-msg" hidden></p>
+      <div class="lb-bar">
+        <button id="btnPick" class="lb-b">🔄 妖怪を変更</button>
+        <button id="btnReady" class="lb-b ready">✅ 出撃妖怪を確定</button>
+        <button id="btnBoss" class="lb-b boss"></button>
+        <button id="btnStart" class="lb-b go">鬼の世界へ！</button>
+        <span id="waitMsg" class="sub wait">ホストの出撃を待っています…</span>
+      </div>
     </div>
-    <div class="lb-right">
-      <div id="friendTabs" class="tabs"></div>
-      <div id="friends" class="friends"></div>
+    <!-- 妖怪を変更（出撃妖怪を選ぶ） -->
+    <div id="pickPanel" class="lb-panel" hidden>
+      <div class="lb-pick-l">
+        <div id="yokaiInfo" class="lb-preview"></div>
+        <button id="btnPickDone" class="big">この妖怪にする</button>
+      </div>
+      <div class="lb-right">
+        <div id="friendTabs" class="tabs"></div>
+        <div id="friends" class="friends"></div>
+      </div>
+    </div>
+    <!-- 鬼を選ぶ（ホスト） -->
+    <div id="bossPanel" class="lb-panel boss-panel" hidden>
+      <div class="ov-head"><h2>👹 鬼を選ぶ</h2><button id="btnBossDone" class="small">✕ とじる</button></div>
+      <div id="bossPick" class="boss-pick"></div>
     </div>
   </section>
 

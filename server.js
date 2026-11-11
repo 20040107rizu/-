@@ -355,7 +355,7 @@ class Room {
   lobbyInfo() {
     return {
       t: 'lobby', code: this.code, state: this.state, boss: this.bossSel, challenge: this.challengeOn, week: S.weekIndex(),
-      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined, gw: this.state === 'result' && !p.viewed && !p.away ? 1 : undefined })), // gw: まだガチャ中
+      players: [...this.players.values()].map(p => ({ id: p.id, name: p.name, yokai: p.yokai, host: p.host, totsu: p.totsu, lv: p.lv, cs: p.charmList.length ? p.charmList : undefined, title: p.title, away: !!p.away || undefined, ok: p.ready || !p.rdy || undefined, gw: this.state === 'result' && !p.viewed && !p.away ? 1 : undefined })), // gw: まだガチャ中
     };
   }
 
@@ -2008,12 +2008,16 @@ wss.on('connection', ws => {
         pid = cleanPid(msg.pid);
         if (pid) touchPlayer(pid, msg.name, msg.yokai);
         me = room.addPlayer(ws, msg.name, msg.yokai, pid, msg.totsu, msg.title, msg.lv, msg.ch, msg.cs);
+        me.lastYk = me.yokai; me.rdy = !!msg.rdy; // 新しいロビー（出撃妖怪の確定）に対応している端末か。古い端末の人は確定ずみとして扱う
         send({ t: 'welcome', id: me.id });
         room.broadcast(room.lobbyInfo());
         break;
       }
       case 'yokai':
-        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.charm = cleanCharm(msg.ch); me.charmList = cleanCharmList(msg.cs); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
+        if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.charm = cleanCharm(msg.ch); me.charmList = cleanCharmList(msg.cs); me.title = cleanTitle(msg.title); if (msg.id !== me.lastYk) me.ready = false; me.lastYk = msg.id; room.broadcast(room.lobbyInfo()); }
+        break;
+      case 'ready': // 出撃妖怪を確定する／取り消す
+        if (room && me && room.state === 'lobby') { me.ready = !!msg.on; room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
         if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret && (!S.BOSSES[msg.type].event || S.EVENT.active() || process.env.EVENT_TEST)) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
@@ -2029,6 +2033,8 @@ wss.on('connection', ws => {
             room.broadcast({ t: 'lobbyMsg', msg: '今週のチャレンジは「ヒーラー禁止」！ ヒーラーの妖怪を連れている人がいます' });
             break;
           }
+          if ([...room.players.values()].some(p => p.rdy && !p.ready && !p.away)) { send({ t: 'lobbyMsg', msg: 'まだ出撃妖怪を確定していない人がいます' }); break; }
+          for (const p of room.players.values()) p.ready = false; // 次にロビーにもどったら、また確定から
           room.start();
           room.broadcast(room.lobbyInfo());
         }

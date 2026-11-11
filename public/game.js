@@ -1424,7 +1424,7 @@
     ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     watcher = first.t === 'watch';
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), lv: myLv(), ch: myCharm(), cs: myCharmList(), title: myTitle, zip: CAN_ZIP ? 1 : undefined });
+    ws.onopen = () => send({ ...first, name, yokai: selYokai, pid, totsu: myTotsu(), lv: myLv(), ch: myCharm(), cs: myCharmList(), title: myTitle, zip: CAN_ZIP ? 1 : undefined, rdy: 1 });
     // 圧縮されたメッセージ（バイナリ）は戻してから読む。順番が入れかわらないように、1つずつ順に処理する
     let rx = Promise.resolve();
     ws.onmessage = e => {
@@ -1622,8 +1622,12 @@
         const y = S.YOKAI_BY_ID[p.yokai];
         if (p.id === myId) li.className = 'me';
         li.onclick = () => showMember(p); // タップでくわしく
-        li.innerHTML = `${faceImg(y)}${totsuTag(p.totsu)}${p.lv > 1 ? `<span class="plv">Lv${p.lv}</span>` : ''}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b>${p.title ? `<span class="rtitle">${titleTag(p.title)}</span>` : ''}<span style="color:${S.RANKS[y.rank].color}">${y.god ? '神' : y.legend ? 'L' : y.rank} ${y.name}</span>${p.away ? '<small class="away">📡 つなぎ直し中…</small>' : ''}</div>`;
-      } else { li.className = 'empty'; li.textContent = 'あき'; }
+        if (p.ok) li.classList.add('ok');
+        const rk = y.god ? 'G' : y.legend ? 'L' : y.rank;
+        li.innerHTML = `${faceImg(y)}<div class="pinfo"><b>${nameTag(p.name, p.title)}${p.host ? '👑' : ''}</b><span class="pyk" style="color:${(S.RANKS[rk] || S.RANKS[y.rank]).color}">${y.god ? '神' : rk} ${y.name}</span>`
+          + `<div class="pbd"><span class="plv">Lv${p.lv || 1}</span>${totsuTag(p.totsu)}</div>${p.title ? `<span class="rtitle">${titleTag(p.title, 'm')}</span>` : ''}${p.away ? '<small class="away">📡 つなぎ直し中…</small>' : ''}</div>`
+          + `<span class="pok">${p.ok ? '✅ 出撃OK' : '⏳ 選んでいます…'}</span>`;
+      } else { li.className = 'empty'; li.innerHTML = '<span>あき</span><small>招待でフレンドを呼ぼう</small>'; }
       ul.appendChild(li);
     }
     requestAnimationFrame(fitTitles);
@@ -1636,9 +1640,24 @@
       send({ t: 'boss', type: ok[ok.length - 1] });
     }
     renderBossPick(isHost);
+    // 下のボタン: 妖怪を変更・出撃妖怪を確定・鬼を選ぶ・出撃（全員が確定したらホストが押せる）
+    const okN = lobby.players.filter(p => p.ok).length, all = okN === lobby.players.length, mine = me && me.ok;
+    $('btnReady').classList.toggle('on', !!mine);
+    $('btnReady').innerHTML = mine ? '✅ 確定ずみ<small>（タップで取り消す）</small>' : '✅ 出撃妖怪を確定';
+    const bk = lobby.challenge ? '🎯 今週のチャレンジ' : S.BOSSES[lobby.boss] ? S.BOSSES[lobby.boss].name : '？';
+    $('btnBoss').innerHTML = `👹 ${isHost ? '鬼を選ぶ' : '戦う鬼'}<small>${esc(bk)}</small>`;
+    $('btnBoss').disabled = !isHost;
     $('btnStart').style.display = isHost ? '' : 'none';
+    $('btnStart').disabled = !all;
+    $('btnStart').innerHTML = all ? '⚔️ 出撃！' : `出撃<small>確定 ${okN}/${lobby.players.length}人</small>`;
     $('waitMsg').style.display = isHost ? 'none' : '';
+    $('waitMsg').textContent = all ? 'ホストの出撃を待っています…' : `みんなの確定を待っています（${okN}/${lobby.players.length}）`;
   }
+  $('btnPick').onclick = () => { $('pickPanel').hidden = false; renderFriends(); };
+  $('btnPickDone').onclick = () => { $('pickPanel').hidden = true; };
+  $('btnReady').onclick = () => { const me = lobby && lobby.players.find(p => p.id === myId); send({ t: 'ready', on: !(me && me.ok) }); };
+  $('btnBoss').onclick = () => { $('bossPanel').hidden = false; const on = $('bossPick').querySelector('.boss-card.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' }); };
+  $('btnBossDone').onclick = () => { $('bossPanel').hidden = true; };
 
   function renderBossPick(isHost) {
     const evOn = S.EVENT.active();
@@ -1656,7 +1675,7 @@
       $('bossPick').innerHTML += `<button class="boss-card challenge${lobby.challenge ? ' on' : ''}" data-ch="1" ${isHost ? '' : 'disabled'}><span class="bname">🎯</span><small>今週のチャレンジ</small></button>`;
       if (lobby.challenge) for (const el of $('bossPick').querySelectorAll('.boss-card:not(.challenge)')) el.classList.remove('on');
     }
-    for (const el of $('bossPick').querySelectorAll('button')) el.onclick = () => (el.dataset.ch ? send({ t: 'challenge', on: !lobby.challenge }) : send({ t: 'boss', type: el.dataset.k }));
+    for (const el of $('bossPick').querySelectorAll('button')) el.onclick = () => { if (el.dataset.ch) send({ t: 'challenge', on: !lobby.challenge }); else send({ t: 'boss', type: el.dataset.k }); setTimeout(() => { $('bossPanel').hidden = true; }, 350); };
     $('lobbyMsg').hidden = !lobby.challenge;
     if (lobby.challenge) $('lobbyMsg').textContent = `🎯 ${th.name}　しばり：${th.ruleName}（記録はランキングに入ります）`;
   }

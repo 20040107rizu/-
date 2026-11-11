@@ -884,3 +884,40 @@ html.art-ui .g10s-skip { background: #0008; background-image: none; border: 1px 
 .plist li .pinfo > span { font-size: 10.5px; }
 .member-pop { z-index: 90; position: fixed; }
 .member-pop .mp-title { margin: 1px 0; }
+/* ===== ロビー（4分割の参加者カード＋下のボタン） ===== */
+#lobby .lb-left { width: 100%; flex: 1; }
+#lobby .plist { flex: 1; min-height: 0; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; }
+#lobby .plist li { height: auto; min-height: 0; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; padding: 6px 12px; font-size: 12px; background: #2a1840e8; border: 2px solid #ffffff1a; overflow: hidden; }
+#lobby .plist li.me { border-color: #ffe36b; }
+#lobby .plist li.ok { box-shadow: inset 0 0 0 2px #5ae07a88, 0 0 12px #5ae07a44; }
+#lobby .plist li .face { width: min(38%, 24vh, 130px); height: auto; aspect-ratio: 1; border-radius: 12px; filter: drop-shadow(0 4px 6px #000a); }
+#lobby .plist li .pinfo { flex: 1; min-width: 0; align-items: flex-start; gap: 4px; padding: 0; }
+#lobby .plist li .pinfo > * { white-space: nowrap; max-width: 100%; }
+#lobby .plist li b { font-size: clamp(13px, 4vh, 18px); }
+#lobby .plist li .pyk { font-size: clamp(11px, 3.2vh, 14px); font-weight: bold; }
+#lobby .plist li .pbd { display: flex; gap: 5px; align-items: center; overflow: visible; }
+#lobby .plist li .plv, #lobby .plist li .totsu { position: static; font-size: 11px; font-weight: bold; color: #fff; background: #1a5a8a; border: 1px solid #7ad8ff; border-radius: 8px; padding: 1px 7px; }
+#lobby .plist li .totsu { background: linear-gradient(#e85ad8, #9a1ab8); border-color: #ffb0f0; }
+#lobby .plist li .pinfo > .rtitle { width: 100%; transform-origin: left center; text-align: left; overflow: visible; }
+#lobby .plist li .pok { position: absolute; right: 8px; top: 6px; font-size: 11px; font-weight: bold; color: #ffe8b0; background: #0007; border-radius: 8px; padding: 1px 7px; }
+#lobby .plist li.ok .pok { color: #fff; background: #2a9a4ae0; }
+#lobby .plist li.empty { flex-direction: column; justify-content: center; font-size: 15px; }
+#lobby .plist li.empty small { display: block; font-size: 10px; opacity: .8; }
+.lb-bar { display: flex; gap: 6px; align-items: stretch; flex: none; }
+.lb-b { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: clamp(12px, 3.6vh, 16px); font-weight: bold; padding: 6px 4px; border-radius: 14px; border: 2px solid #ffd23a; color: #fff; background: linear-gradient(#a24ae8, #5a1a9a); text-shadow: 0 1px 2px #000; line-height: 1.2; }
+html.art-ui .lb-b { background-image: linear-gradient(#a24ae8, #5a1a9a); }
+.lb-b small { font-size: 10px; font-weight: normal; opacity: .9; }
+.lb-b.ready, html.art-ui .lb-b.ready { background-image: linear-gradient(#3ac87a, #1a7a3a); }
+.lb-b.ready.on, html.art-ui .lb-b.ready.on { background-image: linear-gradient(#2a6a3a, #1a3a22); border-color: #7dff9a; }
+.lb-b.boss, html.art-ui .lb-b.boss { background-image: linear-gradient(#c8241a, #6a0a1a); }
+.lb-b.go, html.art-ui .lb-b.go { flex: 1.3; background-image: linear-gradient(#ffb03a, #e8461a); font-size: clamp(14px, 4.4vh, 20px); }
+.lb-b:disabled { filter: grayscale(.6) brightness(.7); }
+.lb-b.boss:disabled { filter: none; opacity: .9; }
+#lobby .wait { flex: 1.3; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; }
+.lb-panel { position: absolute; inset: 0; z-index: 30; display: flex; gap: 10px; padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); background: #0b0514f2; }
+html.art-ui .lb-panel { background: linear-gradient(#0b0514e0, #0b0514f2), var(--art-bg-lobby) center/cover no-repeat; }
+.lb-panel[hidden] { display: none; }
+.lb-pick-l { width: min(44%, 330px); flex: none; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.boss-panel { flex-direction: column; align-items: center; justify-content: center; }
+.boss-panel .boss-pick { flex-wrap: wrap; justify-content: center; overflow-y: auto; max-width: 860px; gap: 8px; }
+.boss-panel .boss-card { width: 112px; height: 82px; flex: none; }
