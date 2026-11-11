@@ -44,6 +44,7 @@
       <button id="btnBgm" class="small">🔊 BGM ON</button>
       <button id="btnHistory" class="small">📜 更新履歴</button>
       <button id="btnShop" class="small">🏅 交換所</button>
+      <button id="btnEvent" class="small ev-btn" hidden>🏮 百鬼祭</button>
       <button id="btnInstall" class="small install">📲 ホーム画面に追加</button>
     </div>
     <p id="err" class="err"></p>
@@ -246,6 +247,20 @@
     <h2>🎉 アップデートしました！</h2>
     <ul id="whatsNewList" class="notes"></ul>
     <div class="row"><button id="btnWhatsNewHistory" class="small alt">📜 これまでの更新</button><button id="btnWhatsNewClose" class="big">OK</button></div>
+  </section>
+
+  <!-- 期間限定イベント「月夜の百鬼祭」 -->
+  <section id="eventScreen" class="screen overlay">
+    <div class="ov-head"><h2>🏮 月夜の百鬼祭</h2><button id="btnEventClose" class="small">✕ とじる</button></div>
+    <div class="ev-wrap">
+      <div class="ev-left">
+        <div id="evHead" class="ev-head"></div>
+        <p class="ev-how">ボス選びの「祭りの鬼王」で遊ぶと、祭り提灯が集まる（町で拾う・見回り鬼をたおす・鬼王をたおす・脱出する）。<b>特攻妖怪</b>を使うと多くもらえて、ランクが低いほどたくさん！ 4人で遊ぶと +40%</p>
+        <div class="ev-sub">特攻妖怪</div>
+        <div id="evBoost" class="ev-boost"></div>
+      </div>
+      <div id="evRewards" class="ev-rewards"></div>
+    </div>
   </section>
 
   <!-- 鬼の塔の交換所（メダル） -->

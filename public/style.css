@@ -755,3 +755,25 @@ html.art-ui .gs-divine .gs-charabox::before { background-image: var(--sp-burst-d
 @keyframes tSpin { to { transform: rotate(360deg); } }
 @keyframes tTwinkle { 0%, 100% { opacity: 0; transform: scale(.3); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
 .my-id { display: block; font-size: 10px; opacity: .55; margin-top: 2px; user-select: text; -webkit-user-select: text; }
+/* イベント「百鬼祭」 */
+.ev-btn { background: linear-gradient(#ff6a2a, #c8241a) !important; border-image: none !important; border: 2px solid #ffd23a !important; border-radius: 10px !important; animation: evGlow 1.6s ease-in-out infinite; }
+@keyframes evGlow { 50% { box-shadow: 0 0 14px #ff8a1a; } }
+#eventScreen { z-index: 71; justify-content: flex-start; background: radial-gradient(circle at 50% 0%, #5a1a1a, #12060c 70%); }
+html.art-ui #eventScreen { background: linear-gradient(#2a0808c8, #0b0514f0), var(--art-gacha-bg) center/cover no-repeat; }
+.ev-wrap { display: flex; gap: 12px; width: 100%; max-width: 900px; flex: 1; min-height: 0; }
+.ev-left { flex: 1.1; min-width: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.ev-head { text-align: center; background: #ffffff10; border: 1px solid #ffb03a66; border-radius: 12px; padding: 6px; }
+.ev-pts { font-size: 26px; font-weight: bold; color: #ffb03a; text-shadow: 0 0 10px #ff6a1a; } .ev-pts small { font-size: 13px; }
+.ev-time { font-size: 12px; color: #ffd23a; } .ev-next { font-size: 12px; opacity: .85; }
+.ev-how { font-size: 11px; margin: 0; opacity: .85; line-height: 1.5; }
+.ev-sub { font-size: 12px; font-weight: bold; color: #ffb03a; }
+.ev-boost { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.ev-b { position: relative; background: #ffffff10; border-radius: 8px; text-align: center; padding: 2px; }
+.ev-b .face { width: 100%; height: 40px; object-fit: contain; } .ev-b span { display: block; font-size: 10px; font-weight: bold; color: #ffd23a; }
+.ev-b.no { opacity: .55; }
+.ev-rewards { flex: 1; min-width: 0; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 3px; padding-right: 4px; }
+.ev-r { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; background: #ffffff0d; font-size: 12px; }
+.ev-r b { width: 62px; flex: none; color: #ffb03a; text-align: right; } .ev-r span { flex: 1; } .ev-r i { color: #7dff9a; font-style: normal; font-weight: bold; }
+.ev-r.got { opacity: .55; }
+.boss-card.bk-matsuri { background: linear-gradient(135deg, #c8241a, #5a0a1a 60%, #ffb03a); border-color: #ffd23a; box-shadow: 0 0 12px #ff6a1a88; }
+.pboss.on.bk-matsuri { background: #c8241a; color: #fff; border: 1px solid #ffd23a; }

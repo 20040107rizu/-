@@ -156,6 +156,8 @@
     { id: 'flawless', name: '無傷の英雄', color: '#9ad8ff', feat: 'flawless', fx: 'bolt',    plate: 'bolt',    emblem: 'flawless', desc: '金鬼から先のボス鬼を、1回もダメージを受けずにたおす' },
     { id: 'charm10',  name: 'お守り蒐集家', color: '#ff9ae8', feat: 'charm10', fx: 'rainbow', plate: 'rainbow', emblem: 'legend',  desc: '虹のお守りを10個持つ' },
     // 特別な称号（ふつうには手に入らない）
+    { id: 'matsuri1', name: '百鬼祭の主', color: '#ff8a3a', feat: 'matsuri1', fx: 'fire', plate: 'fire', emblem: 'orb', hidden: true, desc: 'イベント「月夜の百鬼祭」で祭り提灯を10,000個集める（期間限定）' },
+    { id: 'matsuri2', name: '百鬼祭の覇王', color: '#ffd23a', feat: 'matsuri2', fx: 'creator', plate: 'gold', emblem: 'orb', hidden: true, desc: 'イベント「月夜の百鬼祭」で祭り提灯を100,000個集める（期間限定）' },
     { id: 'creator',  name: '鬼バスターズの創造主', color: '#ffd23a', feat: 'creator', fx: 'creator', plate: 'creator', emblem: 'creator', hidden: true, desc: 'このゲームを作った人' },
   ];
   const TITLE_BY_ID = Object.fromEntries(TITLES.map(t => [t.id, t]));
@@ -344,6 +346,7 @@
     hyakki: { name: '百鬼王', color: '#5a1a8a', hp: 5.5, dmg: 3.0, atkGap: 0.42, warn: 0.72, drop: 400, need: 'gokuou', team: true, hidden: true, time: 480,
               rush: ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin'], rushHp: 1 / 3 }, // 7体を体力1/3で倒すと百鬼王が降ってくる
     shin:   { name: '鬼神・真', color: '#2a0014', hp: 5.5, dmg: 3.1, atkGap: 0.4, warn: 0.7, drop: 400, team: true, hidden: true, secret: true }, // 選べない（鬼神から覚醒する）
+    matsuri: { name: '祭りの鬼王', color: '#ff5a3a', hp: 3.6, dmg: 2.2, atkGap: 0.52, warn: 0.8, drop: 250, need: null, team: true, event: true }, // 期間限定イベント「百鬼祭」のボス（期間中だけ選べる）
     tower:  { name: '鬼の塔', color: '#c8a0ff', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 0, need: 'kishin', team: true, tower: true }, // 1階ずつボスを倒して登る（毎回1階から・終わりなし）
     sanki:  { name: '三鬼合戦', color: '#ff2a6a', hp: 1, dmg: 1, atkGap: 0.42, warn: 0.72, drop: 600, need: 'amanojaku', team: true, sanki: true, time: 420 }, // ボス鬼3体が同時に出る（超高難易度）
   };
@@ -392,12 +395,41 @@
       { id: 'special', name: 'スペシャルガチャチケット', price: 1200 },
     ],
   };
-  // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%
+  // ---------- 期間限定イベント「百鬼祭」 ----------
+  // 祭りの鬼王のバトルで「祭り提灯」を集める。特攻妖怪（ランクが低いほど％が高い）とチームの人数で倍率がつく
+  const EVENT = {
+    id: 'matsuri2611', name: '月夜の百鬼祭', boss: 'matsuri',
+    start: Date.UTC(2026, 10, 11, 3, 0), end: Date.UTC(2026, 10, 18, 3, 0), // 11/11 12:00 〜 11/18 12:00（日本時間）
+    // 特攻妖怪（C +150%・B +100%・A +70%・S +50%・L +30%）
+    boost: { chochin: 1.5, mamedanuki: 1.5, kogitsune: 1.5, sunekosuri: 1.5, hitodama: 1.5,
+      chouchin2: 1.0, taiko: 1.0, kitsunemen: 1.0, nekomusume: 1.0, kijimuna: 1.0,
+      kitsunebi: 0.7, oni_child: 0.7, hannya: 0.7, kasha: 0.7,
+      tamamo: 0.5, houou: 0.5, shuten: 0.5, amaterasu: 0.5,
+      ura: 0.3, nurarihyon: 0.3 },
+    team: [0, 0, 0.1, 0.2, 0.4], // チームの人数ごと（1人 +0%・2人 +10%・3人 +20%・4人 +40%）
+    get: { pick: 1, patrol: 2, boss: 60, escape: 20 },
+    // ごほうび（届くたびにもらえる）。k: exp / ticket(gold,black,special,matsuri,legendSure,godSure) / charm(レア度) / frag / title
+    rewards: [
+      [200, [['exp', 5000]]], [500, [['ticket', 'gold']]], [1000, [['charm', 3]]], [2000, [['ticket', 'special']]], [3000, [['ticket', 'black']]],
+      [4500, [['ticket', 'matsuri']]], [6000, [['charm', 4], ['exp', 30000]]], [8000, [['ticket', 'matsuri']]], [10000, [['title', 'matsuri1']]],
+      [13000, [['ticket', 'matsuri', 2]]], [16000, [['ticket', 'special', 3]]], [20000, [['ticket', 'matsuri', 3]]], [25000, [['frag', 10]]],
+      [30000, [['ticket', 'matsuri', 5]]], [40000, [['ticket', 'legendSure']]], [50000, [['ticket', 'matsuri', 5], ['exp', 100000]]],
+      [60000, [['ticket', 'special', 5]]], [70000, [['frag', 20]]], [80000, [['ticket', 'legendSure']]], [90000, [['ticket', 'matsuri', 8]]],
+      [100000, [['ticket', 'godSure'], ['title', 'matsuri2']]],
+    ],
+    every: 5000, // 100,000 から先は 5,000 ごとに祭りガチャ ×1
+    active(now = Date.now()) { return now >= EVENT.start && now < EVENT.end; },
+    mul(yokai, n) { return 1 + (EVENT.boost[yokai] || 0) + (EVENT.team[Math.min(4, n)] || 0); },
+  };
+  // スペシャルガチャ: S 96.9%・レジェンド 3%・神 0.1%（祭りガチャ: S 90%・レジェンド 9%・神 1%）
   const SPECIAL_ODDS = { god: 0.001, legend: 0.03 };
-  function rollSpecial(rnd = Math.random) {
+  const MATSURI_ODDS = { god: 0.01, legend: 0.09 };
+  function rollSpecial(rnd = Math.random, odds = SPECIAL_ODDS) {
+    if (odds === 'legend') return { kind: 'legend', y: LEGENDS[Math.floor(rnd() * LEGENDS.length)] };
+    if (odds === 'god') return { kind: 'god', y: GODS[Math.floor(rnd() * GODS.length)] };
     const x = rnd();
-    if (x < SPECIAL_ODDS.god) return { kind: 'god', y: GODS[Math.floor(rnd() * GODS.length)] };
-    if (x < SPECIAL_ODDS.god + SPECIAL_ODDS.legend) return { kind: 'legend', y: LEGENDS[Math.floor(rnd() * LEGENDS.length)] };
+    if (x < odds.god) return { kind: 'god', y: GODS[Math.floor(rnd() * GODS.length)] };
+    if (x < odds.god + odds.legend) return { kind: 'legend', y: LEGENDS[Math.floor(rnd() * LEGENDS.length)] };
     const pool = YOKAI.filter(y => y.rank === 'S');
     return { kind: 'S', y: pool[Math.floor(rnd() * pool.length)] };
   }
@@ -414,8 +446,8 @@
     return { r, s };
   }
   // BOSS_ORDER はセーブ（倒したボスのビット）の並び。新しいボスは必ず末尾に足す。ボス選びの並びは BOSS_LIST
-  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'sanki', 'tower'];
-  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki', 'sanki', 'tower'];
+  const BOSS_ORDER = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'gokuou', 'hyakki', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'sanki', 'tower', 'matsuri'];
+  const BOSS_LIST = ['red', 'blue', 'black', 'gold', 'white', 'fuurai', 'kishin', 'yakubyo', 'kage', 'nue', 'twin', 'kyubi', 'toki', 'gasha', 'amanojaku', 'gokuou', 'hyakki', 'sanki', 'tower', 'matsuri'];
   const BOSSES_N = Object.fromEntries(Object.entries(BOSSES).map(([k, b]) => [k, b.name]));
   // cleared: { red: true, ... } 倒したことのある鬼
   function bossUnlocked(type, cleared) {
@@ -579,5 +611,5 @@
     return true;
   }
 
-  return { TOWER, rollSpecial, makeCharm, SPECIAL_ODDS, CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, PICK_ANY, PICK_COPIES, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
+  return { EVENT, MATSURI_ODDS, TOWER, rollSpecial, makeCharm, SPECIAL_ODDS, CHARM_SKILLS, CHARM_RARITY, CHARM_MAX, charmOdds, rollCharm, charmEffects, charmName, charmText, RANKS, ROLES, YOKAI, LEGENDS, GODS, GOD_FRAG, SEAL, legendTotsu, TRIALS, trialDone, sealProgress, sealDrop, YOKAI_BY_ID, yokaiStats, LV_MAX, LV_STEP, EXP_MUL, SEAL_PICK, PICK_ANY, PICK_COPIES, expForLv, lvOf, BALLS, ballOdds, rollBall, TOTSU_MAX, TOTSU_STEP, totsuOf, FULL_COUNT, OVER_EXP, TITLES, TITLE_BY_ID, titleProgress, weekIndex, weekStart, WEEK_MS, themeOf, fmtScore, weeklyReward, weeklyTitle, BOSSES, BOSS_ORDER, BOSS_LIST, bossUnlocked, STAGES, STAGE_KEYS, pickStage, ITEMS, MAP_W, MAP_H, CELL, generateCity, collide, lineOfSight, isFree, rng };
 });

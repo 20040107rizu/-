@@ -417,7 +417,7 @@ class Room {
         hp: Math.round(st.hp * (1 + (p.charm.hp || 0))), maxHp: Math.round(st.hp * (1 + (p.charm.hp || 0))), ch: p.charm, atkT: 0, // お守り: 体力
         strongT: 0, down: false, reviveProg: 0, escaped: false,
         shieldT: 0, dashT: 0, dashDir: 0, invulT: 0, stamina: STAMINA_MAX, exhausted: false, staminaT: 0, invisT: 0,
-        item: null, dama: 0, dmgDealt: 0, prevItem: true, escProg: 0,
+        item: null, dama: 0, lan: 0, dmgDealt: 0, prevItem: true, escProg: 0,
         skillT: 0, atkUpT: 0, spdUpT: 0, leap: null, flurry: null, comboN: 0, dodge: false, jump: 0,
         spotted: false, revives: 0, kills: 0, bossDmg: 0, // ランキング用の記録
         seenByPatrol: false, atKill: null, judge: null, // レジェンドの試練用（見回り鬼に見つかったか・ボスを倒した瞬間の様子）
@@ -444,6 +444,9 @@ class Room {
     for (const d of this.dama) { d.x += rand(-15, 15); d.y += rand(-15, 15); }
     // 取られた鬼玉は、少しずつ別の場所に湧き直す（街に出ている数はこの上限まで）
     this.damaCap = damaCount;
+    // イベント「百鬼祭」: 祭りの鬼王のバトルだけ、町に祭り提灯が落ちている
+    this.lans = []; this.lanOn = (process.env.TEST_BOSS || this.bossSel) === S.EVENT.boss && !this.challenge && (S.EVENT.active() || !!process.env.EVENT_TEST); this.lanT = 0;
+    if (this.lanOn) for (let k = 0; k < 40; k++) this.lans.push({ id: genId(), ...this.gridS.randomFreePoint() });
     this.damaRespawnT = DAMA_RESPAWN;
 
     // アイテム
@@ -458,6 +461,7 @@ class Room {
 
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
+    if (S.BOSSES[this.bossSel] && S.BOSSES[this.bossSel].event && !S.EVENT.active() && !process.env.EVENT_TEST) this.bossSel = 'red'; // イベントが終わっていたら
     const type = process.env.TEST_BOSS || (this.challenge ? this.challenge.boss : this.bossSel);
     const kind = S.BOSSES[type];
     if (kind.time && !this.challenge) { this.timeLimit = kind.time; this.timeLeft = kind.time; } // 隠しボスは制限時間が長い
@@ -503,6 +507,7 @@ class Room {
     this.broadcast({
       t: 'start', seed, stage: this.stage, timeLimit: this.timeLimit, challenge: !!this.challenge, fusuma: this.fusuma, boss: type, movie: INTRO_MOVIE, countdown: COUNTDOWN, sanki: this.oni3 ? this.oni3.map(b => b.type) : undefined, tower: this.tower ? { f: 1, boss: this.boss.type, mods: this.tower.mods } : undefined,
       dama: this.dama.map(d => ({ id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: d.v, b: d.b })),
+      lans: this.lanOn ? this.lans.map(l => ({ id: l.id, x: Math.round(l.x), y: Math.round(l.y) })) : undefined,
     });
   }
 
@@ -721,6 +726,7 @@ class Room {
     if (src && src.passive === 'godArmor') this.makeMinion(src, e); // オニガミ: 倒した見回り鬼も手下になる
     if (src && src.passive === 'kuniumi') this.zones.push({ id: genId(), owner: src.id, x: e.x, y: e.y, r: 120, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#fff2a0' }); // イザナギ: 国生み（回復の島）
     this.calmPatrol(e); // 伝達はここで途切れる
+    if (this.lanOn && src) src.lan += S.EVENT.get.patrol; // 祭り提灯
     this.dropDama(e.x, e.y, this.patrolDrop() + Math.floor(Math.random() * 3)); // 強いボスの戦いほど多い（赤鬼 3〜5個 … 天邪鬼 9〜11個）
     e.respawnT = 25;
   }
@@ -1502,6 +1508,9 @@ class Room {
         this.events.push({ k: 'dg', id: d.id, by: p.id, v: d.v });
       }
     }
+    if (this.lanOn) for (const l of this.lans) { // 祭り提灯
+      if (!l.taken && Math.hypot(l.x - p.x, l.y - p.y) < 34) { l.taken = true; p.lan += S.EVENT.get.pick; this.events.push({ k: 'lg', id: l.id, by: p.id }); }
+    }
     if (!p.item) {
       for (const it of this.items) {
         if (!it.taken && Math.hypot(it.x - p.x, it.y - p.y) < 34) {
@@ -1573,6 +1582,10 @@ class Room {
         this.dama.push(d);
         this.events.push({ k: 'da', id: d.id, x: Math.round(d.x), y: Math.round(d.y), v: 1 });
       }
+    }
+    if (this.lanOn && (this.lanT -= DT) <= 0) { // 取られた提灯は少しずつ湧き直す
+      this.lanT = 3; this.lans = this.lans.filter(l => !l.taken);
+      if (this.lans.length < 40) { const near = [...this.players.values()].filter(p => !p.escaped); const l = { id: genId(), ...this.farFromAll(this.gridS, near, 400) }; this.lans.push(l); this.events.push({ k: 'la', id: l.id, x: Math.round(l.x), y: Math.round(l.y) }); }
     }
     this.itemRespawnT -= DT;
     if (this.itemRespawnT <= 0) { this.itemRespawnT = 40; if (this.items.length < this.itemCap) this.spawnItem(); }
@@ -1730,7 +1743,9 @@ class Room {
     this.state = 'result';
     // ガチャ（または経験値）は、みんなで集めた鬼玉の合計そのままで引く
     const team = [...this.players.values()].reduce((a, p) => a + p.dama, 0);
+    const lanN = this.players.size, lanBoss = this.lanOn && this.mainDown;
     const players = [...this.players.values()].map(p => ({
+      lan: this.lanOn ? Math.round((p.lan + (p.escaped ? S.EVENT.get.escape : 0) + (lanBoss ? S.EVENT.get.boss : 0)) * S.EVENT.mul(p.yokai, lanN)) : undefined, // 祭り提灯（特攻・チームの倍率つき）
       id: p.id, name: p.name, yokai: p.yokai, escaped: p.escaped, dama: p.dama, dmg: Math.round(p.dmgDealt), hurt: Math.round(p.hurtSum || 0),
       // 脱出できなかった人も引けるが、その人だけ鬼玉が半分になる
       count: p.escaped ? team : Math.floor(team / 2),
@@ -1837,7 +1852,7 @@ class Room {
       players: [...this.players.values()].map(p => ({
         id: p.id, name: p.name, yokai: p.yokai, x: Math.round(p.x), y: Math.round(p.y), face: +p.face.toFixed(2),
         hp: Math.round(p.hp), maxHp: p.maxHp, down: p.down, rv: +(p.reviveProg / REVIVE_TIME).toFixed(2), esc: p.escaped,
-        dama: p.dama, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
+        dama: p.dama, ln: this.lanOn ? p.lan : undefined, item: p.item, ep: +(p.escProg / ESCAPE_TIME).toFixed(2), stam: Math.round(p.stamina), exh: p.exhausted, inf: p.staminaT > 0, invis: p.invisT > 0,
         sh: p.shieldT > 0, dash: p.dashT > 0, run: p.dashing, atkCd: +(p.atkT / A.NORMAL[A.of(p.yokai).normal].cd).toFixed(2), stCd: +(p.strongT / A.STRONG[A.of(p.yokai).strong].cd).toFixed(2),
         skCd: +(p.skillT / A.SKILL[S.YOKAI_BY_ID[p.yokai].role].cd).toFixed(2), au: p.atkUpT > 0, su: p.spdUpT > 0, ult: p.legend ? Math.floor(p.ult) : -1, jd: p.judge ? { k: p.judge.k, t: Math.ceil(p.judge.t), w: p.judge.warn > 0 || undefined } : undefined, nyoi: p.nyoi && p.nyoiA != null ? +p.nyoiA.toFixed(2) : undefined, /* なぎはらい中だけ（前のバトルの向きが残っていても出さない） */ nk: p.nyoi && p.nyoi.sweep ? 1 : undefined, jump: p.fly ? 0.5 : +(p.jump || 0).toFixed(2), fly: p.fly || undefined, rev: p.revT > 0 || undefined, charm: p.charmT > 0 || undefined, curse: p.curseT > 0 || undefined, crit: p.critT > 0 || undefined, dodge: !!p.dodge, sl: p.slowT > 0 || undefined, fz: p.frozenT > 0 || undefined, dk: p.darkT > 0 || undefined,
       })),
@@ -1989,7 +2004,7 @@ wss.on('connection', ws => {
         if (room && me && room.state === 'lobby' && usableYokai(msg.id)) { me.yokai = msg.id; me.totsu = cleanTotsu(msg.totsu); me.lv = cleanLv(msg.lv); me.charm = cleanCharm(msg.ch); me.charmList = cleanCharmList(msg.cs); me.title = cleanTitle(msg.title); room.broadcast(room.lobbyInfo()); }
         break;
       case 'boss':
-        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
+        if (room && me && me.host && room.state === 'lobby' && S.BOSSES[msg.type] && !S.BOSSES[msg.type].secret && (!S.BOSSES[msg.type].event || S.EVENT.active() || process.env.EVENT_TEST)) { room.bossSel = msg.type; room.challengeOn = false; room.broadcast(room.lobbyInfo()); }
         break;
       case 'challenge':
         if (room && me && me.host && room.state === 'lobby') { room.challengeOn = !!msg.on && S.themeOf(S.weekIndex()).key === 'challenge'; room.broadcast(room.lobbyInfo()); }
