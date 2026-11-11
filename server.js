@@ -447,13 +447,13 @@ class Room {
 
     // 鬼玉
     this.dama = [];
-    const damaCount = 60 + 20 * n;
+    // イベント「百鬼祭」: 祭りの鬼王のバトルだけ、集めた鬼玉がそのまま祭り提灯になる（町に提灯は落ちていない）
+    this.lans = []; this.lanOn = (process.env.TEST_BOSS || this.bossSel) === S.EVENT.boss && !this.challenge && (S.EVENT.active() || !!process.env.EVENT_TEST);
+    const damaCount = (60 + 20 * n) * (this.lanOn ? 2 : 1); // イベントは町の提灯（鬼玉）が2倍
     for (let k = 0; k < damaCount; k++) this.dama.push({ id: genId(), v: 1, ...this.gridS.randomFreePoint() });
     for (const d of this.dama) { d.x += rand(-15, 15); d.y += rand(-15, 15); }
     // 取られた鬼玉は、少しずつ別の場所に湧き直す（街に出ている数はこの上限まで）
     this.damaCap = damaCount;
-    // イベント「百鬼祭」: 祭りの鬼王のバトルだけ、集めた鬼玉がそのまま祭り提灯になる（町に提灯は落ちていない）
-    this.lans = []; this.lanOn = (process.env.TEST_BOSS || this.bossSel) === S.EVENT.boss && !this.challenge && (S.EVENT.active() || !!process.env.EVENT_TEST);
     this.damaRespawnT = DAMA_RESPAWN;
 
     // アイテム
@@ -464,7 +464,7 @@ class Room {
 
     // 見回り鬼
     this.patrols = [];
-    for (let k = 0; k < 12 + 2 * n; k++) this.spawnPatrol(spawns);
+    for (let k = 0; k < (12 + 2 * n) * (this.lanOn ? 1.5 : 1); k++) this.spawnPatrol(spawns); // イベントは見回り鬼が1.5倍
 
     // ボス鬼
     const bp = this.farFromAll(this.gridB, spawns, 1800);
@@ -639,6 +639,7 @@ class Room {
 
   // 鬼玉を落とす（v はその玉1個の価値。ボス鬼は v の大きい「どデカい鬼玉」1個）
   dropDama(x, y, n, v = 1, b) {
+    if (this.lanOn) { if (v > 1) v = Math.round(v * 2); else n *= 2; } // イベント: 鬼が落とす提灯は2倍
     for (let k = 0; k < n; k++) {
       const d = { id: genId(), x: x + rand(-40, 40), y: y + rand(-40, 40), v, b }; // b: 落としたボス鬼（どデカい鬼玉の色）
       S.collide(this.map, d, v > 1 ? 30 : 10);
@@ -736,7 +737,7 @@ class Room {
     if (src && src.passive === 'kuniumi') this.zones.push({ id: genId(), owner: src.id, x: e.x, y: e.y, r: 120, life: 5, tick: 0, amt: 8, every: 0.5, kind: 'heal', c: '#fff2a0' }); // イザナギ: 国生み（回復の島）
     this.calmPatrol(e); // 伝達はここで途切れる
     this.dropDama(e.x, e.y, this.patrolDrop() + Math.floor(Math.random() * 3)); // 強いボスの戦いほど多い（赤鬼 3〜5個 … 天邪鬼 9〜11個）
-    e.respawnT = 25;
+    e.respawnT = this.lanOn ? 15 : 25; // イベントは見回り鬼の再出現も早い
   }
 
   canSee(e, p, range, halfAngle) {
@@ -1580,7 +1581,7 @@ class Room {
     this.dama = this.dama.filter(d => !d.taken);
     this.damaRespawnT -= DT;
     if (this.damaRespawnT <= 0) {
-      this.damaRespawnT = DAMA_RESPAWN;
+      this.damaRespawnT = this.lanOn ? DAMA_RESPAWN / 2 : DAMA_RESPAWN; // イベントは湧き直しも2倍の速さ
       if (this.dama.filter(d => d.v === 1).length < this.damaCap) {
         // 誰かのすぐ近くには湧かない
         const near = [...this.players.values()].filter(p => !p.escaped);
