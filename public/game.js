@@ -1740,7 +1740,7 @@
         if (why) result.towerNotes.push(`倍率 ${x.m}倍 ＝ 1 ＋ ${why}`);
         result.towerNotes.push(ps.some(p => p.lx.bo) ? `🏮 合計 ${f(eventPts())}個` : `🏮 合計 ${f(eventPts())}個　💡 特攻妖怪を連れていくと +100%〜+200%！`);
       } else result.towerNotes.push(`🏮 祭り提灯 +${f(mine.lan)}（合計 ${f(eventPts())}個）`);
-      for (const l of lines) result.towerNotes.push('🏮 ' + l);
+      if (lines.length) result.towerNotes.push('🎁 ' + lines.map(l => l.replace('個のごほうび：', '個：')).join('　／　')); // 届いたごほうびは1つにまとめる
     }
     // 三鬼合戦のごほうび（毎回）: 倒した数に応じて。3体ぜんぶ倒すと豪華
     if (mine && result.sanki && result.sanki.down > 0) {
